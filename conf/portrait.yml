@@ -1,0 +1,90 @@
+EXPERIMENT_NAME: 'PortraitMatting'
+
+## DATASET
+DATASET:
+  NAME: 'Portrait'
+  CLASS: 'src.datasets.Portrait.PortraitDataset'
+  DICTIONARY: 'conf/dicts/portrait_dict.yml'
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/portrait/train/images'
+    IMG_SUFFIX: '*.png'
+    INDICES: '/home/lmin/data/portrait/train.txt'
+    SHUFFLE: True
+    LABELS:
+      - NAME: "det"
+        DIR: '/home/lmin/data/portrait/train/anno'
+        SUFFIX: '.xml'
+      - NAME: "seg"
+        DIR: '/home/lmin/data/portrait/train/mask'
+        SUFFIX: '*.png'
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/portrait/val/images'
+    IMG_SUFFIX: '*.png'
+    INDICES: '/home/lmin/data/portrait/val.txt'
+    SHUFFLE: False
+    LABELS:
+      - NAME: "det"
+        DIR: '/home/lmin/data/portrait/train/anno'
+        SUFFIX: '.xml'
+      - NAME: "seg"
+        DIR: '/home/lmin/data/portrait/train/mask'
+        SUFFIX: '*.png'
+
+  TRANSFORMS:
+    CenterCrop:
+      crop_size: [600, 800]
+    ToTensor:
+    ToBGR:
+    ImageSubtract128:
+
+## MODEL
+USE_MODEL: 'src.models.seg_model.SegModel'
+
+## CHECKPOINT
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 10
+# PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+RESUME: False
+
+## OPTIMIZER
+INIT_LR: 0.1
+OPTIMIZER:
+  TYPE: 'SGD' # Adam, RMSprop
+  BIAS_PARAMS:
+    momentum: 0
+    weight_decay: 0
+  WEIGHT_PARAMS:
+    momentum: 0
+    weight_decay: 0
+  BIAS_LR_MULTIPLIER: 1
+
+## LR_SCHEDULER
+LR_SCHEDULER:
+  TYPE: 'MultiStepLR'
+  MILESTONES: [30, 50, 80, 100, 150]
+  GAMMA: 0.1
+  PATIENCE: 10
+
+## HALF
+HALF: False
+
+## GRAD_CLIP
+GRAD_CLIP:
+  TYPE: 'norm'
+  VALUE: 5
+
+## CONFIGURATIONS
+GPU_IDS: [1]
+BATCH_SIZE: 4
+NUM_WORKERS: 8
+N_MAX_EPOCHS: 200
+
+N_ITERS_TO_DISPLAY_STATUS: 200
+
+## TENSORBOARD
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: True
+TENSORBOARD_WEIGHT: True

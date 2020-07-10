@@ -1,0 +1,153 @@
+#######################################
+# Basic Information of the Experiment
+#######################################
+EXPERIMENT_NAME: 'Parking'  # you can name it arbitrarily, better to make it distinguishing.
+
+#############################
+# Dataset Related Settings
+#############################
+
+DATASETS:
+  - NAME: 'motovis-parking'
+    CLASS: 'src.dataset.dataset.MvDetSegDatasetNoTransform'
+
+    ARGS:
+      TRAIN:
+        im_dir: '/fast/yuchen/Yu_Automind/parking/rlan-pytorch/data/parking/inputs'
+        im_suffix: '.jpg'
+        indices: '/fast/yuchen/Yu_Automind/parking/rlan-pytorch/data/parking/train.txt'
+        labels:
+          - name: "det"
+            dir: '/fast/yuchen/Yu_Automind/parking/rlan-pytorch/data/parking/labels'
+            suffix: '.xml'
+          - name: "seg"
+            dir: '/raid/commondata/motovis_devkit/DET_CURB_LANE/label/mask'
+            suffix: '.png'
+
+      VALIDATION:
+        im_dir: '/fast/yuchen/Yu_Automind/parking/rlan-pytorch/data/parking/inputs'
+        im_suffix: '.jpg'
+        indices: '/fast/yuchen/Yu_Automind/parking/rlan-pytorch/data/parking/val.txt'
+        labels:
+          - name: "det"
+            dir: '/fast/yuchen/Yu_Automind/parking/rlan-pytorch/data/parking/labels'
+            suffix: '.xml'
+          - name: "seg"
+            dir: '/raid/commondata/motovis_devkit/DET_CURB_LANE/label/mask'
+            suffix: '.png'
+
+    DICTIONARY:
+      BASE: 'conf/dicts/pixel_labeling_dictionary_park_v5.yml'
+      OVERRIDE:
+        DETECTION_CLASSES:
+          - people                # 1  => 0
+          - car                   # 2  => 1
+          - bus                   # 3  => 2
+          - truck                 # 4  => 3
+          - midelbus              # 5  => 4
+          - zebracrossing         # 6  => 5
+          - bicycle               # 7  => 6
+          - tricycle              # 8  => 7
+          - trafficsign           # 9  => 10
+          - truck_frontback       # 10 => 19
+          - car_frontback         # 11 => 20
+          - midelbus_frontback    # 12 => 21
+          - bus_frontback         # 13 => 22
+        SEGMENTATION_CLASSES:
+          - curb
+          - carline
+        SEG_CHANNEL_MAP: [0, 1]
+
+    TRANSFORMS:
+      CenterCrop:
+        new_im_size: [640, 640]
+      ToTensor:
+      ToBGR:
+      ImageSubtract128:
+
+
+
+#########################
+# Model Configurations
+#########################
+# INTEGRATED_MODEL: 'src.integrated_models.deeplab_shufflev2_v3_fpga_20G_q_v6_all_slot.DeepLabv3_plus'
+INTEGRATED_MODEL: 'src.integrated_models.deeplab_shufflev2_v3_fpga_20G_q_v6_clip.DeepLabv3_plus'
+MODEL_CONFIG:
+  BASE: 'conf/model_cfgs/deeplabv3plus.yml'
+  OVERRIDE:
+    DRAW_IMAGE_RESULTS:
+      - True
+    N_SIGMA_TO_BOUND:
+      - 3
+    ACTIVATE_BOUND:
+      - True
+    # ENFORCED_MIN:
+    #   - -8
+    # ENFORCED_MAX:
+    #   - 8
+      
+RESUME_TRAINING: False
+#PRETRAIN_MODEL: 'checkpoints/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
+CHECKPOINT_SAVE_DIR: 'checkpoints'
+USE_GLOBAL_BN_STATS: False
+#PARAMS_TO_FREEZE:
+#  PREFIX:
+#    - 'det'
+#    - 'backbone'
+#    - 'pn'
+#  EXACT:
+#    - 'backbone.conv1'
+#    - 'backbone.conv1_bn'
+
+##########################################
+# Training Solver Related Configurations
+##########################################
+N_GPUS: 2
+BATCH_SIZE: 2
+N_MAX_EPOCHS: 60
+INIT_LR: 0.0002
+MILESTONES: [20, 40, 55]
+GAMMA: 0.5  # controls how much lr to reduce each time the epoch reaches a milestone
+OPTIMIZER:
+  TYPE: 'rmsprop'
+  BIAS_PARAMS:
+    momentum: 0
+    weight_decay: 0
+  WEIGHT_PARAMS:
+    momentum: 0
+    weight_decay: 0.0000
+  BIAS_LR_MULTIPLIER: 1
+HALF: False
+#GRAD_CLIP:
+#  TYPE: 'norm'
+#  VALUE: 5
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 400
+N_ITERS_TO_SAVE_MODEL: 2000
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+
+###############################
+# Quantization Configurations
+###############################
+# BITWIDTH:
+#   w_bit: 8
+#   b_bit: 22
+#   a_bit: 10
+#   m_bit: 24
+BITWIDTH:
+  w_bit: 7
+  b_bit: 16
+  b_ext_bit: 4
+  a_bit: 8
+  m_bit: 22
+# BITWIDTH:
+#   w_bit: 6
+#   b_bit: 16
+#   a_bit: 10
+#   m_bit: 18
+
+

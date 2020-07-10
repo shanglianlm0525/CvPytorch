@@ -1,0 +1,82 @@
+EXPERIMENT_NAME: 'Pet'
+
+DATASET:
+  NAME: 'DogCat'
+  CLASS: 'src.datasets.Pet.PetDataset'
+  DICTIONARY: 'conf/dicts/pet_dict.yml'
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/Pet/train'
+    IMG_SUFFIX: '.jpg'
+    INDICES: '/home/lmin/data/Pet/train.txt'
+    SHUFFLE: True
+    LABELS:
+      - NAME: "det"
+        DIR: '/home/lmin/data/Pet/anno'
+        SUFFIX: '.xml'
+      - NAME: "seg"
+        DIR: '/home/lmin/data/Pet/mask'
+        SUFFIX: '.png'
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/Pet/val'
+    IMG_SUFFIX: '.jpg'
+    INDICES: '/home/lmin/data/Pet/val.txt'
+    SHUFFLE: False
+    LABELS:
+      - NAME: "det"
+        DIR: '/home/lmin/data/Pet/anno'
+        SUFFIX: '.xml'
+      - NAME: "seg"
+        DIR: '/home/lmin/data/Pet/mask'
+        SUFFIX: '.png'
+
+  TRANSFORMS:
+    CenterCrop:
+      crop_size: [640, 640]
+    ToTensor:
+    ToBGR:
+    ImageSubtract128:
+
+USE_MODEL: 'src.models.cls_model.ClsModel'
+
+RESUME_TRAINING: False
+#PRETRAIN_MODEL: 'checkpoints/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
+CHECKPOINT_SAVE_DIR: 'checkpoints'
+USE_GLOBAL_BN_STATS: False
+
+
+GPU_IDS: [1]
+BATCH_SIZE: 4
+NUM_WORKERS: 4
+N_MAX_EPOCHS: 6
+INIT_LR: 0.001
+MILESTONES: [20, 40, 55]
+GAMMA: 0.5  # controls how much lr to reduce each time the epoch reaches a milestone
+OPTIMIZER:
+  TYPE: 'sgd'
+  BIAS_PARAMS:
+    momentum: 0
+    weight_decay: 0
+  WEIGHT_PARAMS:
+    momentum: 0
+    weight_decay: 0.0000
+  BIAS_LR_MULTIPLIER: 1
+HALF: False
+#GRAD_CLIP:
+#  TYPE: 'norm'
+#  VALUE: 5
+LR_SCHEDULER:
+  TYPE: 'MultiStepLR'
+  MILESTONES: [10, 20, 30, 40, 50, 60]
+  GAMMA: 0.1
+  PATIENCE: 10
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 100
+N_ITERS_TO_SAVE_MODEL: 1000
+
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'

@@ -1,0 +1,9 @@
+CLS_CLASSES:
+  - cat: 2
+  - dog: 1
+DET_CLASSES:
+  - cat: 2               # 1  => 0
+  - dog: 1               # 2  => 1
+SEG_CLASSES:
+  - cat: 2
+  - dog: 1

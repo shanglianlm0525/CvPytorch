@@ -1,0 +1,92 @@
+EXPERIMENT_NAME: 'Hymenoptera'
+
+DATASET:
+  NAME: 'AntsBees'
+  CLASS: 'src.datasets.Hymenoptera.HymenopteraDataset'
+  DICTIONARY: 'conf/dicts/hymenoptera_dict.yml'
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/hymenoptera/train'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/hymenoptera/train.txt'
+    SHUFFLE: True
+    LABELS:
+      - NAME: "det"
+        DIR: '/home/lmin/data/hymenoptera/anno'
+        SUFFIX: '*.xml'
+      - NAME: "seg"
+        DIR: '/home/lmin/data/hymenoptera/mask'
+        SUFFIX: '*.png'
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/hymenoptera/val'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/hymenoptera/val.txt'
+    SHUFFLE: False
+    LABELS:
+      - NAME: "det"
+        DIR: '/home/lmin/data/hymenoptera/anno'
+        SUFFIX: '*.xml'
+      - NAME: "seg"
+        DIR: '/home/lmin/data/hymenoptera/mask'
+        SUFFIX: '*.png'
+
+  TRANSFORMS:
+    CenterCrop:
+      crop_size: [224, 224]
+    ToTensor:
+    ToBGR:
+    ImageSubtract128:
+
+USE_MODEL: 'src.models.cls_model.ClsModel'
+
+
+## CHECKPOINT
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 2
+# PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+RESUME: False
+
+## OPTIMIZER
+OPTIMIZER:
+  TYPE: 'SGD' # Adam, RMSprop
+  BIAS_PARAMS:
+    momentum: 0
+    weight_decay: 0
+  WEIGHT_PARAMS:
+    momentum: 0
+    weight_decay: 0
+  BIAS_LR_MULTIPLIER: 1
+
+## LR_SCHEDULER
+
+
+GPU_IDS: [1]
+BATCH_SIZE: 4
+NUM_WORKERS: 4
+N_MAX_EPOCHS: 25
+INIT_LR: 0.001
+MILESTONES: [20, 40, 55]
+GAMMA: 0.5  # controls how much lr to reduce each time the epoch reaches a milestone
+
+HALF: False
+GRAD_CLIP:
+  TYPE: 'norm'
+  VALUE: 5
+LR_SCHEDULER:
+  TYPE: 'MultiStepLR'
+  MILESTONES: [7, 14, 21]
+  GAMMA: 0.1
+  PATIENCE: 10
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 10
+
+
+## tensorboard
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: True
+TENSORBOARD_WEIGHT: True
