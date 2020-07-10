@@ -7,29 +7,29 @@ DATASET:
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/Pet/train'
-    IMG_SUFFIX: '.jpg'
+    IMG_SUFFIX: '*.jpg'
     INDICES: '/home/lmin/data/Pet/train.txt'
     SHUFFLE: True
     LABELS:
       - NAME: "det"
         DIR: '/home/lmin/data/Pet/anno'
-        SUFFIX: '.xml'
+        SUFFIX: '*.xml'
       - NAME: "seg"
         DIR: '/home/lmin/data/Pet/mask'
-        SUFFIX: '.png'
+        SUFFIX: '*.png'
 
   VAL:
     IMG_DIR: '/home/lmin/data/Pet/val'
-    IMG_SUFFIX: '.jpg'
+    IMG_SUFFIX: '*.jpg'
     INDICES: '/home/lmin/data/Pet/val.txt'
     SHUFFLE: False
     LABELS:
       - NAME: "det"
         DIR: '/home/lmin/data/Pet/anno'
-        SUFFIX: '.xml'
+        SUFFIX: '*.xml'
       - NAME: "seg"
         DIR: '/home/lmin/data/Pet/mask'
-        SUFFIX: '.png'
+        SUFFIX: '*.png'
 
   TRANSFORMS:
     CenterCrop:

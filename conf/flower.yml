@@ -7,29 +7,29 @@ DATASET:
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/Flower17/train'
-    IMG_SUFFIX: '.jpg'
+    IMG_SUFFIX: '*.jpg'
     INDICES: '/home/lmin/data/Flower17/train.txt'
     SHUFFLE: True
     LABELS:
       - NAME: "det"
         DIR: '/home/lmin/data/Flower17/anno'
-        SUFFIX: '.xml'
+        SUFFIX: '*.xml'
       - NAME: "seg"
         DIR: '/home/lmin/data/Flower17/mask'
-        SUFFIX: '.png'
+        SUFFIX: '*.png'
 
   VAL:
     IMG_DIR: '/home/lmin/data/Flower17/val'
-    IMG_SUFFIX: '.jpg'
+    IMG_SUFFIX: '*.jpg'
     INDICES: '/home/lmin/data/Flower17/val.txt'
     SHUFFLE: False
     LABELS:
       - NAME: "det"
         DIR: '/home/lmin/data/Flower17/anno'
-        SUFFIX: '.xml'
+        SUFFIX: '*.xml'
       - NAME: "seg"
         DIR: '/home/lmin/data/Flower17/mask'
-        SUFFIX: '.png'
+        SUFFIX: '*.png'
 
   TRANSFORMS:
     CenterCrop:
