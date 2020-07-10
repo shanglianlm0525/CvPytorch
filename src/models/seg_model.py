@@ -105,6 +105,7 @@ class SegModel(nn.Module):
 
         self._criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 
+        self.init_params()
 
     def init_params(self):
         for m in self.modules():
