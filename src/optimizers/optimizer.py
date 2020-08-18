@@ -8,6 +8,7 @@ import torch
 import torch.optim as optim
 
 def parser_optimizer(cfg, model):
+    # params = [p for p in model.parameters() if p.requires_grad]
     _params = []
     # filter(lambda p: p.requires_grad, model.parameters())
     for n, p in dict(model.named_parameters()).items():

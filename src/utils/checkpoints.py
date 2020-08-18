@@ -13,8 +13,21 @@ _NAME_PREFIX = "model_epoch_"
 _DIR_NAME = "checkpoints"
 
 
+def load_checkpoint(save_path, model, optimizer=None, lr_scheduler=None):
+    """Loads the checkpoint from the given file."""
+    error_str = "Checkpoint '{}' not found"
+    assert os.path.exists(save_path), error_str.format(save_path)
+    # Load the checkpoint on CPU to avoid GPU mem spike
+    checkpoint_state = torch.load(save_path, map_location="cpu")
+    model.load_state_dict(checkpoint_state["model"], strict=False)
+    # Load the optimizer state (commonly not done when fine-tuning)
+    if optimizer:
+        optimizer.load_state_dict(checkpoint_state["optimizer"])
+    if lr_scheduler:
+        lr_scheduler.load_state_dict(checkpoint_state["lr_scheduler"])
+
 class Checkpoints():
-    def __init__(self, logger, checkpoint_dir, experiment_id):
+    def __init__(self, logger=None, checkpoint_dir=None, experiment_id=None):
         self.logger = logger
         super(Checkpoints, self).__init__()
         self.checkpoint_dir = checkpoint_dir

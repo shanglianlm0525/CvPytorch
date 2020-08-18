@@ -8,6 +8,7 @@ LOG_LEVEL = os.environ.get('LOG_LEVEL') or 'INFO'
 logger = logging.getLogger('pytorch')
 logger.setLevel(LOG_LEVEL)
 logger.handlers = []
+logger.propagate = 0
 
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)

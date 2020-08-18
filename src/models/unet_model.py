@@ -1,15 +1,14 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/7/9 12:52
+# @Time : 2020/7/17 9:41
 # @Author : liumin
-# @File : seg_model.py
-import cv2
+# @File : unet_model.py
+
 import torch
 import torch.nn as nn
 from PIL import Image
 import torchvision
 from torchvision import models as modelsT
-from torchvision import transforms as transformsT
 import numpy as np
 import torch.nn.functional as torchF
 from ..losses.dice_loss import dice_coeff
@@ -83,11 +82,11 @@ class OutConv(nn.Module):
         return self.conv(x)
 
 
-class SegModel(nn.Module):
+class UnetModel(nn.Module):
     def __init__(self, dictionary=None):
-        super(SegModel, self).__init__()
+        super(UnetModel, self).__init__()
         self.dictionary = dictionary
-        self.dummy_input = torch.zeros(1, 3, 600, 800)
+        self.dummy_input = torch.zeros(1, 3, 640, 320)
 
         self._num_classes = len(self.dictionary)
         self._category = [v for d in self.dictionary for v in d.keys()]
@@ -119,8 +118,8 @@ class SegModel(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, img, labels=None, mode='infer', **kwargs):
-        x1 = self.inc(img)
+    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+        x1 = self.inc(imgs)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
         x4 = self.down3(x3)
@@ -133,34 +132,25 @@ class SegModel(nn.Module):
 
         threshold = 0.5
         if mode == 'infer':
-            np.set_printoptions(threshold=1e6)
-
             probs = torch.sigmoid(outputs)
-
-            probs = probs.squeeze(0)
-
-            tf = transformsT.Compose(
-                [
-                    transformsT.ToPILImage(),
-                    # transformsT.Resize(img.shape[:2]),
-                    transformsT.ToTensor()
-                ]
-            )
-
-            probs = tf(probs.cpu())
-            full_mask = probs.squeeze().cpu().numpy()
-            full_mask[full_mask < threshold] = 0
-            full_mask[full_mask >= threshold] = 1
-
-            print(full_mask.shape)
-
-            result = Image.fromarray((full_mask * 255).astype(np.uint8))
-            result.save(str(333)+'.png')
-            assert 1==2
-            return probs
+            probs[probs<threshold] = 0
+            return probs*255
         else:
             losses = {}
             device_id = labels.data.device
+            dtype = imgs.data.dtype
+
+            labels_s = torch.zeros([labels.size(0), len(self.dictionary), labels.size(2), labels.size(3)],
+                                   dtype=torch.float,device=device_id)
+
+            for i in range(labels_s.size(1)):
+                # print(i, torch.nonzero(labels == i).size(0))
+                # print(labels_s[:, i, :, :].size(),(labels == i).int().size())
+                labels_s[:, i, :, :] = (labels == i).squeeze(1).int()
+                # print(i, torch.nonzero(labels_s[:, i, :, :]).size(0))
+            labels = labels_s
+
+
             losses['all_loss'] = 0
             losses['bce_loss'] = 0
 
@@ -171,27 +161,24 @@ class SegModel(nn.Module):
 
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
-                        losses['bce_loss'] += torchF.binary_cross_entropy_with_logits(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
+                        losses['bce_loss'] += self._criterion(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
                         performances[_label + '_perf'] = torch.as_tensor(dice_coeff(outs[:,idx,:,:], labels[:,idx,:,:].squeeze(dim=1)).item(),device=device_id)
                         performances['all_perf'] += performances[_label + '_perf']
 
-                performances['all_perf'] = performances['all_perf'] / len(self.dictionary)
                 losses['all_loss'] = losses['bce_loss']
-
+                performances['all_perf'] = performances['all_perf'] / len(self.dictionary)
                 return losses, performances
             else:
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
-                        losses['bce_loss'] += torchF.binary_cross_entropy_with_logits(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
+                        losses['bce_loss'] += self._criterion(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
 
-                losses['all_loss'] = losses['bce_loss']
-
-                print(losses)
+                        losses['all_loss'] = losses['bce_loss']
                 return losses
 
 
 if __name__ =='__main__':
-    model = SegModel()
+    model = UnetModel()
     print(model)
 
     input = torch.randn(1,3,600,800)
