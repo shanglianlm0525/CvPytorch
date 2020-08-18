@@ -127,15 +127,12 @@ def default_collate1(batch):
         return elem_type(*(default_collate(samples) for samples in zip(*batch)))
     elif isinstance(elem, container_abcs.Sequence):
         if elem_type.__name__ == 'tuple':
-            if type(batch[1]).__name__ == 'tuple':
-                return tuple(zip(*batch))
-            else:
-                targets = []
-                imgs = []
-                for sample in batch:
-                    imgs.append(sample[0])
-                    targets.append(torch.FloatTensor(sample[1])) # torch.FloatTensor(sample[1])
-                return torch.stack(imgs, 0), targets
+            targets = []
+            imgs = []
+            for sample in batch:
+                imgs.append(sample[0])
+                targets.append(torch.FloatTensor(sample[1])) # torch.FloatTensor(sample[1])
+            return torch.stack(imgs, 0), targets
         else:
             transposed = zip(*batch)
             return [default_collate(samples) for samples in transposed]
@@ -285,9 +282,11 @@ class Trainer:
         ## parser_optimizer
         optimizer_ft = parser_optimizer(cfg,model_ft)
 
+        optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9,
+                                 weight_decay=5e-4)
+
         ## parser_lr_scheduler
         lr_scheduler_ft = parser_lr_scheduler(cfg, optimizer_ft)
-
 
         if self.cfg.PRETRAIN_MODEL is not None:
             if self.cfg.RESUME:
@@ -347,10 +346,8 @@ class Trainer:
             if len(self.device)>1:
                 out = data_parallel(model, (imgs, labels, prefix), device_ids=self.device, output_device=self.device[0])
             else:
-                # imgs = imgs.cuda()
-                imgs = list(img.cuda() for img in imgs) if isinstance(imgs,list) else imgs.cuda()
-                # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-                labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
+                imgs = imgs.cuda()
+                labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
                 out = model(imgs, labels, prefix)
 
             if not isinstance(out, tuple):
@@ -358,12 +355,12 @@ class Trainer:
             else:
                 losses, performances = out
 
-            if losses["loss_all"].sum().requires_grad:
+            if losses["all_loss"].sum().requires_grad:
                 if self.cfg.GRADNORM is not None:
                     grad_normalizer.adjust_losses(losses)
                     grad_normalizer.adjust_grad(model, losses)
                 else:
-                    losses["loss_all"].sum().backward()
+                    losses["all_loss"].sum().backward()
 
             optimizer.step()
 
@@ -371,15 +368,7 @@ class Trainer:
 
             _timer.toc()
 
-            # lossMeter.__add__(losses)
-
-            # reduce losses over all GPUs for logging purposes
-            loss_dict_reduced = utils.reduce_dict(loss_dict)
-            print('loss_dict_reduced', loss_dict_reduced)
-            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-            print('losses_reduced', losses_reduced)
-            loss_value = losses_reduced.item()
-            print('loss_value', loss_value)
+            lossMeter.__add__(losses)
 
             if performances is not None and all(performances):
                 perfMeter.put(performances)
@@ -391,7 +380,7 @@ class Trainer:
                     template.format(
                         epoch, self.cfg.N_MAX_EPOCHS, i,
                         round(get_current_lr(optimizer), 6),
-                        avg_losses["loss_all"],
+                        avg_losses["all_loss"],
                         self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS /  _timer.total_time,
                         "\n".join(["{}: {:.4f}".format(n, l) for n, l in avg_losses.items() if n != "all_loss"]),
                     )
@@ -435,11 +424,8 @@ class Trainer:
                     losses, performances = data_parallel(model, (imgs, labels, prefix), device_ids=self.device,
                                                          output_device=self.device[-1])
                 else:
-                    # imgs = imgs.cuda()
-                    imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                    # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-                    labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,
-                                                                                                 list) else labels.cuda()
+                    imgs = imgs.cuda()
+                    labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
                     losses, performances = model(imgs, labels, prefix)
 
                 lossMeter.__add__(losses)
@@ -453,7 +439,7 @@ class Trainer:
         template = "[epoch {}] Total {} loss : {:.4f} " "\n" "{}"
         logger.info(
             template.format(
-                epoch,prefix,avg_losses["loss_all"],
+                epoch,prefix,avg_losses["all_loss"],
                 "\n".join(["{}: {:.4f}".format(n, l) for n, l in avg_losses.items() if n != "all_loss"]),
             )
         )
@@ -479,7 +465,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/pennfudan.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/voc.yml', help='The path to the configuration file.')
 
     args = parser.parse_args()
     cfg = CommonConfiguration.from_yaml(args.setting)

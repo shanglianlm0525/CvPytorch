@@ -5,7 +5,6 @@
 # @File : trainer.py
 
 import argparse
-# import logging
 import os
 
 import torch
@@ -18,14 +17,13 @@ import torchvision
 from torch.nn.parallel import data_parallel
 from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
-from torch.utils.data._utils.collate import default_collate_err_msg_format, np_str_obj_array_pattern
-from torch.utils.data.dataloader import default_collate
 from torchvision import transforms as transformsT
 from torchvision import datasets as datasetsT
 from torchvision import models as modelsT
 
 import attr
 from tqdm import tqdm
+import logging
 from copy import deepcopy
 import importlib
 from time import time
@@ -68,79 +66,6 @@ def clip_grad(cfg, model):
 
     clip_method(model.parameters(), cfg.GRAD_CLIP.VALUE)
 
-
-def detection_collate(batch):
-    """Custom collate fn for dealing with batches of images that have a different
-    number of associated object annotations (bounding boxes).
-
-    Arguments:
-        batch: (tuple) A tuple of tensor images and lists of annotations
-
-    Return:
-        A tuple containing:
-            1) (tensor) batch of images stacked on their 0 dim
-            2) (list of tensors) annotations for a given image are stacked on
-                                 0 dim
-    """
-    targets = []
-    imgs = []
-    for sample in batch:
-        imgs.append(sample[0])
-        targets.append(torch.FloatTensor(sample[1]))
-    return torch.stack(imgs, 0), targets
-
-from torch._six import container_abcs, string_classes, int_classes
-
-def default_collate1(batch):
-    r"""Puts each data field into a tensor with outer dimension batch size"""
-    elem = batch[0]
-    elem_type = type(elem)
-    if isinstance(elem, torch.Tensor):
-        out = None
-        if torch.utils.data.get_worker_info() is not None:
-            # If we're in a background process, concatenate directly into a
-            # shared memory tensor to avoid an extra copy
-            numel = sum([x.numel() for x in batch])
-            storage = elem.storage()._new_shared(numel)
-            out = elem.new(storage)
-        return torch.stack(batch, 0, out=out)
-    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-            and elem_type.__name__ != 'string_':
-        elem = batch[0]
-        if elem_type.__name__ == 'ndarray':
-            # array of string classes and object
-            if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                raise TypeError(default_collate_err_msg_format.format(elem.dtype))
-
-            return default_collate([torch.as_tensor(b) for b in batch])
-        elif elem.shape == ():  # scalars
-            return torch.as_tensor(batch)
-    elif isinstance(elem, float):
-        return torch.tensor(batch, dtype=torch.float64)
-    elif isinstance(elem, int_classes):
-        return torch.tensor(batch)
-    elif isinstance(elem, string_classes):
-        return batch
-    elif isinstance(elem, container_abcs.Mapping):
-        return {key: default_collate([d[key] for d in batch]) for key in elem}
-    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-        return elem_type(*(default_collate(samples) for samples in zip(*batch)))
-    elif isinstance(elem, container_abcs.Sequence):
-        if elem_type.__name__ == 'tuple':
-            if type(batch[1]).__name__ == 'tuple':
-                return tuple(zip(*batch))
-            else:
-                targets = []
-                imgs = []
-                for sample in batch:
-                    imgs.append(sample[0])
-                    targets.append(torch.FloatTensor(sample[1])) # torch.FloatTensor(sample[1])
-                return torch.stack(imgs, 0), targets
-        else:
-            transposed = zip(*batch)
-            return [default_collate(samples) for samples in transposed]
-    raise TypeError(default_collate_err_msg_format.format(elem_type))
-
 def prepare_transforms():
     data_transforms = {
         'train': transformsT.Compose([
@@ -166,24 +91,6 @@ def prepare_transforms():
     }
     return data_transforms
 
-class Relabel:
-    def __init__(self, olabel, nlabel):
-        self.olabel = olabel
-        self.nlabel = nlabel
-
-    def __call__(self, tensor):
-        assert (isinstance(tensor, torch.FloatTensor) or isinstance(tensor, torch.ByteTensor)) , 'tensor needs to be LongTensor'
-        tensor[tensor == self.olabel] = self.nlabel
-        return tensor
-
-class ToLabel255:
-    def __call__(self, image):
-        return torch.from_numpy(np.array(image)/255).float().unsqueeze(0)
-
-class ToLabel:
-    def __call__(self, image):
-        return torch.from_numpy(image).float().unsqueeze(0)
-
 def prepare_transforms_seg():
     data_transforms = {
         'train': transformsT.Compose([
@@ -207,6 +114,25 @@ def prepare_transforms_seg():
     }
     return data_transforms
 
+
+class Relabel:
+    def __init__(self, olabel, nlabel):
+        self.olabel = olabel
+        self.nlabel = nlabel
+
+    def __call__(self, tensor):
+        assert (isinstance(tensor, torch.FloatTensor) or isinstance(tensor, torch.ByteTensor)) , 'tensor needs to be LongTensor'
+        tensor[tensor == self.olabel] = self.nlabel
+        return tensor
+
+class ToLabel255:
+    def __call__(self, image):
+        return torch.from_numpy(np.array(image)/255).float().unsqueeze(0)
+
+class ToLabel:
+    def __call__(self, image):
+        return torch.from_numpy(image).float().unsqueeze(0)
+
 def prepare_transforms_mask():
     data_transforms = {
         'train': transformsT.Compose([
@@ -226,7 +152,47 @@ def prepare_transforms_mask():
     }
     return data_transforms
 
-# logger = logging.getLogger("pytorch")
+def prepare_transforms_seg_cityscapes():
+    data_transforms = {
+        'train': transformsT.Compose([
+            transformsT.Resize((640,320)),
+            # transformsT.RandomHorizontalFlip(),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ]),
+
+        'val': transformsT.Compose([
+            transformsT.Resize((640,320)),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ]),
+
+        'test': transformsT.Compose([
+            transformsT.Resize((640,320)),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ])
+    }
+    return data_transforms
+
+def prepare_transforms_mask_cityscapes():
+    data_transforms = {
+        'train': transformsT.Compose([
+            # transformsT.Resize((640,320)),
+            ToLabel(),
+        ]),
+
+        'val': transformsT.Compose([
+            # transformsT.Resize((640,320)),
+            ToLabel(),
+        ]),
+
+        'test': transformsT.Compose([
+            # transformsT.Resize((640,320)),
+            ToLabel(),
+        ])
+    }
+    return data_transforms
 
 class Trainer:
     def __init__(self, cfg):
@@ -238,8 +204,9 @@ class Trainer:
         self.batch_size_all = self.cfg.BATCH_SIZE * len(self.cfg.GPU_IDS)
 
         self.n_steps_per_epoch = None
+        self.logger = logging.getLogger("pytorch")
         self.experiment_id = self.experiment_id(self.cfg)
-        self.checkpoints = Checkpoints(logger,self.cfg.CHECKPOINT_DIR,self.experiment_id)
+        self.checkpoints = Checkpoints(self.logger,self.cfg.CHECKPOINT_DIR,self.experiment_id)
         self.tb_writer = DummyWriter(log_dir="%s/%s" % (self.cfg.TENSORBOARD_LOG_DIR, self.experiment_id))
 
     def experiment_id(self, cfg):
@@ -250,15 +217,15 @@ class Trainer:
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
         return next(dictionary.items())[1] ## return first
 
-    def _parser_datasets(self,dictionary):
+    def _parser_datasets(self):
         transforms = prepare_transforms_seg()
         target_transforms = prepare_transforms_mask()
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(importlib.import_module(".".join(dataset_str_parts)), dataset_class_str)
-        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=dictionary,transform=transforms[x],target_transform=target_transforms[x], stage=x) for x in ['train', 'val']}
+        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], transform=transforms[x],target_transform=target_transforms[x], stage=x) for x in ['train', 'val']}
         dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size_all, num_workers=cfg.NUM_WORKERS,
-                                     shuffle=cfg.DATASET[x.upper()].SHUFFLE,collate_fn=default_collate1,pin_memory=True) for x in ['train', 'val']} # collate_fn=detection_collate,
-        return datasets, dataloaders # detection_collate
+                                     shuffle=cfg.DATASET[x.upper()].SHUFFLE, pin_memory=True) for x in ['train', 'val']}
+        return datasets, dataloaders
 
 
     def _parser_model(self,dictionary):
@@ -275,7 +242,7 @@ class Trainer:
         dictionary = self._parser_dict()
 
         ## parser_datasets
-        datasets, dataloaders = self._parser_datasets(dictionary)
+        datasets, dataloaders = self._parser_datasets()
         # dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         # class_names = datasets['train'].classes
 
@@ -284,6 +251,7 @@ class Trainer:
 
         ## parser_optimizer
         optimizer_ft = parser_optimizer(cfg,model_ft)
+
 
         ## parser_lr_scheduler
         lr_scheduler_ft = parser_lr_scheduler(cfg, optimizer_ft)
@@ -314,9 +282,9 @@ class Trainer:
 
         best_acc = 0.0
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
-            self.train_epoch(epoch, model_ft, dataloaders['train'], optimizer_ft, lr_scheduler_ft,None)
+            self.train_epoch(epoch, model_ft, dataloaders['train'],dictionary, optimizer_ft, lr_scheduler_ft,None)
             if self.cfg.DATASET.VAL:
-                acc = self.val_epoch(epoch, model_ft, dataloaders['val'] , optimizer=optimizer_ft, lr_scheduler=lr_scheduler_ft)
+                acc = self.val_epoch(epoch, model_ft, dataloaders['val'],dictionary, optimizer=optimizer_ft, lr_scheduler=lr_scheduler_ft)
                 # start to save best performance model after learning rate decay to 1e-6
                 if best_acc < acc:
                     self.checkpoints.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
@@ -329,7 +297,7 @@ class Trainer:
         self.tb_writer.close()
 
 
-    def train_epoch(self, epoch, model, dataloader, optimizer, lr_scheduler, grad_normalizer=None, prefix="train"):
+    def train_epoch(self, epoch, model, dataloader, dictionary, optimizer, lr_scheduler, grad_normalizer=None, prefix="train"):
         model.train()
 
         _timer = Timer()
@@ -347,10 +315,8 @@ class Trainer:
             if len(self.device)>1:
                 out = data_parallel(model, (imgs, labels, prefix), device_ids=self.device, output_device=self.device[0])
             else:
-                # imgs = imgs.cuda()
-                imgs = list(img.cuda() for img in imgs) if isinstance(imgs,list) else imgs.cuda()
-                # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-                labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
+                imgs = imgs.cuda()
+                labels = labels.cuda()
                 out = model(imgs, labels, prefix)
 
             if not isinstance(out, tuple):
@@ -358,12 +324,12 @@ class Trainer:
             else:
                 losses, performances = out
 
-            if losses["loss_all"].sum().requires_grad:
+            if losses["all_loss"].sum().requires_grad:
                 if self.cfg.GRADNORM is not None:
                     grad_normalizer.adjust_losses(losses)
                     grad_normalizer.adjust_grad(model, losses)
                 else:
-                    losses["loss_all"].sum().backward()
+                    losses["all_loss"].sum().backward()
 
             optimizer.step()
 
@@ -371,27 +337,19 @@ class Trainer:
 
             _timer.toc()
 
-            # lossMeter.__add__(losses)
-
-            # reduce losses over all GPUs for logging purposes
-            loss_dict_reduced = utils.reduce_dict(loss_dict)
-            print('loss_dict_reduced', loss_dict_reduced)
-            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-            print('losses_reduced', losses_reduced)
-            loss_value = losses_reduced.item()
-            print('loss_value', loss_value)
+            lossMeter.__add__(losses)
 
             if performances is not None and all(performances):
-                perfMeter.put(performances)
+                perfMeter.__add__(performances)
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
                 avg_losses = lossMeter.average()
                 template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f} )\n" "{}"
-                logger.info(
+                self.logger.info(
                     template.format(
                         epoch, self.cfg.N_MAX_EPOCHS, i,
                         round(get_current_lr(optimizer), 6),
-                        avg_losses["loss_all"],
+                        avg_losses["all_loss"],
                         self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS /  _timer.total_time,
                         "\n".join(["{}: {:.4f}".format(n, l) for n, l in avg_losses.items() if n != "all_loss"]),
                     )
@@ -400,7 +358,7 @@ class Trainer:
                 if self.cfg.TENSORBOARD:
                     tb_step = int((epoch * self.n_steps_per_epoch + i) / self.cfg.N_ITERS_TO_DISPLAY_STATUS)
                     # Logging train losses
-                    [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l, tb_step) for n, l in avg_losses.items()]
+                    [self.tb_writer.add_scalar(f"loss/{prefix}_{k}", v, tb_step) for k, v in avg_losses.items()]
 
                 lossMeter.clear()
 
@@ -419,7 +377,7 @@ class Trainer:
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataloader, optimizer=None, lr_scheduler=None, prefix="val"):
+    def val_epoch(self, epoch, model, dataloader, dictionary, optimizer=None, lr_scheduler=None, prefix="val"):
         model.eval()
 
         lossMeter = LossMeter()
@@ -429,17 +387,14 @@ class Trainer:
             for (imgs, labels) in dataloader:
 
                 if self.cfg.HALF:
-                    imgs = imgs.half()
+                    im = im.half()
 
                 if len(self.device)>1:
                     losses, performances = data_parallel(model, (imgs, labels, prefix), device_ids=self.device,
                                                          output_device=self.device[-1])
                 else:
-                    # imgs = imgs.cuda()
-                    imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                    # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-                    labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,
-                                                                                                 list) else labels.cuda()
+                    imgs = imgs.cuda()
+                    labels = labels.cuda()
                     losses, performances = model(imgs, labels, prefix)
 
                 lossMeter.__add__(losses)
@@ -451,9 +406,9 @@ class Trainer:
         avg_perf = perfMeter.average()
 
         template = "[epoch {}] Total {} loss : {:.4f} " "\n" "{}"
-        logger.info(
+        self.logger.info(
             template.format(
-                epoch,prefix,avg_losses["loss_all"],
+                epoch,prefix,avg_losses["all_loss"],
                 "\n".join(["{}: {:.4f}".format(n, l) for n, l in avg_losses.items() if n != "all_loss"]),
             )
         )
@@ -468,7 +423,7 @@ class Trainer:
         for k,v in avg_perf.items():
             perf_log_str += "{:}: {:.4f}\n".format(k, v)
         perf_log_str += "------------------------------------\n"
-        logger.info(perf_log_str)
+        self.logger.info(perf_log_str)
 
         acc = avg_perf['all_perf']
 
@@ -479,7 +434,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/pennfudan.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/portrait_test.yml', help='The path to the configuration file.')
 
     args = parser.parse_args()
     cfg = CommonConfiguration.from_yaml(args.setting)
