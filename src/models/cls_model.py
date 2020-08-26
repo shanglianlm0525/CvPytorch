@@ -41,8 +41,8 @@ class ClsModel(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, img, labels=None, mode='infer', **kwargs):
-        outputs = self._model(img)
+    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+        outputs = self._model(imgs)
 
         if mode == 'infer':
             out = self.softmax(outputs)
@@ -52,19 +52,18 @@ class ClsModel(nn.Module):
         else:
             losses = {}
             losses['loss'] = self._criterion(outputs, labels)
-            device_id = labels.data.device
 
             if mode == 'val':
                 performances = {}
                 _, preds = torch.max(outputs, 1)
-                performances['performance'] = preds.eq(labels).sum()
+                performances['performance'] = preds.eq(labels).sum() *1.0 / imgs.size(0)
 
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
                         cognize = labels == idx
                         if labels[cognize].size(0):
                             losses['loss_'+_label] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
-                            performances['performance_'+_label] = preds[cognize].eq(labels[cognize]).sum()
+                            performances['performance_'+_label] = preds[cognize].eq(labels[cognize]).sum() * 1.0 / torch.nonzero(cognize,as_tuple=False).size(0)
 
                 return losses, performances
             else:
