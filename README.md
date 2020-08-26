@@ -3,12 +3,12 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 
 ## Dependencies
-- Python 3.6+
-- PyTorch 1.2.0
-- Torchvision 0.4.0
+- Python 3.8
+- PyTorch 1.6.0
+- Torchvision 0.7.0
 - torchsummary 1.5.1
 - tensorflow 2.2.0          
-- tensorboardX 2.0
+- tensorboardX 2.1
 - numpy 1.18.0
 - matplotlib 3.1.0
 - Pillow 6.2.0
@@ -33,12 +33,12 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 - (**FCOS**) FCOS: Fully Convolutional One-Stage Object Detection
 
 ## Semantic Segmentation
-- (**FCN**) Fully Convolutional Networks for Semantic Segmentation (https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf) 
-- (**Deeplab V3+**) Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation (https://arxiv.org/abs/1802.02611)
-- (**PSPNet**) Pyramid Scene Parsing Network (http://jiaya.me/papers/PSPNet_cvpr17.pdf) 
-- (**ENet**) A Deep Neural Network Architecture for Real-Time Semantic Segmentation (https://arxiv.org/abs/1606.02147)
-- (**U-Net**) Convolutional Networks for Biomedical Image Segmentation (https://arxiv.org/abs/1505.04597)
-- (**SegNet**) A Deep ConvolutionalEncoder-Decoder Architecture for ImageSegmentation (https://arxiv.org/pdf/1511.00561)
+- (**FCN**) Fully Convolutional Networks for Semantic Segmentation 
+- (**Deeplab V3+**) Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation
+- (**PSPNet**) Pyramid Scene Parsing Network
+- (**ENet**) A Deep Neural Network Architecture for Real-Time Semantic Segmentation
+- (**U-Net**) Convolutional Networks for Biomedical Image Segmentation
+- (**SegNet**) A Deep ConvolutionalEncoder-Decoder Architecture for ImageSegmentation
 
 ## Instance Segmentation
 - (**Mask-RCNN**) Mask-RCNN
@@ -55,3 +55,12 @@ The second step is to augment the dataset using the additionnal annotations prov
 
 - **COCO Stuff:** For COCO, there is two partitions, CocoStuff10k with only 10k that are used for training the evaluation, note that this dataset is outdated, can be used for small scale testing and training, and can be downloaded [here](https://github.com/nightrome/cocostuff10k). For the official dataset with all of the training 164k examples, it can be downloaded from the official [website](http://cocodataset.org/#download).\
 Note that when using COCO dataset, 164k version is used per default, if 10k is prefered, this needs to be specified with an additionnal parameter `partition = 'CocoStuff164k'` in the config file with the corresponding path.
+
+
+### Install
+
+'''
+$ git clone https://github.com/NVIDIA/apex
+$ cd apex
+$ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+'''
