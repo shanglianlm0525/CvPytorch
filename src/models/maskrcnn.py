@@ -17,6 +17,8 @@ import torch.nn.functional as torchF
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 
+from src.utils.metrics import SegmentationEvaluator
+
 
 def get_model_instance_segmentation(num_classes):
     # load an instance segmentation model pre-trained pre-trained on COCO
@@ -63,6 +65,8 @@ class MaskRCNN(nn.Module):
                                                            hidden_layer,
                                                            self._num_classes)
 
+        self.segmentationEvaluator = SegmentationEvaluator(self._num_classes)
+
 
     def init_params(self):
         for m in self.modules():
@@ -79,27 +83,58 @@ class MaskRCNN(nn.Module):
 
         threshold = 0.5
         if mode == 'infer':
-            output = self._model(imgs)[0]
-            boxes = output['boxes'].cpu().detach().numpy()
-            scores = output['scores'].cpu().detach().numpy()
-            labels = output['labels'].cpu().detach().numpy()
-            labels = output['labels'].cpu().detach().numpy()
-            masks = output['masks'].cpu().detach().numpy()
+            outputs = self._model(imgs)[0]
+            boxes = outputs['boxes'].cpu().detach().numpy()
+            scores = outputs['scores'].cpu().detach().numpy()
+            lbls = outputs['labels'].cpu().detach().numpy()
+            masks = outputs['masks'].cpu().detach().numpy()
 
-            return probs
+            return
         else:
-            losses = self._model(imgs, labels)
-            losses['loss_all'] = sum(loss for loss in losses.values())
-
-            print(losses)
+            device_id = imgs[0].data.device if isinstance(imgs, list) else imgs.data.device
 
             if mode == 'val':
+                outputs = self._model(imgs)
                 performances = {}
-                performances['perf_all'] = 0
+                performances['performance'] = 0
+
+                print(outputs)
+                print(labels)
+
+                for output,label_gt in zip(outputs,labels):
+                    boxes = output['boxes'].cpu().detach().numpy()
+                    scores = output['scores'].cpu().detach().numpy()
+                    lbls = output['labels'].cpu().detach().numpy()
+                    masks = output['masks'].cpu().detach().numpy()
+
+                    for box, score, lbl, mask in zip(boxes, scores, lbls, masks):
+                        if score >= scores[0]:
+                            print(box, score)
 
 
+
+
+                    masks = outputs['masks'].cpu().detach().numpy()
+                labels = np.array([label['masks'].unsqueeze(1).cpu().detach().numpy() for label in labels]) if isinstance(labels,list) else labels.cpu().numpy()
+                print('masks.shape',masks.shape)
+                print('labels[0].shape', labels[0].shape)
+                preds = np.argmax(masks, axis=1)
+
+                mask = (labels >= 0) & (labels < self._num_classes)
+                label = self._num_classes * labels[mask].astype('int') + preds[mask]
+                count = np.bincount(label, minlength=self.num_class ** 2)
+                confusion_matrix = count.reshape(self._num_classes, self._num_classes)
+
+                print('confusion_matrix',confusion_matrix)
+
+
+                losses = {}
+                losses['loss'] = torch.as_tensor(0,device=device_id)
                 return losses, performances
             else:
+                losses = self._model(imgs, labels)
+                losses['loss'] = sum(loss for loss in losses.values())
+
                 return losses
 
 

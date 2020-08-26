@@ -51,32 +51,20 @@ class ClsModel(nn.Module):
             return out
         else:
             losses = {}
-            loss = self._criterion(outputs, labels)
+            losses['loss'] = self._criterion(outputs, labels)
             device_id = labels.data.device
-
-            losses['all_loss'] = loss
-            losses['all_loss_num'] = torch.as_tensor(labels.size(0),device=device_id)
 
             if mode == 'val':
                 performances = {}
                 _, preds = torch.max(outputs, 1)
-                correct_num = preds.eq(labels).sum()
-                performances['all_perf'] = torch.as_tensor(correct_num,device=device_id)
-                performances['all_perf_num'] = torch.as_tensor(labels.size(0),device=device_id)
+                performances['performance'] = preds.eq(labels).sum()
 
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
                         cognize = labels == idx
                         if labels[cognize].size(0):
-                            losses[_label + '_loss'] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
-                            losses[_label + '_loss_num'] = torch.as_tensor(labels[cognize].size(0),device=device_id)
-                            performances[_label + '_perf'] = torch.as_tensor(preds[cognize].eq(labels[cognize]).sum(),device=device_id)
-                            performances[_label + '_perf_num'] = torch.as_tensor(labels[cognize].size(0),device=device_id)
-                        else:
-                            losses[_label + '_loss'] = torch.as_tensor(0,device=device_id)
-                            losses[_label + '_loss_num'] = torch.as_tensor(0,device=device_id)
-                            performances[_label + '_perf'] = torch.as_tensor(0,device=device_id)
-                            performances[_label + '_perf_num'] = torch.as_tensor(0,device=device_id)
+                            losses['loss_'+_label] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
+                            performances['performance_'+_label] = preds[cognize].eq(labels[cognize]).sum()
 
                 return losses, performances
             else:
@@ -84,11 +72,8 @@ class ClsModel(nn.Module):
                     for _label, _weight in d.items():
                         cognize = labels == idx
                         if labels[cognize].size(0):
-                            losses[_label + '_loss'] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
-                            losses[_label + '_loss_num'] = torch.as_tensor(labels[cognize].size(0),device=device_id)
-                        else:
-                            losses[_label + '_loss'] = torch.as_tensor(0,device=device_id)
-                            losses[_label + '_loss_num'] = torch.as_tensor(0,device=device_id)
+                            losses['loss_'+_label] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
+
                 return losses
 
 

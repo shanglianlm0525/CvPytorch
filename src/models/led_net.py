@@ -424,16 +424,16 @@ class LEDNet(nn.Module):
 
             losses = {}
 
-            losses['crossEntropy_loss'] = self._criterion(outputs, labels[:, 0])
-            losses['all_loss'] = losses['crossEntropy_loss']
+            losses['loss_crossEntropy'] = self._criterion(outputs, labels[:, 0])
+            losses['loss'] = losses['loss_crossEntropy']
             if mode == 'val':
                 performances = {}
 
                 preds =  outputs.max(1)[1].unsqueeze(1).data
                 labels = labels.data
 
-                performances['mIoU_perf'] = computeIoU(preds, labels, self._num_classes, 19)
-                performances['all_perf'] = performances['mIoU_perf']
+                performances['performance_mIoU'] = computeIoU(preds, labels, self._num_classes, 19)
+                performances['performance'] = performances['performance_mIoU']
 
                 return losses, performances
             else:

@@ -119,7 +119,7 @@ class SegModel(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, img, labels=None, mode='infer', **kwargs):
+    def forward(self, img, targets=None, mode='infer', **kwargs):
         x1 = self.inc(img)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -133,8 +133,6 @@ class SegModel(nn.Module):
 
         threshold = 0.5
         if mode == 'infer':
-            np.set_printoptions(threshold=1e6)
-
             probs = torch.sigmoid(outputs)
 
             probs = probs.squeeze(0)
@@ -156,37 +154,36 @@ class SegModel(nn.Module):
 
             result = Image.fromarray((full_mask * 255).astype(np.uint8))
             result.save(str(333)+'.png')
-            assert 1==2
             return probs
         else:
             losses = {}
-            device_id = labels.data.device
-            losses['all_loss'] = 0
-            losses['bce_loss'] = 0
+            device_id = targets.data.device
+            losses['loss'] = 0
+            losses['loss_bce'] = 0
 
             if mode == 'val':
                 performances = {}
                 outs = (outputs > threshold).float()
-                performances['all_perf'] = 0
+                performances['performance'] = 0
 
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
-                        losses['bce_loss'] += torchF.binary_cross_entropy_with_logits(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
-                        performances[_label + '_perf'] = torch.as_tensor(dice_coeff(outs[:,idx,:,:], labels[:,idx,:,:].squeeze(dim=1)).item(),device=device_id)
-                        performances['all_perf'] += performances[_label + '_perf']
+                        losses['loss_bce'] += torchF.binary_cross_entropy_with_logits(outputs[:,idx,:,:], targets[:,idx,:,:]) * _weight
+                        performances['performance_'+_label] = torch.as_tensor(dice_coeff(outs[:,idx,:,:], targets[:,idx,:,:].squeeze(dim=1)).item(),device=device_id)
+                        performances['performance'] += performances['performance_'+_label]
 
-                performances['all_perf'] = performances['all_perf'] / len(self.dictionary)
-                losses['all_loss'] = losses['bce_loss']
+                performances['performance'] = performances['performance'] / len(self.dictionary)
+                losses['loss'] = losses['loss_bce']
 
                 return losses, performances
             else:
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
-                        losses['bce_loss'] += torchF.binary_cross_entropy_with_logits(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
+                        losses['loss_bce'] += torchF.binary_cross_entropy_with_logits(outputs[:,idx,:,:], targets[:,idx,:,:]) * _weight
 
-                losses['all_loss'] = losses['bce_loss']
+                losses['loss'] = losses['loss_bce']
 
-                print(losses)
+                # print(losses)
                 return losses
 
 
