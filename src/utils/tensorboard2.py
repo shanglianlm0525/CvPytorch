@@ -4,14 +4,11 @@
 # @Author : liumin
 # @File : tensorboard.py
 from torch.utils.tensorboard import SummaryWriter
-from tensorboardX import SummaryWriter
-
 
 class DummyWriter(SummaryWriter):
-    def __init__(self, logdir=None, comment='', purge_step=None, max_queue=10, flush_secs=120, filename_suffix='',
-                 write_to_disk=True, log_dir=None, **kwargs):
-        super().__init__(logdir, comment, purge_step, max_queue, flush_secs, filename_suffix, write_to_disk, log_dir,
-                         **kwargs)
+    def __init__(self, log_dir=None, comment='', purge_step=None, max_queue=10,
+                     flush_secs=120, filename_suffix=''):
+        super().__init__(log_dir, comment, purge_step, max_queue,flush_secs, filename_suffix)
 
     def add_scalar(self, tag, scalar_value, global_step=None, walltime=None):
         super(DummyWriter, self).add_scalar(tag, scalar_value, global_step, walltime)
@@ -25,16 +22,16 @@ class DummyWriter(SummaryWriter):
     def add_image(self, tag, img_tensor, global_step=None, walltime=None, dataformats='CHW'):
         super(DummyWriter, self).add_image(tag, img_tensor, global_step, walltime, dataformats)
 
-    def add_graph(self, model, input_to_model=None, verbose=False, profile_with_cuda=False, **kwargs):
-        super(DummyWriter, self).add_graph(model, input_to_model, verbose, profile_with_cuda, **kwargs)
+    def add_graph(self, model, input_to_model=None, verbose=False):
+        super(DummyWriter, self).add_graph(model, input_to_model, verbose)
 
     def add_images(self, tag, img_tensor, global_step=None, walltime=None, dataformats='NCHW'):
         super(DummyWriter, self).add_images(tag, img_tensor, global_step, walltime, dataformats)
 
     def add_image_with_boxes(self, tag, img_tensor, box_tensor, global_step=None,
-                             walltime=None, dataformats='CHW', labels=None, **kwargs):
+                             walltime=None, rescale=1, dataformats='CHW', labels=None):
         super(DummyWriter, self).add_image_with_boxes(tag, img_tensor, box_tensor, global_step,
-                             walltime, dataformats, labels, **kwargs)
+                             walltime)
 
     def add_figure(self, tag, figure, global_step=None, close=True, walltime=None):
         super(DummyWriter, self).add_figure(tag, figure, global_step, close, walltime)
@@ -54,9 +51,6 @@ class DummyWriter(SummaryWriter):
 
     def add_mesh(self, tag, vertices, colors=None, faces=None, config_dict=None, global_step=None, walltime=None):
         super(DummyWriter, self).add_mesh(tag, vertices, colors, faces, config_dict, global_step, walltime)
-
-    def export_scalars_to_json(self, path):
-        super(DummyWriter, self).export_scalars_to_json(path)
 
     def close(self):
         super(DummyWriter, self).close()

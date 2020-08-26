@@ -1,0 +1,21 @@
+SEG_CLASSES:
+  # - background: 1
+  - road: 1
+  - sidewalk: 1
+  - building: 1
+  - wall: 1
+  - fence: 1
+  - pole: 1
+  - traffic light: 1
+  - traffic sign: 1
+  - vegetation : 1
+  - terrain: 1
+  - sky: 1
+  - person: 1
+  - rider: 1
+  - car: 1
+  - truck: 1
+  - bus: 1
+  - train: 1
+  - motorcycle: 1
+  - bicycle: 1

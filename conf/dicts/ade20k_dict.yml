@@ -1,0 +1,151 @@
+SEG_CLASSES:
+  # - background: 1
+ - wallbuilding: 1
+ - sky: 1
+ - floor: 1
+ - tree: 1
+ - ceiling: 1
+ - road: 1
+ - bed : 1
+ - windowpane: 1
+ - grass: 1
+ - cabinet: 1
+ - sidewalk: 1
+ - person: 1
+ - earth: 1
+ - door: 1
+ - table: 1
+ - mountain: 1
+ - plant: 1
+ - curtain: 1
+ - chair: 1
+ - car: 1
+ - water: 1
+ - painting: 1
+ - sofa: 1
+ - shelf: 1
+ - house: 1
+ - sea: 1
+ - mirror: 1
+ - rug: 1
+ - field: 1
+ - armchair: 1
+ - seat: 1
+ - fence: 1
+ - desk: 1
+ - rock: 1
+ - wardrobe: 1
+ - lamp: 1
+ - bathtub: 1
+ - railing: 1
+ - cushion: 1
+ - base: 1
+ - box: 1
+ - column: 1
+ - signboard: 1
+ - chest of drawers: 1
+ - counter: 1
+ - sand: 1
+ - sink: 1
+ - skyscraper: 1
+ - fireplace: 1
+ - refrigerator: 1
+ - grandstand: 1
+ - path: 1
+ - stairs: 1
+ - runway: 1
+ - case: 1
+ - pool table: 1
+ - pillow: 1
+ - screen door: 1
+ - stairway: 1
+ - river: 1
+ - bridge: 1
+ - bookcase: 1
+ - blind: 1
+ - coffee table: 1
+ - toilet: 1
+ - flower: 1
+ - book: 1
+ - hill: 1
+ - bench: 1
+ - countertop: 1
+ - stove: 1
+ - palm: 1
+ - kitchen island: 1
+ - computer: 1
+ - swivel chair: 1
+ - boat: 1
+ - bar: 1
+ - arcade machine: 1
+ - hovel: 1
+ - bus: 1
+ - towel: 1
+ - light: 1
+ - truck: 1
+ - tower: 1
+ - chandelier: 1
+ - awning: 1
+ - streetlight: 1
+ - booth: 1
+ - television receiver: 1
+ - airplane: 1
+ - dirt track: 1
+ - apparel: 1
+ - pole: 1
+ - land: 1
+ - bannister: 1
+ - escalator: 1
+ - ottoman: 1
+ - bottle: 1
+ - buffet: 1
+ - poster: 1
+ - stage: 1
+ - van: 1
+ - ship: 1
+ - fountain: 1
+ - conveyer belt: 1
+ - canopy: 1
+ - washer: 1
+ - plaything: 1
+ - swimming pool: 1
+ - stool: 1
+ - barrel: 1
+ - basket: 1
+ - waterfall: 1
+ - tent: 1
+ - bag: 1
+ - minibike: 1
+ - cradle: 1
+ - oven: 1
+ - ball: 1
+ - food: 1
+ - step: 1
+ - tank: 1
+ - trade name: 1
+ - microwave: 1
+ - pot: 1
+ - animal: 1
+ - bicycle: 1
+ - lake: 1
+ - dishwasher: 1
+ - screen: 1
+ - blanket: 1
+ - sculpture: 1
+ - hood: 1
+ - sconce: 1
+ - vase: 1
+ - traffic light: 1
+ - tray: 1
+ - ashcan: 1
+ - fan: 1
+ - pier: 1
+ - crt screen: 1
+ - plate: 1
+ - monitor: 1
+ - bulletin board: 1
+ - shower: 1
+ - radiator: 1
+ - glass: 1
+ - clock: 1
+ - flag: 1

@@ -1,41 +1,41 @@
-EXPERIMENT_NAME: 'PortraitMatting'
+EXPERIMENT_NAME: 'Cityscapes_LEDnet'
 
 ## DATASET
 DATASET:
-  CLASS: 'src.datasets.portrait.PortraitSegmentation'
-  DICTIONARY: 'conf/dicts/portrait_dict.yml'
+  CLASS: 'src.datasets.cityscapes2.CityscapesSegmentation'
+  DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/portrait'
-    IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/portrait/train.txt'
+    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+    IMG_SUFFIX: '.png'
+    INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
     LABELS:
-      DET_DIR: '/home/lmin/data/portrait'
+      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/portrait'
-      SEG_SUFFIX: '*.png'
+      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      SEG_SUFFIX: '.png'
 
   VAL:
-    IMG_DIR: '/home/lmin/data/portrait'
-    IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/portrait/val.txt'
+    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+    IMG_SUFFIX: '.png'
+    INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
     SHUFFLE: False
     LABELS:
-      DET_DIR: '/home/lmin/data/portrait'
+      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/portrait'
-      SEG_SUFFIX: '*.png'
+      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      SEG_SUFFIX: '.png'
 
-  TRANSFORMS:
-    CenterCrop:
-      crop_size: [600, 800]
-    ToTensor:
-    ToBGR:
-    ImageSubtract128:
+TRANSFORMS:
+  CenterCrop:
+    crop_size: [400, 400]
+  ToTensor:
+  ToBGR:
+  ImageSubtract128:
 
 ## MODEL
-USE_MODEL: 'src.models.seg_model.SegModel'
+USE_MODEL: 'src.models.led_net.LEDNet'
 
 ## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'
@@ -72,9 +72,9 @@ GRAD_CLIP:
 
 ## CONFIGURATIONS
 GPU_IDS: [1]
-BATCH_SIZE: 2
-NUM_WORKERS: 4
-N_MAX_EPOCHS: 100
+BATCH_SIZE: 8
+NUM_WORKERS: 16
+N_MAX_EPOCHS: 160
 
 N_ITERS_TO_DISPLAY_STATUS: 100
 

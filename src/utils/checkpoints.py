@@ -7,13 +7,15 @@
 import os
 import torch
 
+from src.utils.distributed import is_main_process
+
 # Common prefix for checkpoint file names
 _NAME_PREFIX = "model_epoch_"
 # Checkpoints directory name
 _DIR_NAME = "checkpoints"
 
 
-def load_checkpoint(save_path, model, optimizer=None, lr_scheduler=None):
+def load_checkpoint(save_path, model, optimizer=None, lr_scheduler=None,amp=None):
     """Loads the checkpoint from the given file."""
     error_str = "Checkpoint '{}' not found"
     assert os.path.exists(save_path), error_str.format(save_path)
@@ -25,6 +27,8 @@ def load_checkpoint(save_path, model, optimizer=None, lr_scheduler=None):
         optimizer.load_state_dict(checkpoint_state["optimizer"])
     if lr_scheduler:
         lr_scheduler.load_state_dict(checkpoint_state["lr_scheduler"])
+    if amp:
+        amp.load_state_dict(checkpoint_state["amp"])
 
 class Checkpoints():
     def __init__(self, logger=None, checkpoint_dir=None, experiment_id=None):
@@ -43,7 +47,7 @@ class Checkpoints():
         return checkpoint_path
 
 
-    def load_checkpoint(self,save_path, model, optimizer=None,lr_scheduler=None):
+    def load_checkpoint(self,save_path, model, optimizer=None,lr_scheduler=None,amp=None):
         """Loads the checkpoint from the given file."""
         error_str = "Checkpoint '{}' not found"
         assert os.path.exists(save_path), error_str.format(save_path)
@@ -55,6 +59,8 @@ class Checkpoints():
             optimizer.load_state_dict(checkpoint_state["optimizer"])
         if lr_scheduler:
             lr_scheduler.load_state_dict(checkpoint_state["lr_scheduler"])
+        #if amp:
+        #    amp.load_state_dict(checkpoint_state["amp"])
         self.logger.info("Checkpoint loaded from {}".format(save_path))
         return checkpoint_state["epoch"]
 
@@ -67,39 +73,43 @@ class Checkpoints():
         return os.path.join(checkpoint_dir, last_checkpoint_name)
 
 
-    def resume_checkpoint(self, model, optimizer, lr_scheduler):
+    def resume_checkpoint(self, model, optimizer, lr_scheduler,amp):
         chkpnt = torch.load("xxx")
         model.load_state_dict(chkpnt["model"], strict=False)
         start_epoch = chkpnt["epoch"]
         optimizer.load_state_dict(chkpnt["optimizer"])
         lr_scheduler.load_state_dict(chkpnt["lr_scheduler"])
+        amp.load_state_dict(chkpnt["amp"])
         self.logger.info("Resumed checkpoint: {}".format('xxx'))
         return start_epoch
 
 
-    def save_checkpoint(self, model,checkpoint_path, epoch=-1, optimizer=None, lr_scheduler=None):
+    def save_checkpoint(self, model,checkpoint_path, epoch=-1, optimizer=None, lr_scheduler=None,amp=None):
         checkpoint_state = {
             "epoch": epoch,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "lr_scheduler": lr_scheduler.state_dict(),
+            # 'amp': amp.state_dict()
         }
 
         torch.save(checkpoint_state, checkpoint_path)
         self.logger.info("Checkpoint saved to {}".format(checkpoint_path))
 
-    def autosave_checkpoint(self,model, epoch,type, optimizer, lr_scheduler):
-        if type=='best':
-            checkpoint_path = os.path.join(self.checkpoint_dir,self.experiment_id, self.experiment_id+'#best.pth')
-        else:
-            checkpoint_path = self.checkpoint_path.format(epoch=epoch, type=type)
-        self.save_checkpoint(
-            checkpoint_path=checkpoint_path,
-            epoch=epoch,
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler
-        )
+    def autosave_checkpoint(self,model, epoch,type, optimizer, lr_scheduler,amp):
+        if is_main_process():
+            if type=='best':
+                checkpoint_path = os.path.join(self.checkpoint_dir,self.experiment_id, self.experiment_id+'#best.pth')
+            else:
+                checkpoint_path = self.checkpoint_path.format(epoch=epoch, type=type)
+            self.save_checkpoint(
+                checkpoint_path=checkpoint_path,
+                epoch=epoch,
+                model=model,
+                optimizer=optimizer,
+                lr_scheduler=lr_scheduler,
+                amp = amp
+            )
 
 
 

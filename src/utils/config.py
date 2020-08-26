@@ -113,7 +113,7 @@ class CommonConfiguration(Configuration):
     def from_yaml(cls, path, warning_suppress=False):
         cls.validate_path(path)
         with open(path, 'r') as f:
-            y = yaml.load(f)
+            y = yaml.load(f, Loader=yaml.FullLoader)
         return CommonConfiguration.from_dict(y, warning_suppress=warning_suppress)
 
     @classmethod

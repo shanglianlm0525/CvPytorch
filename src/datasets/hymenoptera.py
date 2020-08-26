@@ -13,6 +13,32 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder
 
+
+
+data_transforms = {
+    'train': transformsT.Compose([
+        transformsT.RandomResizedCrop(224),
+        transformsT.RandomHorizontalFlip(),
+        transformsT.ToTensor(),
+        transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    ]),
+
+    'val': transformsT.Compose([
+        transformsT.Resize(256),
+        transformsT.CenterCrop(224),
+        transformsT.ToTensor(),
+        transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    ]),
+
+    'test': transformsT.Compose([
+        transformsT.Resize(256),
+        transformsT.CenterCrop(224),
+        transformsT.ToTensor(),
+        transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    ])
+}
+
+
 class HymenopteraDataset(Dataset):
     """
         hymenoptera_data
@@ -22,8 +48,8 @@ class HymenopteraDataset(Dataset):
         super(HymenopteraDataset, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = transform
-        self.target_transform = target_transform
+        self.transform = data_transforms[stage]
+        self.target_transform = None
         self.stage = stage
 
         self._imgs = []

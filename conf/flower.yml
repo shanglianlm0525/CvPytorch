@@ -1,7 +1,6 @@
 EXPERIMENT_NAME: 'Flower'
 
 DATASET:
-  NAME: 'Flower'
   CLASS: 'src.datasets.Flower.FlowerDataset'
   DICTIONARY: 'conf/dicts/flower_dict.yml'
 

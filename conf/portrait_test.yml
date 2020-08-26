@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'PortraitMatting'
+EXPERIMENT_NAME: 'PortraitMatting_Test'
 
 ## DATASET
 DATASET:
@@ -7,25 +7,36 @@ DATASET:
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/portrait'
-    IMG_SUFFIX: '*.png'
+    IMG_SUFFIX: '.png'
     INDICES: '/home/lmin/data/portrait/train.txt'
     SHUFFLE: True
     LABELS:
       DET_DIR: '/home/lmin/data/portrait'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/portrait'
-      SEG_SUFFIX: '*.png'
+      SEG_SUFFIX: '.png'
 
   VAL:
     IMG_DIR: '/home/lmin/data/portrait'
-    IMG_SUFFIX: '*.png'
+    IMG_SUFFIX: '.png'
     INDICES: '/home/lmin/data/portrait/val.txt'
     SHUFFLE: False
     LABELS:
       DET_DIR: '/home/lmin/data/portrait'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/portrait'
-      SEG_SUFFIX: '*.png'
+      SEG_SUFFIX: '.png'
+
+  INFER:
+    IMG_DIR: '/home/lmin/data/portrait'
+    IMG_SUFFIX: '.png'
+    INDICES: '/home/lmin/data/portrait/test2.txt'
+    SHUFFLE: False
+    LABELS:
+      DET_DIR: '/home/lmin/data/portrait'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/portrait'
+      SEG_SUFFIX: '.png'
 
   TRANSFORMS:
     CenterCrop:
@@ -49,16 +60,16 @@ OPTIMIZER:
   TYPE: 'RMSprop' # Adam, RMSprop
   BIAS_PARAMS:
     momentum: 0
-    weight_decay: 0.00000001
+    weight_decay: 0
   WEIGHT_PARAMS:
     momentum: 0
-    weight_decay: 0.00000001
+    weight_decay: 0
   BIAS_LR_MULTIPLIER: 1
 
 ## LR_SCHEDULER
 LR_SCHEDULER:
   TYPE: 'MultiStepLR'
-  MILESTONES: [10, 30, 50, 70, 90]
+  MILESTONES: [30, 60, 90, 120, 150]
   GAMMA: 0.1
   PATIENCE: 10
 
@@ -73,8 +84,8 @@ GRAD_CLIP:
 ## CONFIGURATIONS
 GPU_IDS: [1]
 BATCH_SIZE: 2
-NUM_WORKERS: 4
-N_MAX_EPOCHS: 100
+NUM_WORKERS: 2
+N_MAX_EPOCHS: 200
 
 N_ITERS_TO_DISPLAY_STATUS: 100
 
@@ -83,3 +94,4 @@ TENSORBOARD: True
 TENSORBOARD_LOG_DIR: 'runs'
 TENSORBOARD_MODEL: True
 TENSORBOARD_WEIGHT: True
+TENSORBOARD_IMAGE: True

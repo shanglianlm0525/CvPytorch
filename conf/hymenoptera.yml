@@ -1,8 +1,7 @@
 EXPERIMENT_NAME: 'Hymenoptera'
 
 DATASET:
-  NAME: 'AntsBees'
-  CLASS: 'src.datasets.Hymenoptera.HymenopteraDataset'
+  CLASS: 'src.datasets.hymenoptera.HymenopteraDataset'
   DICTIONARY: 'conf/dicts/hymenoptera_dict.yml'
 
   TRAIN:
@@ -78,6 +77,11 @@ LR_SCHEDULER:
   MILESTONES: [7, 14, 21]
   GAMMA: 0.1
   PATIENCE: 10
+
+SYNC_BN: False
+
+APEX: False
+APEX_LEVEL: '00' # '00':fp32 train '01': Mixed Precision (recommended)  '02': almost fp16 '03': fp16 training
 
 #########################################
 # Logging / Visualization Configurations
