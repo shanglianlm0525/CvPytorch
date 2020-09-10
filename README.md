@@ -59,8 +59,33 @@ Note that when using COCO dataset, 164k version is used per default, if 10k is p
 
 ### Install
 
-'''
-$ git clone https://github.com/NVIDIA/apex
-$ cd apex
-$ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
-'''
+**apex:**
+
+`$ git clone https://github.com/NVIDIA/apex`
+`$ cd apex`
+`$ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./`
+
+
+
+### Training
+
+For this example, we will use [COCO](https://github.com/ultralytics/yolov5/blob/master/data/get_coco2017.sh) dataset with `yolov5l.yaml` . Feel free to use your own custom dataset and configurations.
+
+#### Single GPU
+
+```bash
+$ python trainer.py --setting 'conf/hymenoptera.yml'
+```
+
+#### Multiple GPUs
+
+```bash
+$ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'conf/hymenoptera.yml'
+```
+
+### Inference
+
+
+
+### TODO
+- [x] Cache reused layer 
