@@ -336,7 +336,7 @@ class Trainer:
     def _parser_model(self,dictionary):
         *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.split(".")
         model_class = getattr(importlib.import_module(".".join(model_mod_str_parts)), model_class_str)
-        model = model_class(dictionary=dictionary,device=cfg.device)
+        model = model_class(dictionary=dictionary)
         return model
 
     def run(self):
@@ -435,7 +435,8 @@ class Trainer:
                 if cfg.local_rank == 0:
                     self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft,amp=None)
 
-        self.tb_writer.close()
+        if cfg.local_rank == 0:
+            self.tb_writer.close()
 
         dist.destroy_process_group() if cfg.local_rank!=0 else None
         torch.cuda.empty_cache()
@@ -446,9 +447,6 @@ class Trainer:
         _timer = Timer()
         lossLogger = MetricLogger(delimiter="  ")
         performanceLogger = MetricLogger(delimiter="  ")
-
-        # Creates once at the beginning of training
-        scaler = torch.cuda.amp.GradScaler()
 
         for i, (imgs, targets) in enumerate(dataloader):
             _timer.tic()
@@ -485,11 +483,9 @@ class Trainer:
             _timer.toc()
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
-                print('losses',losses)
                 if self.cfg.distributed:
                     # reduce losses over all GPUs for logging purposes
                     loss_dict_reduced = reduce_dict(losses)
-                    print('loss_dict_reduced', loss_dict_reduced)
                     lossLogger.update(**loss_dict_reduced)
                 else:
                     lossLogger.update(**losses)
@@ -612,53 +608,19 @@ if __name__ == '__main__':
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(list(map(str, cfg.GPU_IDS)))
 
-    cfg.gpu = cfg.GPU_IDS[0]
     cfg.world_size = 1
     cfg.local_rank = args.local_rank
 
     if cfg.distributed:
-        cfg.gpu = cfg.local_rank
-        torch.cuda.set_device(cfg.gpu)
+        torch.cuda.set_device(cfg.local_rank)
         torch.distributed.init_process_group(backend='nccl', init_method='env://')
         cfg.world_size = torch.distributed.get_world_size()
 
+    print(cfg.distributed, cfg.local_rank, cfg.world_size, cfg.GPU_IDS, len(cfg.GPU_IDS))
     assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
+    assert (cfg.distributed and len(cfg.GPU_IDS)>1) or (not cfg.distributed and len(cfg.GPU_IDS)<2),'world_size must be compatible with len(cfg.GPU_IDS)'
 
-    logger.info('Loaded configuration file: {}'.format(args.setting))
-    logger.info('Use gpu ids: {}'.format(cfg.GPU_IDS))
-
-    trainer = Trainer(cfg)
-    logger.info('Begin to training ...')
-    trainer.run()
-
-    logger.info('finish!')
-    torch.cuda.empty_cache()
-
-    '''
-    cfg.world_size = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
-    cfg.global_rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
-    cfg.distributed = cfg.world_size > 1
-    cfg.rank = args.local_rank
-
-    print(cfg.rank,cfg.world_size,cfg.GPU_IDS,len(cfg.GPU_IDS))
-    if cfg.rank== -1 and len(cfg.GPU_IDS)>0:
-        cfg.GPU_IDS = [cfg.GPU_IDS[0]]
-    assert (cfg.rank != -1 and len(cfg.GPU_IDS)>1) or (cfg.rank == -1 and len(cfg.GPU_IDS)==1) ,'--rank must be compatible with len(cfg.GPU_IDS)'
-
-    # torch_distributed_zero_first(cfg.rank)
-
-    # DDP mode
-    if cfg.rank != -1:
-        assert torch.cuda.device_count() > cfg.rank
-        torch.cuda.set_device(cfg.rank)
-        device = torch.device('cuda', cfg.rank)
-        dist.init_process_group(backend='nccl', init_method='env://')  # distributed backend
-    else:
-        device = torch.device('cuda:'+str(cfg.GPU_IDS[0]) if torch.cuda.is_available() else 'cpu')
-
-    cfg.device = device
-
-    if cfg.rank in [-1, 0]:
+    if cfg.local_rank == 0:
         logger.info('Loaded configuration file: {}'.format(args.setting))
         logger.info('Use gpu ids: {}'.format(cfg.GPU_IDS))
 
@@ -666,7 +628,6 @@ if __name__ == '__main__':
     logger.info('Begin to training ...')
     trainer.run()
 
-    if cfg.rank in [-1, 0]:
+    if cfg.local_rank == 0:
         logger.info('finish!')
-        torch.cuda.empty_cache()
-    '''
+    torch.cuda.empty_cache()

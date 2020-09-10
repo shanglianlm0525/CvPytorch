@@ -111,10 +111,18 @@ def reduce_dict(input_dict, average=True):
             names.append(k)
             values.append(input_dict[k])
         values = torch.stack(values, dim=0)
+
+        if average:
+            reduced_dict = {k: torch.mean(v) for k, v in zip(names, values)}
+        else:
+            reduced_dict = {k: torch.sum(v) for k, v in zip(names, values)}
+
+        ''' 
         dist.all_reduce(values)
         if average:
             values /= world_size
         reduced_dict = {k: v for k, v in zip(names, values)}
+        '''
     return reduced_dict
 
 class SmoothedValue(object):
