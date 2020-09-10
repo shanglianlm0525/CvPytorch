@@ -56,14 +56,15 @@ The second step is to augment the dataset using the additionnal annotations prov
 - **COCO Stuff:** For COCO, there is two partitions, CocoStuff10k with only 10k that are used for training the evaluation, note that this dataset is outdated, can be used for small scale testing and training, and can be downloaded [here](https://github.com/nightrome/cocostuff10k). For the official dataset with all of the training 164k examples, it can be downloaded from the official [website](http://cocodataset.org/#download).\
 Note that when using COCO dataset, 164k version is used per default, if 10k is prefered, this needs to be specified with an additionnal parameter `partition = 'CocoStuff164k'` in the config file with the corresponding path.
 
-
 ### Install
 
-**apex:**
+#### apex:
 
-`$ git clone https://github.com/NVIDIA/apex`
-`$ cd apex`
-`$ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./`
+```bash
+$ git clone https://github.com/NVIDIA/apex
+$ cd apex
+$ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+```
 
 
 
@@ -71,13 +72,13 @@ Note that when using COCO dataset, 164k version is used per default, if 10k is p
 
 For this example, we will use [COCO](https://github.com/ultralytics/yolov5/blob/master/data/get_coco2017.sh) dataset with `yolov5l.yaml` . Feel free to use your own custom dataset and configurations.
 
-#### Single GPU
+#### Single GPU:
 
 ```bash
 $ python trainer.py --setting 'conf/hymenoptera.yml'
 ```
 
-#### Multiple GPUs
+#### Multiple GPUs:
 
 ```bash
 $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'conf/hymenoptera.yml'
@@ -88,4 +89,18 @@ $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'co
 
 
 ### TODO
-- [x] Cache reused layer 
+- [x] Train Custom Data
+
+- [x] Multi-GPU Training
+
+- [ ] Mixed Precision Training
+
+- [ ] Model Pruning/Sparsity
+
+- [ ] Quantization
+
+- [ ] TensorRT Deployment
+
+- [ ] ONNX and TorchScript Export
+
+  
