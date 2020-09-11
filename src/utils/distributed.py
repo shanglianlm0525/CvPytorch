@@ -67,28 +67,23 @@ def torch_distributed_zero_first(local_rank: int):
         torch.distributed.barrier()
 
 
-def init_distributed(dist_backend = 'nccl',dist_url='env://',world_size=1):
-    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        rank = int(os.environ["RANK"])
-        world_size = int(os.environ['WORLD_SIZE'])
-        gpu = int(os.environ['LOCAL_RANK'])
-    elif 'SLURM_PROCID' in os.environ:
-        rank = int(os.environ['SLURM_PROCID'])
-        gpu = rank % torch.cuda.device_count()
+def init_distributed(cfg):
+    cfg.distributed = False
+    if 'WORLD_SIZE' in os.environ:
+        cfg.distributed = int(os.environ['WORLD_SIZE']) > 1
     else:
-        print('Not using distributed mode')
-        distributed = False
-        return distributed
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(list(map(str, cfg.GPU_IDS)))
 
-    distributed = True
+    cfg.world_size = 1
 
-    torch.cuda.set_device(gpu)
-    print('| distributed init (rank {}): {}'.format(rank, dist_url), flush=True)
-    dist.init_process_group(backend=dist_backend, init_method=dist_url,
-                                         world_size=world_size, rank=rank)
-    # dist.barrier()
-    # setup_for_distributed(rank == 0)
-    return distributed
+    if cfg.distributed:
+        torch.cuda.set_device(cfg.local_rank)
+        torch.distributed.init_process_group(backend='nccl', init_method='env://')
+        cfg.world_size = torch.distributed.get_world_size()
+
+    assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
+    assert (cfg.distributed and len(cfg.GPU_IDS) > 1) or (not cfg.distributed and len(cfg.GPU_IDS) < 2), 'world_size %s incompatible with GPU_IDS %s' % (cfg.world_size,cfg.GPU_IDS)
+    return cfg
 
 
 def reduce_dict(input_dict, average=True):
@@ -124,6 +119,14 @@ def reduce_dict(input_dict, average=True):
         reduced_dict = {k: v for k, v in zip(names, values)}
         '''
     return reduced_dict
+
+
+def is_dist_avail_and_initialized():
+    if not dist.is_available():
+        return False
+    if not dist.is_initialized():
+        return False
+    return True
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
