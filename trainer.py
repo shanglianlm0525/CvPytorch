@@ -340,12 +340,11 @@ class Trainer:
         return model
 
     def run(self):
+        ## init distributed
+        self.cfg = init_distributed(self.cfg)
+
         cfg = self.cfg
         # cfg.print()
-
-        ## init distributed
-        # self.distributed = init_distributed(dist_backend = 'nccl',dist_url='env://',world_size=1)
-        # self.distributed = True if cfg.rank != -1 else False
 
         ## parser_dict
         dictionary = self._parser_dict()
@@ -358,7 +357,7 @@ class Trainer:
         ## parser_model
         model_ft = self._parser_model(dictionary)
 
-        if cfg.distributed and False:
+        if cfg.distributed:
             model_ft = apex.parallel.convert_syncbn_model(model_ft).cuda()
         else:
             model_ft = model_ft.cuda()
@@ -601,26 +600,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     cfg = CommonConfiguration.from_yaml(args.setting)
-
-    cfg.distributed = False
-    if 'WORLD_SIZE' in os.environ:
-        cfg.distributed = int(os.environ['WORLD_SIZE']) > 1
-    else:
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(list(map(str, cfg.GPU_IDS)))
-
-    cfg.world_size = 1
     cfg.local_rank = args.local_rank
 
-    if cfg.distributed:
-        torch.cuda.set_device(cfg.local_rank)
-        torch.distributed.init_process_group(backend='nccl', init_method='env://')
-        cfg.world_size = torch.distributed.get_world_size()
-
-    print(cfg.distributed, cfg.local_rank, cfg.world_size, cfg.GPU_IDS, len(cfg.GPU_IDS))
-    assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
-    assert (cfg.distributed and len(cfg.GPU_IDS)>1) or (not cfg.distributed and len(cfg.GPU_IDS)<2),'world_size must be compatible with len(cfg.GPU_IDS)'
-
-    if cfg.local_rank == 0:
+    if cfg.local_rank==0:
         logger.info('Loaded configuration file: {}'.format(args.setting))
         logger.info('Use gpu ids: {}'.format(cfg.GPU_IDS))
 
