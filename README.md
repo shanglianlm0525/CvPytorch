@@ -1,4 +1,5 @@
-# CvPytorch
+CvPytorch
+
 CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 
@@ -10,38 +11,48 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 - tensorflow 2.2.0          
 - tensorboardX 2.1
 - numpy 1.18.0
-- matplotlib 3.1.0
-- Pillow 6.2.0
-- tqdm==4.45.0
 - opencv-python 4.2.0.32           
-- openpyxl 2.5.3   
 
 ## Models 
 
 ## Image Classification
-- (**VGG**) VGG: Very Deep Convolutional Networks for Large-Scale Image Recognition
-- (**ResNet**) ResNet: Deep Residual Learning for Image Recognition
-- (**DenseNet**) DenseNet: Densely Connected Convolutional Networks
-- (**ShuffleNet**) ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices
-- (**ShuffleNet V2**) ShuffleNet V2: Practical Guidelines for Ecient CNN Architecture Design
+- [x] (**VGG**) VGG: Very Deep Convolutional Networks for Large-Scale Image Recognition
+
+- [x] (**ResNet**) ResNet: Deep Residual Learning for Image Recognition
+
+- [x] (**DenseNet**) DenseNet: Densely Connected Convolutional Networks
+
+- [x] (**ShuffleNet**) ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices
+
+- [x] (**ShuffleNet V2**) ShuffleNet V2: Practical Guidelines for Ecient CNN Architecture Design
 
 ## Object Detection
-- (**SSD**) SSD: Single Shot MultiBox Detector
-- (**Faster R-CNN**) Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks
-- (**YOLOv3**) YOLOv3: An Incremental Improvement
-- (**FPN**) FPN: Feature Pyramid Networks for Object Detection
-- (**FCOS**) FCOS: Fully Convolutional One-Stage Object Detection
+- [x] (**SSD**) SSD: Single Shot MultiBox Detector
+
+- [ ] (**Faster R-CNN**) Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks
+
+- [ ] (**YOLOv3**) YOLOv3: An Incremental Improvement
+- [ ] (**YOLOv5**) 
+
+- [ ] (**FPN**) FPN: Feature Pyramid Networks for Object Detection
+
+- [ ] (**FCOS**) FCOS: Fully Convolutional One-Stage Object Detection
 
 ## Semantic Segmentation
-- (**FCN**) Fully Convolutional Networks for Semantic Segmentation 
-- (**Deeplab V3+**) Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation
-- (**PSPNet**) Pyramid Scene Parsing Network
-- (**ENet**) A Deep Neural Network Architecture for Real-Time Semantic Segmentation
-- (**U-Net**) Convolutional Networks for Biomedical Image Segmentation
-- (**SegNet**) A Deep ConvolutionalEncoder-Decoder Architecture for ImageSegmentation
+- [ ] (**FCN**) Fully Convolutional Networks for Semantic Segmentation 
+
+- [x] (**Deeplab V3+**) Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation
+
+- [x] (**PSPNet**) Pyramid Scene Parsing Network
+
+- [ ] (**ENet**) A Deep Neural Network Architecture for Real-Time Semantic Segmentation
+
+- [x] (**U-Net**) Convolutional Networks for Biomedical Image Segmentation
+
+- [ ] (**SegNet**) A Deep ConvolutionalEncoder-Decoder Architecture for ImageSegmentation
 
 ## Instance Segmentation
-- (**Mask-RCNN**) Mask-RCNN
+- [x] (**Mask-RCNN**) Mask-RCNN
 
 ### Datasets
 
@@ -93,7 +104,7 @@ $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'co
 
 - [x] Multi-GPU Training
 
-- [ ] Mixed Precision Training
+- [x] Mixed Precision Training
 
 - [ ] Model Pruning/Sparsity
 
