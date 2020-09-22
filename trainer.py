@@ -18,8 +18,6 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim import lr_scheduler
 import torchvision
 from torch.nn.parallel import data_parallel
-# from torch.nn import SyncBatchNorm
-# from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
 from torch.utils.data._utils.collate import default_collate_err_msg_format, np_str_obj_array_pattern
@@ -27,11 +25,13 @@ from torch.utils.data.dataloader import default_collate
 from torchvision import transforms as transformsT
 from torchvision import datasets as datasetsT
 from torchvision import models as modelsT
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import RandomSampler, SequentialSampler
 
 import attr
 from tqdm import tqdm
 from copy import deepcopy
-import importlib
+from importlib import import_module
 from time import time
 from datetime import datetime
 from pathlib import Path as P
@@ -41,12 +41,18 @@ import numpy as np
 from pathlib import Path as P
 import torch.distributed as dist
 
+'''
 try:
     import apex
     from apex import amp
-    from apex.parallel import DistributedDataParallel, SyncBatchNorm, convert_syncbn_model
+    from apex.parallel import DistributedDataParallel, convert_syncbn_model
 except ImportError:
     raise ImportError("Please install apex from https://www.github.com/nvidia/apex.")
+'''
+
+from torch.cuda import amp
+from torch.nn import SyncBatchNorm
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from src.utils.distributed import torch_distributed_zero_first
 from src.lr_schedulers.lr_scheduler import parser_lr_scheduler
@@ -59,9 +65,11 @@ from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
 from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
 
-cudnn.benchmark = False
+torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.enabled = True
+
+torch.set_default_tensor_type(torch.FloatTensor)
 
 def get_current_lr(optimizer):
     return min(g["lr"] for g in optimizer.param_groups)
@@ -312,31 +320,37 @@ class Trainer:
         return next(dictionary.items())[1] ## return first
 
     def _parser_datasets(self,dictionary):
-        transforms = prepare_transforms_seg()
-        target_transforms = prepare_transforms_mask()
+        # transforms = prepare_transforms_seg()
+        # target_transforms = prepare_transforms_mask()
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
-        dataset_class = getattr(importlib.import_module(".".join(dataset_str_parts)), dataset_class_str)
+        dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
-        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=dictionary, transform=transforms[x],
-                                     target_transform=target_transforms[x], stage=x) for x in ['train', 'val']}
+        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=dictionary, transform=None,
+                                     target_transform=None, stage=x) for x in ['train', 'val']}
 
         data_samplers = defaultdict()
         if self.cfg.distributed:
-            data_samplers = {x: torch.utils.data.distributed.DistributedSampler(datasets[x],shuffle=cfg.DATASET[x.upper()].SHUFFLE) for x in ['train', 'val']}
+            data_samplers = {x: DistributedSampler(datasets[x],shuffle=cfg.DATASET[x.upper()].SHUFFLE) for x in ['train', 'val']}
         else:
-            data_samplers['train'] = torch.utils.data.RandomSampler(datasets['train'])
-            data_samplers['val'] = torch.utils.data.SequentialSampler(datasets['val'])
+            data_samplers['train'] = RandomSampler(datasets['train'])
+            data_samplers['val'] = SequentialSampler(datasets['val'])
 
         dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=default_collate2, pin_memory=True) for x in ['train', 'val']} # collate_fn=detection_collate,
+                                      collate_fn=default_collate2, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
 
         return datasets, dataloaders, data_samplers
 
 
     def _parser_model(self,dictionary):
         *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.split(".")
-        model_class = getattr(importlib.import_module(".".join(model_mod_str_parts)), model_class_str)
+        model_class = getattr(import_module(".".join(model_mod_str_parts)), model_class_str)
         model = model_class(dictionary=dictionary)
+
+        if self.cfg.distributed:
+            model = SyncBatchNorm.convert_sync_batchnorm(model).cuda()
+        else:
+            model = model.cuda()
+
         return model
 
     def run(self):
@@ -357,11 +371,6 @@ class Trainer:
         ## parser_model
         model_ft = self._parser_model(dictionary)
 
-        if cfg.distributed:
-            model_ft = apex.parallel.convert_syncbn_model(model_ft).cuda()
-        else:
-            model_ft = model_ft.cuda()
-
         test_only = False
         if test_only:
             '''
@@ -378,8 +387,6 @@ class Trainer:
         ## parser_lr_scheduler
         lr_scheduler_ft = parser_lr_scheduler(cfg, optimizer_ft)
 
-        model_ft, optimizer_ft = amp.initialize(model_ft, optimizer_ft, opt_level=cfg.APEX_LEVEL)
-
         '''
         # Scheduler https://arxiv.org/pdf/1812.01187.pdf
         # https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#OneCycleLR
@@ -388,7 +395,7 @@ class Trainer:
         '''
 
         if cfg.distributed:
-            model_ft = DistributedDataParallel(model_ft, delay_allreduce=True)
+            model_ft = DDP(model_ft, device_ids=[cfg.local_rank], output_device=(cfg.local_rank))
 
         '''
         # Freeze
@@ -413,26 +420,26 @@ class Trainer:
         self.n_steps_per_epoch = int(ceil(sum(len(t) for t in datasets['train'])))
 
         best_acc = 0.0
+        scaler = amp.GradScaler(enabled=True)
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
                 dataloaders['train'].sampler.set_epoch(epoch)
-                # data_samplers['train'].set_epoch(epoch)
-            self.train_epoch(epoch, model_ft, dataloaders['train'], optimizer_ft, lr_scheduler_ft,None)
+            self.train_epoch(scaler, epoch, model_ft, dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL:
-                acc = self.val_epoch(epoch, model_ft, dataloaders['val'] , optimizer_ft, lr_scheduler_ft)
+                acc = self.val_epoch(epoch, model_ft, dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
                     if best_acc < acc:
-                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft,amp=None)
+                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
                         best_acc = acc
                         continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft,amp=None)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -440,7 +447,7 @@ class Trainer:
         dist.destroy_process_group() if cfg.local_rank!=0 else None
         torch.cuda.empty_cache()
 
-    def train_epoch(self, epoch, model, dataloader, optimizer, lr_scheduler, grad_normalizer=None,prefix="train"):
+    def train_epoch(self, scaler, epoch, model, dataloader, optimizer, prefix="train"):
         model.train()
 
         _timer = Timer()
@@ -464,7 +471,9 @@ class Trainer:
             else:
                 targets = targets.cuda()
 
-            out = model(imgs, targets, prefix)
+            # Autocast
+            with amp.autocast(enabled=True):
+                out = model(imgs, targets, prefix)
 
             if not isinstance(out, tuple):
                 losses, performances = out, None
@@ -473,12 +482,18 @@ class Trainer:
 
             self.n_iters_elapsed += 1
 
-            with amp.scale_loss(losses["loss"], optimizer) as scaled_loss:
-                scaled_loss.backward()
+            # Scales loss.  Calls backward() on scaled loss to create scaled gradients.
+            # Backward passes under autocast are not recommended.
+            # Backward ops run in the same dtype autocast chose for corresponding forward ops.
+            scaler.scale(losses["loss"]).backward()
+            # scaler.step() first unscales the gradients of the optimizer's assigned params.
+            # If these gradients do not contain infs or NaNs, optimizer.step() is then called,
+            # otherwise, optimizer.step() is skipped.
+            scaler.step(optimizer)
+            # Updates the scale for next iteration.
+            scaler.update()
 
-            optimizer.step()
-
-            # torch.cuda.synchronize()
+            torch.cuda.synchronize()
             _timer.toc()
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
@@ -524,7 +539,7 @@ class Trainer:
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataloader, optimizer=None, lr_scheduler=None,prefix="val"):
+    def val_epoch(self, epoch, model, dataloader,prefix="val"):
         model.eval()
 
         lossLogger = MetricLogger(delimiter="  ")

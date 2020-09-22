@@ -47,7 +47,7 @@ class Checkpoints():
         return checkpoint_path
 
 
-    def load_checkpoint(self,save_path, model, optimizer=None,lr_scheduler=None,amp=None):
+    def load_checkpoint(self,save_path, model, optimizer=None,lr_scheduler=None):
         """Loads the checkpoint from the given file."""
         error_str = "Checkpoint '{}' not found"
         assert os.path.exists(save_path), error_str.format(save_path)
@@ -59,8 +59,6 @@ class Checkpoints():
             optimizer.load_state_dict(checkpoint_state["optimizer"])
         if lr_scheduler:
             lr_scheduler.load_state_dict(checkpoint_state["lr_scheduler"])
-        #if amp:
-        #    amp.load_state_dict(checkpoint_state["amp"])
         self.logger.info("Checkpoint loaded from {}".format(save_path))
         return checkpoint_state["epoch"]
 
@@ -84,19 +82,18 @@ class Checkpoints():
         return start_epoch
 
 
-    def save_checkpoint(self, model,checkpoint_path, epoch=-1, optimizer=None, lr_scheduler=None,amp=None):
+    def save_checkpoint(self, model,checkpoint_path, epoch=-1, optimizer=None, lr_scheduler=None):
         checkpoint_state = {
             "epoch": epoch,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "lr_scheduler": lr_scheduler.state_dict(),
-            # 'amp': amp.state_dict()
         }
 
         torch.save(checkpoint_state, checkpoint_path)
         self.logger.info("Checkpoint saved to {}".format(checkpoint_path))
 
-    def autosave_checkpoint(self,model, epoch,type, optimizer, lr_scheduler,amp):
+    def autosave_checkpoint(self,model, epoch,type, optimizer, lr_scheduler):
         if is_main_process():
             if type=='best':
                 checkpoint_path = os.path.join(self.checkpoint_dir,self.experiment_id, self.experiment_id+'#best.pth')
@@ -108,7 +105,6 @@ class Checkpoints():
                 model=model,
                 optimizer=optimizer,
                 lr_scheduler=lr_scheduler,
-                amp = amp
             )
 
 
