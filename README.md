@@ -7,11 +7,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 - Python 3.8
 - PyTorch 1.6.0
 - Torchvision 0.7.0
-- torchsummary 1.5.1
-- tensorflow 2.2.0          
-- tensorboardX 2.1
-- numpy 1.18.0
-- opencv-python 4.2.0.32           
+- tensorboardX 2.1 
 
 ## Models 
 
@@ -69,13 +65,7 @@ Note that when using COCO dataset, 164k version is used per default, if 10k is p
 
 ### Install
 
-#### apex:
-
-```bash
-$ git clone https://github.com/NVIDIA/apex
-$ cd apex
-$ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
-```
+#### 
 
 
 
