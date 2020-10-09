@@ -60,7 +60,7 @@ OPTIMIZER:
 ## LR_SCHEDULER
 
 
-GPU_IDS: [1]
+GPU_IDS: [0]
 BATCH_SIZE: 4
 NUM_WORKERS: 4
 N_MAX_EPOCHS: 25
@@ -78,10 +78,10 @@ LR_SCHEDULER:
   GAMMA: 0.1
   PATIENCE: 10
 
-SYNC_BN: False
+SYNC_BN: True
 
-APEX: False
-APEX_LEVEL: '00' # '00':fp32 train '01': Mixed Precision (recommended)  '02': almost fp16 '03': fp16 training
+APEX: True
+APEX_LEVEL: 'O0' # 'O0':fp32 train 'O1': Mixed Precision (recommended)  'O2': almost fp16 'O3': fp16 training
 
 #########################################
 # Logging / Visualization Configurations

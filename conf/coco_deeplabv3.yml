@@ -35,7 +35,7 @@ DATASET:
     ImageSubtract128:
 
 ## MODEL
-USE_MODEL: 'src.models.ssd.SSD'
+USE_MODEL: 'src.models.deeplabv3_plus.DeepLabv3Plus'
 
 ## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'

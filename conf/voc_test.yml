@@ -6,30 +6,30 @@ DATASET:
   DICTIONARY: 'conf/dicts/voc_dict.yml'
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/VOCdevkit'
+    IMG_DIR: '/home/lmin/data/VOCdevkit_test'
     IMG_SUFFIX: '*.jpg'
-    INDICES: '/home/lmin/data/VOCdevkit/train_det1.txt'
+    INDICES: '/home/lmin/data/VOCdevkit_test/train_det.txt'
     SHUFFLE: False
     LABELS:
-      DET_DIR: '/home/lmin/data/VOCdevkit'
+      DET_DIR: '/home/lmin/data/VOCdevkit_test'
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/VOCdevkit'
+      SEG_DIR: '/home/lmin/data/VOCdevkit_test'
       SEG_SUFFIX: '*.png'
 
   VAL:
-    IMG_DIR: '/home/lmin/data/VOCdevkit'
+    IMG_DIR: '/home/lmin/data/VOCdevkit_test'
     IMG_SUFFIX: '*.jpg'
-    INDICES: '/home/lmin/data/VOCdevkit/val_det1.txt'
+    INDICES: '/home/lmin/data/VOCdevkit_test/val_det.txt'
     SHUFFLE: False
     LABELS:
-      DET_DIR: '/home/lmin/data/VOCdevkit'
+      DET_DIR: '/home/lmin/data/VOCdevkit_test'
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/VOCdevkit'
+      SEG_DIR: '/home/lmin/data/VOCdevkit_test'
       SEG_SUFFIX: '*.png'
 
   TRANSFORMS:
     CenterCrop:
-      crop_size: [600, 800]
+      crop_size: [300, 300]
     ToTensor:
     ToBGR:
     ImageSubtract128:
@@ -62,6 +62,9 @@ LR_SCHEDULER:
   GAMMA: 0.1
   PATIENCE: 10
 
+
+APEX_LEVEL: 'O0' # 'O0':fp32 train 'O1': Mixed Precision (recommended)  'O2': almost fp16 'O3': fp16 training
+
 ## HALF
 HALF: False
 
@@ -71,14 +74,18 @@ GRAD_CLIP:
   VALUE: 5
 
 ## CONFIGURATIONS
-GPU_IDS: [1]
-BATCH_SIZE: 64
-NUM_WORKERS: 8
+GPU_IDS: [0]
+BATCH_SIZE: 2
+NUM_WORKERS: 2
 N_MAX_EPOCHS: 100
 
-N_ITERS_TO_DISPLAY_STATUS: 50
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 1
 
-## TENSORBOARD
+
+## tensorboard
 TENSORBOARD: True
 TENSORBOARD_LOG_DIR: 'runs'
 TENSORBOARD_MODEL: True

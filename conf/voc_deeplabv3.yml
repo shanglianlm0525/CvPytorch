@@ -2,40 +2,41 @@ EXPERIMENT_NAME: 'VOC'
 
 ## DATASET
 DATASET:
-  CLASS: 'src.datasets.voc.VOCDetection'
+  CLASS: 'src.datasets.voc.VOCSegmentation'
   DICTIONARY: 'conf/dicts/voc_dict.yml'
+  DICTIONARY_NAME: 'SEG_CLASSES'
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/VOCdevkit'
     IMG_SUFFIX: '*.jpg'
-    INDICES: '/home/lmin/data/VOCdevkit/train_det.txt'
-    SHUFFLE: False
+    INDICES: '/home/lmin/data/VOCdevkit/train_seg.txt'
+    SHUFFLE: True
     LABELS:
       DET_DIR: '/home/lmin/data/VOCdevkit'
-      DET_SUFFIX: '.xml'
+      DET_SUFFIX: '*.xml'
       SEG_DIR: '/home/lmin/data/VOCdevkit'
       SEG_SUFFIX: '*.png'
 
   VAL:
     IMG_DIR: '/home/lmin/data/VOCdevkit'
     IMG_SUFFIX: '*.jpg'
-    INDICES: '/home/lmin/data/VOCdevkit/val_det.txt'
+    INDICES: '/home/lmin/data/VOCdevkit/val_seg.txt'
     SHUFFLE: False
     LABELS:
       DET_DIR: '/home/lmin/data/VOCdevkit'
-      DET_SUFFIX: '.xml'
+      DET_SUFFIX: '*.xml'
       SEG_DIR: '/home/lmin/data/VOCdevkit'
       SEG_SUFFIX: '*.png'
 
   TRANSFORMS:
     CenterCrop:
-      crop_size: [600, 800]
+      crop_size: [512, 512]
     ToTensor:
     ToBGR:
     ImageSubtract128:
 
 ## MODEL
-USE_MODEL: 'src.models.ssd.SSD'
+USE_MODEL: 'src.models.deeplabv3_plus.DeepLabv3Plus'
 
 ## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'
@@ -44,7 +45,7 @@ N_EPOCHS_TO_SAVE_MODEL: 10
 RESUME: False
 
 ## OPTIMIZER
-INIT_LR: 0.005
+INIT_LR: 0.007
 OPTIMIZER:
   TYPE: 'SGD' # SGD, Adam, RMSprop
   BIAS_PARAMS:
@@ -58,15 +59,9 @@ OPTIMIZER:
 ## LR_SCHEDULER
 LR_SCHEDULER:
   TYPE: 'MultiStepLR'
-  MILESTONES: [50, 100, 150]
-  GAMMA: 0.9
+  MILESTONES: [10, 20, 40, 60, 80]
+  GAMMA: 0.1
   PATIENCE: 10
-
-
-APEX_LEVEL: 'O0' # 'O0':fp32 train 'O1': Mixed Precision (recommended)  'O2': almost fp16 'O3': fp16 training
-
-## HALF
-HALF: False
 
 ## GRAD_CLIP
 GRAD_CLIP:
@@ -75,14 +70,18 @@ GRAD_CLIP:
 
 ## CONFIGURATIONS
 GPU_IDS: [0]
-BATCH_SIZE: 32
+BATCH_SIZE: 4
 NUM_WORKERS: 8
-N_MAX_EPOCHS: 200
+N_MAX_EPOCHS: 100
 
-N_ITERS_TO_DISPLAY_STATUS: 100
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 10
 
-## TENSORBOARD
+
+## tensorboard
 TENSORBOARD: True
 TENSORBOARD_LOG_DIR: 'runs'
-TENSORBOARD_MODEL: True
-TENSORBOARD_WEIGHT: True
+TENSORBOARD_MODEL: False
+TENSORBOARD_WEIGHT: False
