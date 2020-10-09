@@ -50,23 +50,33 @@
 
 ## Evaluation metrics
 
-**Pixel Accuracy (PA)**: it is the simplest metric, simply computing a ratio between the amount of properly classified pixels and the total number of them.  
+**Pixel Accuracy (Acc)**: it is the simplest metric, simply computing a ratio between the amount of properly classified pixels and the total number of them.  
+$$
+Acc = \frac{\sum_{i=0}^{k}{p_{ii}}}{\sum_{i=0}^{k}{\sum_{j=0}^{k}{p_{ij}}}}
+$$
 
-![image-20201009094650146](C:\Users\liumin\AppData\Roaming\Typora\typora-user-images\image-20201009094650146.png)
 
-**Mean Pixel Accuracy (MPA)**: a slightly improved PA in which the ratio of correct pixels is computed
+**Mean Pixel Accuracy (mAcc)**: a slightly improved PA in which the ratio of correct pixels is computed
 in a per-class basis and then averaged over the total number of classes.  
+$$
+mAcc = \frac{1}{k+1}\sum_{i=0}^{k}{\frac{{p_{ii}}}{\sum_{j=0}^{k}{p_{ij}}}}
+$$
 
-![image-20201009094712686](C:\Users\liumin\AppData\Roaming\Typora\typora-user-images\image-20201009094712686.png)
 
-**Mean Intersection over Union (MIoU)**: this is the standard metric for segmentation purposes. It computes a ratio between the intersection and the union of two sets, in our case the ground truth and our predicted segmentation. That ratio can be reformulated as the number of true positives (intersection) over the sum of true positives, false negatives, and  false positives (union). That IoU is computed on a per-class basis and then averaged.  
+**Mean Intersection over Union (mIoU)**: this is the standard metric for segmentation purposes. It computes a ratio between the intersection and the union of two sets, in our case the ground truth and our predicted segmentation. That ratio can be reformulated as the number of true positives (intersection) over the sum of true positives, false negatives, and  false positives (union). That IoU is computed on a per-class basis and then averaged.  
+$$
+mAcc = \frac{1}{k+1}\sum_{i=0}^{k}{\frac{{p_{ii}}}{\sum_{j=0}^{k}{p_{ij}}+\sum_{j=0}^{k}p_{ji}-p_{ii}}}
+$$
 
-![image-20201009094804639](C:\Users\liumin\AppData\Roaming\Typora\typora-user-images\image-20201009094804639.png)
 
 **Frequency Weighted Intersection over Union (FWIoU)**: it is an improved over the raw MIoU which
 weights each class importance depending on their appearance frequency.  
 
-![image-20201009094744639](C:\Users\liumin\AppData\Roaming\Typora\typora-user-images\image-20201009094744639.png)
+
+$$
+FWIoU = \frac{1}{\sum_{i=0}^{k}\sum_{j=0}^{k}{p_{ij}}}\sum_{i=0}^{k}{\frac{\sum_{j=0}^{k}{p_{ij}p_{ii}}}{\sum_{j=0}^{k}{p_{ij}}+\sum_{j=0}^{k}p_{ji}-p_{ii}}}
+$$
+
 
 
 
