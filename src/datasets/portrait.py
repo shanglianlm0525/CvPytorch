@@ -11,53 +11,33 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from torchvision import transforms as transformsT
+from torchvision import transforms as tf
+from .transforms import custom_transforms as ctf
 
-class ToLabel:
-    def __call__(self, image):
-        return torch.from_numpy(image).float().unsqueeze(0)
 
-def transforms_portrait_img():
-    data_transforms = {
-        'train': transformsT.Compose([
-            transformsT.Resize((800,600)),
-            # transformsT.RandomHorizontalFlip(),
-            transformsT.ToTensor(),
-            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
-        ]),
+data_transforms = {
+    'train': tf.Compose([
+        ctf.Resize((600,800)),
+        ctf.RandomHorizontalFlip(p=0.5),
+        ctf.ColorJitter(brightness=0.01, contrast=0.01, saturation=0.01, hue=0.01),
+        ctf.RandomRotate(5),
+        # ctf.RandomTranslation(2),
+        ctf.ToTensor(),
+        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    ]),
 
-        'val': transformsT.Compose([
-            transformsT.Resize((800,600)),
-            transformsT.ToTensor(),
-            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
-        ]),
+    'val': tf.Compose([
+        ctf.Resize((600, 800)),
+        ctf.ToTensor(),
+        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    ]),
 
-        'infer': transformsT.Compose([
-            transformsT.Resize((800,600)),
-            transformsT.ToTensor(),
-            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
-        ])
-    }
-    return data_transforms
-
-def transforms_portrait_seg():
-    data_transforms = {
-        'train': transformsT.Compose([
-            # transformsT.Resize((800,600)),
-            ToLabel(),
-        ]),
-
-        'val': transformsT.Compose([
-            # transformsT.Resize((800,600)),
-            ToLabel(),
-        ]),
-
-        'infer': transformsT.Compose([
-            # transformsT.Resize((800,600)),
-            ToLabel(),
-        ])
-    }
-    return data_transforms
+    'infer': tf.Compose([
+        ctf.Resize((600, 800)),
+        ctf.ToTensor(),
+        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    ])
+}
 
 
 class PortraitSegmentation(Dataset):
@@ -69,12 +49,12 @@ class PortraitSegmentation(Dataset):
         super(PortraitSegmentation, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = transforms_portrait_img()[stage]
-        self.target_transform = transforms_portrait_seg()[stage]
+        self.transform = data_transforms[stage]
+        self.target_transform = None
         self.stage = stage
 
         self._imgs = []
-        self._labels = []
+        self._targets = []
         if self.stage == 'infer':
             if data_cfg.INDICES is not None:
                 [self._imgs.append(os.path.join(data_cfg.IMG_DIR, line.strip())) for line in open(data_cfg.INDICES)]
@@ -85,29 +65,38 @@ class PortraitSegmentation(Dataset):
                 for line in open(data_cfg.INDICES):
                     imgpath, labelpath = line.strip().split(' ')
                     self._imgs.append(os.path.join(data_cfg.IMG_DIR, imgpath))
-                    self._labels.append(os.path.join(data_cfg.LABELS.DET_DIR, labelpath))
+                    self._targets.append(os.path.join(data_cfg.LABELS.DET_DIR, labelpath))
             else:
                 self._imgs = glob(os.path.join(data_cfg.IMG_DIR, data_cfg.IMG_SUFFIX))
-                self._labels = glob(os.path.join(data_cfg.LABELS.SEG_DIR, data_cfg.LABELS.SEG_SUFFIX))
+                self._targets = glob(os.path.join(data_cfg.LABELS.SEG_DIR, data_cfg.LABELS.SEG_SUFFIX))
 
-            assert len(self._imgs) == len(self._labels), 'len(self._imgs) should be equals to len(self._labels)'
+            assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._targets)'
+            assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            img = Image.open(self._imgs[idx]).convert('RGB')
-        else:
-            img, label = Image.open(self._imgs[idx]).convert('RGB'),cv2.imread(self._labels[idx],0)
-        if self.transform is not None:
-            img = self.transform(img)
-        if self.stage=='infer':
+            _img = Image.open(self._imgs[idx]).convert('RGB')
             image_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
-            return img,image_id
+            sample = {'image': _img, 'mask': None}
+            return self.transform(sample), image_id
         else:
-            label = label /255
-            label = cv2.resize(label,(600,800))
-            if self.target_transform is not None:
-                label = self.target_transform(label)
-            return img, label
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+            _target = self.encode_segmap(_target)
+            sample = {'image': _img, 'target': _target}
+            return self.transform(sample)
+
+    def encode_segmap(self, mask):
+        mask = np.array(mask, dtype=np.uint8)
+        # contain background, index form zero, [0, 1], pls uncomment - background in conf/dicts/portrait_dict.yml
+        # mask[mask > 0] = 1
+
+        # non background index, form zero, [0], pls uncomment - background in conf/dicts/portrait_dict.yml
+        mask_nonzero = mask > 0
+        mask[:,:] = 255
+        mask[mask_nonzero] = 0
+
+        mask = Image.fromarray(mask)
+        return mask
 
     def __len__(self):
         return len(self._imgs)

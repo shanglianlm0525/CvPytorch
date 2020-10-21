@@ -12,7 +12,7 @@ import time
 import torch
 import torch.distributed as dist
 from contextlib import contextmanager
-
+from src.evaluation.eval_segmentation import SegmentationEvaluator
 
 def get_world_size():
     if not dist.is_available():
@@ -189,7 +189,8 @@ class SmoothedValue(object):
             max=self.max,
             value=self.value)
 
-class MetricLogger(object):
+
+class LossLogger(object):
     def __init__(self, delimiter="\t"):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
@@ -277,3 +278,47 @@ class MetricLogger(object):
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('{} Total time: {} ({:.4f} s / it)'.format(
             header, total_time_str, total_time / len(iterable)))
+
+
+class MetricLogger(object):
+    def __init__(self, dictionary, cfg):
+        self.dictionary = dictionary
+        self.cfg = cfg
+        self._num_classes = len(self.dictionary)
+        self.type = self.cfg.EVAL_NAME
+
+        if self.type == 'segmentation':
+            self._evaluator = SegmentationEvaluator(self._num_classes)
+        elif self.type == 'detection':
+            pass
+        elif self.type == 'classification':
+            pass
+        else:
+            raise NotImplementedError
+
+    def update(self, *kwargs):
+        if self.type == 'segmentation':
+            self._evaluator.add_batch(*kwargs)
+        elif self.type == 'detection':
+            pass
+        elif self.type == 'classification':
+            pass
+        else:
+            raise NotImplementedError
+
+    def get(self):
+        if self.type == 'segmentation':
+            performances = {}
+            performances['Acc'] = self._evaluator.Pixel_Accuracy()
+            performances['mAcc'] = self._evaluator.Mean_Pixel_Accuracy()
+            performances['mIoU'] = self._evaluator.Mean_Intersection_over_Union()
+            performances['FWIoU'] = self._evaluator.Frequency_Weighted_Intersection_over_Union()
+
+            performances['performance'] = performances['mIoU']
+            return performances
+        elif self.type == 'detection':
+            pass
+        elif self.type == 'classification':
+            pass
+        else:
+            raise NotImplementedError

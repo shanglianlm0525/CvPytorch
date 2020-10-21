@@ -4,94 +4,171 @@
 # @Author : liumin
 # @File : unet.py
 
+"""
+    U-Net: Convolutional Networks for Biomedical Image Segmentation
+    https://arxiv.org/pdf/1505.04597.pdf
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from ..losses.dice_loss import dice_coeff
 
-class encoder(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(encoder, self).__init__()
-        self.down_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+
+def Conv3x3BNReLU(in_channels,out_channels,stride,groups=1):
+    return nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=stride, padding=1, groups=groups),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True)
         )
-        self.pool = nn.MaxPool2d(kernel_size=2, ceil_mode=True)
+
+
+def Conv1x1BNReLU(in_channels,out_channels):
+    return nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+
+def Conv1x1BN(in_channels,out_channels):
+    return nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1),
+            nn.BatchNorm2d(out_channels)
+        )
+
+
+class DoubleConv(nn.Module):
+    """(convolution => [BN] => ReLU) * 2"""
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.double_conv = nn.Sequential(
+            Conv3x3BNReLU(in_channels, out_channels,stride=1),
+            Conv3x3BNReLU(out_channels, out_channels, stride=1)
+        )
 
     def forward(self, x):
-        x = self.down_conv(x)
-        x_pooled = self.pool(x)
-        return x, x_pooled
+        return self.double_conv(x)
 
-class decoder(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(decoder, self).__init__()
-        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-        self.up_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
 
-    def forward(self, x_copy, x):
-        x = self.up(x)
-        # Padding in case the incomping volumes are of different sizes
-        diffY = x_copy.size()[2] - x.size()[2]
-        diffX = x_copy.size()[3] - x.size()[3]
-        x = F.pad(x, (diffX // 2, diffX - diffX // 2,
-                        diffY // 2, diffY - diffY // 2))
-        # Concatenate
-        x = torch.cat([x_copy, x], dim=1)
-        x = self.up_conv(x)
-        return x
+class DownConv(nn.Module):
+    """(convolution => [BN] => ReLU) * 2"""
+    def __init__(self, in_channels, out_channels,stride=2):
+        super().__init__()
+        self.pool = nn.MaxPool2d(kernel_size=2,stride=stride)
+        self.double_conv = DoubleConv(in_channels, out_channels)
 
-class UNet(BaseModel):
-    def __init__(self, num_classes, in_channels=3):
+    def forward(self, x):
+        return self.pool(self.double_conv(x))
+
+
+class UpConv(nn.Module):
+    def __init__(self, in_channels, out_channels,bilinear=True):
+        super().__init__()
+        self.reduce = Conv1x1BNReLU(in_channels, in_channels//2)
+        # if bilinear, use the normal convolutions to reduce the number of channels
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        else:
+            self.up = nn.ConvTranspose2d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2)
+        self.conv = DoubleConv(in_channels, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(self.reduce(x1))
+        _, channel1, height1, width1 = x1.size()
+        _, channel2, height2, width2 = x2.size()
+
+        # input is CHW
+        diffY = height2 - height1
+        diffX = width2 - width1
+
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+
+
+class UNet(nn.Module):
+    def __init__(self, dictionary=None):
         super(UNet, self).__init__()
-        self.down1 = encoder(in_channels, 64)
-        self.down2 = encoder(64, 128)
-        self.down3 = encoder(128, 256)
-        self.down4 = encoder(256, 512)
-        self.middle_conv = nn.Sequential(
-            nn.Conv2d(512, 1024, kernel_size=3, padding=1),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(1024, 1024, kernel_size=3, padding=1),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(inplace=True),
-        )
-        self.up1 = decoder(1024, 512)
-        self.up2 = decoder(512, 256)
-        self.up3 = decoder(256, 128)
-        self.up4 = decoder(128, 64)
-        self.final_conv = nn.Conv2d(64, num_classes, kernel_size=1)
-        self._initialize_weights()
+        self.dictionary = dictionary
+        self.dummy_input = torch.zeros(1, 3, 800, 600)
 
-    def _initialize_weights(self):
-        for module in self.modules():
-            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
-                nn.init.kaiming_normal_(module.weight)
-                if module.bias is not None:
-                    module.bias.data.zero_()
-            elif isinstance(module, nn.BatchNorm2d):
-                module.weight.data.fill_(1)
-                module.bias.data.zero_()
+        self._num_classes = len(self.dictionary)
+        self._category = [v for d in self.dictionary for v in d.keys()]
+        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
-    def forward(self, x):
-        x1, x = self.down1(x)
-        x2, x = self.down2(x)
-        x3, x = self.down3(x)
-        x4, x = self.down4(x)
-        x = self.middle_conv(x)
-        x = self.up1(x4, x)
-        x = self.up2(x3, x)
-        x = self.up3(x2, x)
-        x = self.up4(x1, x)
-        x = self.final_conv(x)
-        return x
+        self.conv = DoubleConv(3, 64)
+        self.down1 = DownConv(64, 128)
+        self.down2 = DownConv(128, 256)
+        self.down3 = DownConv(256, 512)
+        self.down4 = DownConv(512, 1024)
+        self.up1 = UpConv(1024, 512)
+        self.up2 = UpConv(512, 256)
+        self.up3 = UpConv(256, 128)
+        self.up4 = UpConv(128, 64)
+        self.outconv = nn.Conv2d(64, self._num_classes, kernel_size=1)
+
+        self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
+
+        self.init_params()
+
+    def init_params(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+
+    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+        x1 = self.conv(imgs)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        xx = self.up1(x5, x4)
+        xx = self.up2(xx, x3)
+        xx = self.up3(xx, x2)
+        xx = self.up4(xx, x1)
+        outputs = self.outconv(xx)
+
+        threshold = 0.5
+        if mode == 'infer':
+            probs = torch.sigmoid(outputs)
+            probs[probs < threshold] = 0
+            return probs * 255
+        else:
+            losses = {}
+            device_id = labels.data.device
+
+            losses['loss'] = 0
+            losses['bce_loss'] = 0
+
+            for idx, d in enumerate(self.dictionary):
+                for _label, _weight in d.items():
+                    labels_onehot = torch.zeros_like(labels)
+                    labels_onehot[labels == idx] = 1
+                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(1), labels_onehot.float()) * _weight
+
+            losses['loss'] = losses['bce_loss']
+
+            if mode == 'val':
+                probs = torch.sigmoid(outputs)
+                outs = (probs > threshold).float()
+                performances = {}
+                performances['performance'] = 0
+
+                for idx, d in enumerate(self.dictionary):
+                    for _label, _weight in d.items():
+                        labels_onehot = torch.zeros_like(labels)
+                        labels_onehot[labels == idx] = 1
+                        performances[_label + '_performance'] = torch.as_tensor(
+                            dice_coeff(outs[:, idx, :, :].unsqueeze(1), labels_onehot).item(),device=device_id)
+                        performances['performance'] += performances[_label + '_performance']
+
+                performances['performance'] = performances['performance'] / len(self.dictionary)
+                return losses, performances
+            else:
+                return losses

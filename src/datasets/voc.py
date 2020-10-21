@@ -13,11 +13,14 @@ from PIL import Image
 import cv2
 from glob2 import glob
 from torch.utils.data import Dataset
-from torchvision import transforms
 import xml.etree.ElementTree as ET
+
+from torchvision import transforms as tf
+from .transforms import custom_transforms as ctf
 
 from src.utils import palette
 from src.models.ext.ssd.augmentations import SSDAugmentation
+
 
 VOC_CLASSES = (  # always index 0
     'aeroplane', 'bicycle', 'bird', 'boat',
@@ -110,6 +113,7 @@ class VOCDetection(Dataset):
                 self._imgs.append(os.path.join(data_cfg.IMG_DIR, imgpath))
                 self._labels.append(os.path.join(data_cfg.LABELS.DET_DIR, labelpath))
             assert len(self._imgs) == len(self._labels), 'len(self._imgs) should be equals to len(self._labels)'
+            assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
 
     def __getitem__(self, idx):
         img = cv2.imread(self._imgs[idx])
@@ -132,3 +136,97 @@ class VOCDetection(Dataset):
 
     def __len__(self):
         return len(self._imgs)
+
+    @staticmethod
+    def collate(batch):
+        """Custom collate fn for dealing with batches of images that have a different
+        number of associated object annotations (bounding boxes).
+        Arguments:
+            batch: (tuple) A tuple of tensor images and lists of annotations
+        Return:
+            A tuple containing:
+                1) (tensor) batch of images stacked on their 0 dim
+                2) (list of tensors) annotations for a given image are stacked on
+                                     0 dim
+        """
+        targets = []
+        imgs = []
+        for sample in batch:
+            imgs.append(sample[0])
+            targets.append(torch.FloatTensor(sample[1]))
+        return torch.stack(imgs, 0), targets
+
+
+data_transforms = {
+    'train': tf.Compose([
+        ctf.RandomHorizontalFlip(p=0.5),
+        ctf.RandomScaleCrop(512,512),
+        ctf.RandomGaussianBlur(),
+        ctf.ToTensor(),
+        ctf.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    ]),
+
+    'val': tf.Compose([
+        ctf.FixScaleCrop(512),
+        ctf.ToTensor(),
+        ctf.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    ]),
+
+    'infer': tf.Compose([
+        ctf.FixScaleCrop(512),
+        ctf.ToTensor(),
+        ctf.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    ])
+}
+
+class VOCSegmentation(Dataset):
+    """
+    Pascal Voc dataset
+    http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
+    """
+
+    def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
+        super(VOCSegmentation, self).__init__()
+        self.data_cfg = data_cfg
+        self.dictionary = dictionary
+        self.transform = data_transforms[stage]
+        self.target_transform = None
+        self.stage = stage
+
+        self._imgs = []
+        self._targets = []
+        if self.stage == 'infer':
+            if data_cfg.INDICES is not None:
+                [self._imgs.append(os.path.join(data_cfg.IMG_DIR, line.strip())) for line in open(data_cfg.INDICES)]
+            else:
+                self._imgs = glob(os.path.join(data_cfg.IMG_DIR, data_cfg.IMG_SUFFIX))
+        else:
+            if data_cfg.INDICES is not None:
+                for line in open(data_cfg.INDICES):
+                    imgpath, labelpath = line.strip().split(' ')
+                    self._imgs.append(os.path.join(data_cfg.IMG_DIR, imgpath))
+                    self._targets.append(os.path.join(data_cfg.LABELS.DET_DIR, labelpath))
+            else:
+                self._imgs = glob(os.path.join(data_cfg.IMG_DIR, data_cfg.IMG_SUFFIX))
+                self._targets = glob(os.path.join(data_cfg.LABELS.SEG_DIR, data_cfg.LABELS.SEG_SUFFIX))
+
+            assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._targets)'
+            assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
+
+    def __getitem__(self, idx):
+        if self.stage == 'infer':
+            _img = Image.open(self._imgs[idx]).convert('RGB')
+            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
+            sample = {'image': _img, 'mask': None}
+            return self.transform(sample), img_id
+        else:
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx]).convert('P')
+            sample = {'image': _img, 'target': _target}
+            return self.transform(sample)
+
+    def __len__(self):
+        return len(self._imgs)
+
+    @staticmethod
+    def collate(batch):
+        pass

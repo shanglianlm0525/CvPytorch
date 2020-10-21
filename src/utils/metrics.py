@@ -161,7 +161,7 @@ class SegmentationEvaluator(object):
         Acc = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
         return Acc
 
-    def Pixel_Accuracy_Class(self):
+    def Mean_Pixel_Accuracy(self):
         Acc = np.diag(self.confusion_matrix) / self.confusion_matrix.sum(axis=1)
         Acc = np.nanmean(Acc)
         return Acc

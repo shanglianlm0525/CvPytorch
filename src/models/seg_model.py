@@ -87,7 +87,7 @@ class SegModel(nn.Module):
     def __init__(self, dictionary=None):
         super(SegModel, self).__init__()
         self.dictionary = dictionary
-        self.dummy_input = torch.zeros(1, 3, 600, 800)
+        self.dummy_input = torch.zeros(1, 3, 800, 600)
 
         self._num_classes = len(self.dictionary)
         self._category = [v for d in self.dictionary for v in d.keys()]

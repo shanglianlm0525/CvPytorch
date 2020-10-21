@@ -151,29 +151,29 @@ class UnetModel(nn.Module):
             labels = labels_s
 
 
-            losses['all_loss'] = 0
+            losses['loss'] = 0
             losses['bce_loss'] = 0
 
             if mode == 'val':
                 performances = {}
                 outs = (outputs > threshold).float()
-                performances['all_perf'] = 0
+                performances['performance'] = 0
 
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
                         losses['bce_loss'] += self._criterion(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
-                        performances[_label + '_perf'] = torch.as_tensor(dice_coeff(outs[:,idx,:,:], labels[:,idx,:,:].squeeze(dim=1)).item(),device=device_id)
-                        performances['all_perf'] += performances[_label + '_perf']
+                        performances[_label + '_performance'] = torch.as_tensor(dice_coeff(outs[:,idx,:,:], labels[:,idx,:,:].squeeze(dim=1)).item(),device=device_id)
+                        performances['performance'] += performances[_label + '_performance']
 
-                losses['all_loss'] = losses['bce_loss']
-                performances['all_perf'] = performances['all_perf'] / len(self.dictionary)
+                losses['loss'] = losses['bce_loss']
+                performances['performance'] = performances['performance'] / len(self.dictionary)
                 return losses, performances
             else:
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
                         losses['bce_loss'] += self._criterion(outputs[:,idx,:,:], labels[:,idx,:,:]) * _weight
 
-                        losses['all_loss'] = losses['bce_loss']
+                        losses['loss'] = losses['bce_loss']
                 return losses
 
 

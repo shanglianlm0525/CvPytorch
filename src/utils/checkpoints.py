@@ -87,7 +87,7 @@ class Checkpoints():
             "epoch": epoch,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
-            "lr_scheduler": lr_scheduler.state_dict(),
+            # "lr_scheduler": lr_scheduler.state_dict(),
         }
 
         torch.save(checkpoint_state, checkpoint_path)

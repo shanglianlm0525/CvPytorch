@@ -1,4 +1,4 @@
-from .cityscapes import CityscapesSegmentation
+from .cityscapes_bak import CityscapesSegmentation
 
 datasets = {
     'citys': CityscapesSegmentation,
