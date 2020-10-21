@@ -213,7 +213,7 @@ class ENet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
         x = self.initialBlock(imgs)
         x,indices1 = self.stage1_1(x)
         x = self.stage1_2(x)
@@ -231,7 +231,7 @@ class ENet(nn.Module):
             pass
         else:
             losses = {}
-            losses['loss'] = self.ce_criterion(outputs, labels.squeeze(1).long())
+            losses['loss'] = self.ce_criterion(outputs, targets.squeeze(1).long())
 
             if mode == 'val':
                 return losses, torch.argmax(outputs, dim=1).unsqueeze(1)

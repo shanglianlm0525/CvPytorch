@@ -122,7 +122,7 @@ class UNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
 
-    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
         x1 = self.conv(imgs)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -141,16 +141,16 @@ class UNet(nn.Module):
             return probs * 255
         else:
             losses = {}
-            device_id = labels.data.device
+            device_id = targets.data.device
 
             losses['loss'] = 0
             losses['bce_loss'] = 0
 
             for idx, d in enumerate(self.dictionary):
                 for _label, _weight in d.items():
-                    labels_onehot = torch.zeros_like(labels)
-                    labels_onehot[labels == idx] = 1
-                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(1), labels_onehot.float()) * _weight
+                    targets_onehot = torch.zeros_like(targets)
+                    targets_onehot[targets == idx] = 1
+                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(1), targets_onehot.float()) * _weight
 
             losses['loss'] = losses['bce_loss']
 
@@ -162,10 +162,10 @@ class UNet(nn.Module):
 
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
-                        labels_onehot = torch.zeros_like(labels)
-                        labels_onehot[labels == idx] = 1
+                        targets_onehot = torch.zeros_like(targets)
+                        targets_onehot[targets == idx] = 1
                         performances[_label + '_performance'] = torch.as_tensor(
-                            dice_coeff(outs[:, idx, :, :].unsqueeze(1), labels_onehot).item(),device=device_id)
+                            dice_coeff(outs[:, idx, :, :].unsqueeze(1), targets_onehot).item(),device=device_id)
                         performances['performance'] += performances[_label + '_performance']
 
                 performances['performance'] = performances['performance'] / len(self.dictionary)

@@ -119,7 +119,7 @@ class Deeplabv3Plus(nn.Module):
         self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
         self._evaluator = SegmentationEvaluator(self._num_classes)
 
-    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
         x, low_level_feat = self.backbone(imgs)
         x = self.aspp(x)
         x = self.decoder(x, low_level_feat)
@@ -134,9 +134,9 @@ class Deeplabv3Plus(nn.Module):
 
             for idx, d in enumerate(self.dictionary):
                 for _label, _weight in d.items():
-                    labels_onehot = torch.zeros_like(labels)
-                    labels_onehot[labels == idx] = 1
-                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(dim=1), labels_onehot.float()) * _weight
+                    targets_onehot = torch.zeros_like(targets)
+                    targets_onehot[targets == idx] = 1
+                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(dim=1), targets_onehot.float()) * _weight
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':
