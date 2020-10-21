@@ -22,21 +22,20 @@ data_transforms = {
     'train': tf.Compose([
         ctf.Resize((512,512)),
         ctf.RandomHorizontalFlip(p=0.5),
-        ctf.RandomTranslation(2),
         ctf.ToTensor(),
-        # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ]),
 
     'val': tf.Compose([
-        ctf.Resize((512, 512)),
+        ctf.Resize((360, 480)),
         ctf.ToTensor(),
-        # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ]),
 
     'infer': tf.Compose([
-        ctf.Resize((512, 512)),
+        ctf.Resize((360, 480)),
         ctf.ToTensor(),
-        # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
 }
 
@@ -71,9 +70,8 @@ class CamvidSegmentation(Dataset):
                     self._imgs.append(os.path.join(data_cfg.IMG_DIR, imgpath))
                     self._targets.append(os.path.join(data_cfg.LABELS.SEG_DIR, labelpath))
             else:
-                self._imgs = glob(os.path.join(data_cfg.IMG_DIR, 'leftImg8bit', self.stage, '*', data_cfg.IMG_SUFFIX))
-                self._targets = glob(
-                    os.path.join(data_cfg.LABELS.SEG_DIR, 'gtFine', self.stage, '*', data_cfg.LABELS.SEG_SUFFIX))
+                self._imgs = glob(os.path.join(data_cfg.IMG_DIR, data_cfg.IMG_SUFFIX))
+                self._targets = glob(os.path.join(data_cfg.LABELS.SEG_DIR, data_cfg.LABELS.SEG_SUFFIX))
 
             assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._targets)'
             assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
@@ -85,9 +83,17 @@ class CamvidSegmentation(Dataset):
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx]).convert('P')
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+            _target = self.encode_segmap(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
+
+    def encode_segmap(self, mask):
+        mask = np.array(mask, dtype=np.uint8)
+        # no background, index form zero
+        mask[mask==11] = 255
+        mask = Image.fromarray(mask)
+        return mask
 
     def __len__(self):
         return len(self._imgs)

@@ -1,0 +1,13 @@
+SEG_CLASSES:
+  # - background: 0 # 17.30636391
+  - sky: 5.79203481
+  - building: 4.44028773
+  - pole: 34.02166463
+  - road: 3.44690044
+  - pavement: 15.91194352
+  - tree: 9.02023585
+  - signsymbol: 32.01377376
+  - fence: 32.47892445
+  - car: 13.20714089
+  - pedestrian: 38.38765298
+  - bicyclist: 44.13450551

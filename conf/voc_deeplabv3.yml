@@ -77,7 +77,7 @@ N_MAX_EPOCHS: 100
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 10
+N_ITERS_TO_DISPLAY_STATUS: 100
 
 
 ## tensorboard
