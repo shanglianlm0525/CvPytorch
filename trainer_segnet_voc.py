@@ -45,7 +45,7 @@ from src.utils.logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
-from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
+from src.utils.distributed import init_distributed,is_main_process, reduce_dict, LossLogger, MetricLogger
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -216,6 +216,8 @@ class Trainer:
         return dictionary[cfg.DATASET.DICTIONARY_NAME]
 
     def _parser_datasets(self,dictionary):
+        # transforms = prepare_transforms_seg()
+        # target_transforms = prepare_transforms_mask()
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
@@ -231,7 +233,6 @@ class Trainer:
 
         dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
                                       collate_fn=default_collate2, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
-
         return datasets, dataloaders, data_samplers
 
 
@@ -256,6 +257,7 @@ class Trainer:
 
         ## parser_dict
         dictionary = self._parser_dict()
+        self.dictionary = dictionary
 
         ## parser_datasets
         datasets, dataloaders,data_samplers = self._parser_datasets(dictionary)
@@ -334,6 +336,10 @@ class Trainer:
                     self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
+            best_perf_log_str = f"\n------------ Performances (best) ----------\n"
+            best_perf_log_str += "{:}: {:.4f}\n".format('best_acc', best_acc)
+            best_perf_log_str += "------------------------------------\n"
+            logger.info(best_perf_log_str)
             self.tb_writer.close()
 
         dist.destroy_process_group() if cfg.local_rank!=0 else None
@@ -343,18 +349,16 @@ class Trainer:
         model.train()
 
         _timer = Timer()
-        lossLogger = MetricLogger(delimiter="  ")
-        performanceLogger = MetricLogger(delimiter="  ")
+        lossLogger = LossLogger(delimiter="  ")
+        performanceLogger = MetricLogger(self.dictionary,self.cfg)
 
-        for i, (imgs, targets) in enumerate(dataloader):
+        for i, sample in enumerate(dataloader):
+            imgs, targets = sample['image'],sample['target']
             _timer.tic()
             # zero the parameter gradients
             optimizer.zero_grad()
 
-            # imgs = imgs.cuda()
             imgs = list(img.cuda() for img in imgs) if isinstance(imgs,list) else imgs.cuda()
-            # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-            # labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
             if isinstance(targets,list):
                 if isinstance(targets[0],torch.Tensor):
                     targets = [t.cuda() for t in targets]
@@ -368,9 +372,9 @@ class Trainer:
                 out = model(imgs, targets, prefix)
 
             if not isinstance(out, tuple):
-                losses, performances = out, None
+                losses, predicts = out, None
             else:
-                losses, performances = out
+                losses, predicts = out
 
             self.n_iters_elapsed += 1
 
@@ -397,15 +401,15 @@ class Trainer:
                 else:
                     lossLogger.update(**losses)
 
-                if performances is not None and all(performances):
+                if predicts is not None:
                     if self.cfg.distributed:
                         # reduce performances over all GPUs for logging purposes
-                        performance_dict_reduced = reduce_dict(performances)
-                        performanceLogger.update(**performance_dict_reduced)
-                        del performance_dict_reduced
+                        predicts_dict_reduced = reduce_dict(predicts)
+                        performanceLogger.update(targets, predicts_dict_reduced)
+                        del predicts_dict_reduced
                     else:
-                        performanceLogger.update(**performances)
-                    del performances
+                        performanceLogger.update(**predicts)
+                    del predicts
 
                 if self.cfg.local_rank == 0:
                     template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
@@ -421,11 +425,12 @@ class Trainer:
 
             del imgs, targets, losses
 
+        performances = performanceLogger.get()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            if len(performanceLogger.meters):
-                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v.global_avg, epoch) for k, v in performanceLogger.meters.items()]
+            if len(performances):
+                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
         if self.cfg.TENSORBOARD_WEIGHT and False:
             for name, param in model.named_parameters():
@@ -433,20 +438,18 @@ class Trainer:
                 attr = attr[1:]
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
+
     @torch.no_grad()
     def val_epoch(self, epoch, model, dataloader,prefix="val"):
         model.eval()
 
-        lossLogger = MetricLogger(delimiter="  ")
-        performanceLogger = MetricLogger(delimiter="  ")
+        lossLogger = LossLogger(delimiter="  ")
+        performanceLogger = MetricLogger(self.dictionary,self.cfg)
 
         with torch.no_grad():
-            for (imgs, targets) in dataloader:
-
-                # imgs = imgs.cuda()
+            for sample in dataloader:
+                imgs, targets = sample['image'], sample['target']
                 imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-                # labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
                 if isinstance(targets, list):
                     if isinstance(targets[0], torch.Tensor):
                         targets = [t.cuda() for t in targets]
@@ -455,7 +458,7 @@ class Trainer:
                 else:
                     targets = targets.cuda()
 
-                losses, performances = model(imgs, targets, prefix)
+                losses, predicts = model(imgs, targets, prefix)
 
                 if self.cfg.distributed:
                     # reduce losses over all GPUs for logging purposes
@@ -465,24 +468,25 @@ class Trainer:
                 else:
                     lossLogger.update(**losses)
 
-                if performances is not None and all(performances):
+                if predicts is not None:
                     if self.cfg.distributed:
                         # reduce performances over all GPUs for logging purposes
-                        performance_dict_reduced = reduce_dict(performances)
-                        performanceLogger.update(**performance_dict_reduced)
-                        del performance_dict_reduced
+                        predicts_dict_reduced = reduce_dict(predicts)
+                        performanceLogger.update(targets,predicts_dict_reduced)
+                        del predicts_dict_reduced
                     else:
-                        performanceLogger.update(**performances)
-                    del performances
+                        performanceLogger.update(targets,predicts)
+                    del predicts
 
                 del imgs, targets, losses
 
+        performances = performanceLogger.get()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            if len(performanceLogger.meters):
+            if len(performances):
                 # Logging val performances
-                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v.global_avg, epoch) for k, v in performanceLogger.meters.items()]
+                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
         if self.cfg.local_rank == 0:
             template = "[epoch {}] Total {} loss : {:.4f} " "\n" "{}"
@@ -494,19 +498,19 @@ class Trainer:
             )
 
             perf_log_str = f"\n------------ Performances ({prefix}) ----------\n"
-            for k,v in performanceLogger.meters.items():
-                perf_log_str += "{:}: {:.4f}\n".format(k, v.global_avg)
+            for k,v in performances.items():
+                perf_log_str += "{:}: {:.4f}\n".format(k, v)
             perf_log_str += "------------------------------------\n"
             logger.info(perf_log_str)
 
-        acc = performanceLogger.meters['performance'].global_avg
+        acc = performances['performance']
 
         return acc
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/hymenoptera.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/voc_segnet.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)

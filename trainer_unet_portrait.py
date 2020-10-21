@@ -213,9 +213,11 @@ class Trainer:
 
     def _parser_dict(self):
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
-        return dictionary[cfg.DATASET.DICTIONARY_NAME]
+        return next(dictionary.items())[1] ## return first
 
     def _parser_datasets(self,dictionary):
+        # transforms = prepare_transforms_seg()
+        # target_transforms = prepare_transforms_mask()
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
@@ -334,6 +336,10 @@ class Trainer:
                     self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
+            best_perf_log_str = f"\n------------ Performances (best) ----------\n"
+            best_perf_log_str += "{:}: {:.4f}\n".format('best_acc', best_acc)
+            best_perf_log_str += "------------------------------------\n"
+            logger.info(best_perf_log_str)
             self.tb_writer.close()
 
         dist.destroy_process_group() if cfg.local_rank!=0 else None
@@ -346,15 +352,13 @@ class Trainer:
         lossLogger = MetricLogger(delimiter="  ")
         performanceLogger = MetricLogger(delimiter="  ")
 
-        for i, (imgs, targets) in enumerate(dataloader):
+        for i, sample in enumerate(dataloader):
+            imgs, targets = sample['image'],sample['target']
             _timer.tic()
             # zero the parameter gradients
             optimizer.zero_grad()
 
-            # imgs = imgs.cuda()
             imgs = list(img.cuda() for img in imgs) if isinstance(imgs,list) else imgs.cuda()
-            # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-            # labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
             if isinstance(targets,list):
                 if isinstance(targets[0],torch.Tensor):
                     targets = [t.cuda() for t in targets]
@@ -441,12 +445,9 @@ class Trainer:
         performanceLogger = MetricLogger(delimiter="  ")
 
         with torch.no_grad():
-            for (imgs, targets) in dataloader:
-
-                # imgs = imgs.cuda()
+            for sample in dataloader:
+                imgs, targets = sample['image'], sample['target']
                 imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
-                # labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
                 if isinstance(targets, list):
                     if isinstance(targets[0], torch.Tensor):
                         targets = [t.cuda() for t in targets]
@@ -506,7 +507,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/hymenoptera.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/portrait_unet.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)

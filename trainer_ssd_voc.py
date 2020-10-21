@@ -5,6 +5,7 @@
 # @File : trainer.py
 
 import argparse
+# import logging
 import os
 from collections import defaultdict
 
@@ -12,12 +13,20 @@ import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.autograd import Variable
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
+from torch.optim import lr_scheduler
 import torchvision
+from torch.nn.parallel import data_parallel
+# from torch.nn import SyncBatchNorm
+# from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+from torch.optim import lr_scheduler
 from torch.utils.data._utils.collate import default_collate_err_msg_format, np_str_obj_array_pattern
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms as transformsT
+from torchvision import datasets as datasetsT
+from torchvision import models as modelsT
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
@@ -27,29 +36,34 @@ from copy import deepcopy
 from importlib import import_module
 from time import time
 from datetime import datetime
+from pathlib import Path as P
 from math import ceil
 import torch.backends.cudnn as cudnn
 import numpy as np
 from pathlib import Path as P
 import torch.distributed as dist
 
-from torch.cuda import amp
-from torch.nn import SyncBatchNorm
-from torch.nn.parallel import DistributedDataParallel as DDP
+try:
+    import apex
+    from apex import amp
+    from apex.parallel import DistributedDataParallel, convert_syncbn_model
+except ImportError:
+    raise ImportError("Please install apex from https://www.github.com/nvidia/apex.")
 
-
+from src.utils.distributed import torch_distributed_zero_first
 from src.lr_schedulers.lr_scheduler import parser_lr_scheduler
 from src.optimizers.optimizer import parser_optimizer
 from src.utils.config import CommonConfiguration
 from src.utils.logger import logger
 from src.utils.timer import Timer
+from src.utils.metrics import LossMeter,PerfMeter
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
 from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
 
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.enabled = True
-torch.backends.cudnn.benchmark = True
-
 
 torch.set_default_tensor_type(torch.FloatTensor)
 
@@ -191,6 +205,91 @@ def default_collate2(batch):
 
     raise TypeError(default_collate_err_msg_format.format(elem_type))
 
+def prepare_transforms():
+    data_transforms = {
+        'train': transformsT.Compose([
+            transformsT.RandomResizedCrop(224),
+            transformsT.RandomHorizontalFlip(),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ]),
+
+        'val': transformsT.Compose([
+            transformsT.Resize(256),
+            transformsT.CenterCrop(224),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ]),
+
+        'test': transformsT.Compose([
+            transformsT.Resize(256),
+            transformsT.CenterCrop(224),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ])
+    }
+    return data_transforms
+
+class Relabel:
+    def __init__(self, olabel, nlabel):
+        self.olabel = olabel
+        self.nlabel = nlabel
+
+    def __call__(self, tensor):
+        assert (isinstance(tensor, torch.FloatTensor) or isinstance(tensor, torch.ByteTensor)) , 'tensor needs to be LongTensor'
+        tensor[tensor == self.olabel] = self.nlabel
+        return tensor
+
+class ToLabel255:
+    def __call__(self, image):
+        return torch.from_numpy(np.array(image)/255).float().unsqueeze(0)
+
+class ToLabel:
+    def __call__(self, image):
+        return torch.from_numpy(image).float().unsqueeze(0)
+
+def prepare_transforms_seg():
+    data_transforms = {
+        'train': transformsT.Compose([
+            transformsT.Resize((800,600)),
+            # transformsT.RandomHorizontalFlip(),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ]),
+
+        'val': transformsT.Compose([
+            transformsT.Resize((800,600)),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ]),
+
+        'test': transformsT.Compose([
+            transformsT.Resize((800,600)),
+            transformsT.ToTensor(),
+            transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        ])
+    }
+    return data_transforms
+
+def prepare_transforms_mask():
+    data_transforms = {
+        'train': transformsT.Compose([
+            # transformsT.Resize((800,600)),
+            ToLabel(),
+        ]),
+
+        'val': transformsT.Compose([
+            # transformsT.Resize((800,600)),
+            ToLabel(),
+        ]),
+
+        'test': transformsT.Compose([
+            # transformsT.Resize((800,600)),
+            ToLabel(),
+        ])
+    }
+    return data_transforms
+
 # logger = logging.getLogger("pytorch")
 
 class Trainer:
@@ -199,7 +298,8 @@ class Trainer:
         self.start_epoch = -1
         self.n_iters_elapsed = 0
         self.device = self.cfg.GPU_IDS
-        self.batch_size = self.cfg.BATCH_SIZE * len(self.cfg.GPU_IDS)
+        self.batch_size = self.cfg.BATCH_SIZE
+        self.batch_size_all = self.cfg.BATCH_SIZE * len(self.cfg.GPU_IDS)
 
         self.n_steps_per_epoch = None
         if cfg.local_rank == 0:
@@ -213,9 +313,11 @@ class Trainer:
 
     def _parser_dict(self):
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
-        return dictionary[cfg.DATASET.DICTIONARY_NAME]
+        return next(dictionary.items())[1] ## return first
 
     def _parser_datasets(self,dictionary):
+        # transforms = prepare_transforms_seg()
+        # target_transforms = prepare_transforms_mask()
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
@@ -230,7 +332,7 @@ class Trainer:
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
         dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=default_collate2, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
+                                      collate_fn=dataset_class.collate if hasattr(dataset_class,'collate') else default_collate, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
 
         return datasets, dataloaders, data_samplers
 
@@ -241,7 +343,7 @@ class Trainer:
         model = model_class(dictionary=dictionary)
 
         if self.cfg.distributed:
-            model = SyncBatchNorm.convert_sync_batchnorm(model).cuda()
+            model = convert_syncbn_model(model).cuda()
         else:
             model = model.cuda()
 
@@ -281,6 +383,8 @@ class Trainer:
         ## parser_lr_scheduler
         lr_scheduler_ft = parser_lr_scheduler(cfg, optimizer_ft)
 
+        model_ft, optimizer_ft = amp.initialize(model_ft, optimizer_ft, opt_level=cfg.APEX_LEVEL,verbosity=0)
+
         '''
         # Scheduler https://arxiv.org/pdf/1812.01187.pdf
         # https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#OneCycleLR
@@ -289,8 +393,9 @@ class Trainer:
         '''
 
         if cfg.distributed:
-            model_ft = DDP(model_ft, device_ids=[cfg.local_rank], output_device=(cfg.local_rank))
+            model_ft = DistributedDataParallel(model_ft, delay_allreduce=True)
 
+        '''
         # Freeze
         freeze = ['', ]  # parameter names to freeze (full or partial)
         if any(freeze):
@@ -298,10 +403,11 @@ class Trainer:
                 if any(x in k for x in freeze):
                     print('freezing %s' % k)
                     v.requires_grad = False
+        '''
 
         if self.cfg.PRETRAIN_MODEL is not None:
             if self.cfg.RESUME:
-                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft, lr_scheduler_ft)
+                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft, lr_scheduler_ft,amp)
             else:
                 self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft)
 
@@ -312,26 +418,25 @@ class Trainer:
         self.n_steps_per_epoch = int(ceil(sum(len(t) for t in datasets['train'])))
 
         best_acc = 0.0
-        scaler = amp.GradScaler(enabled=True)
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
                 dataloaders['train'].sampler.set_epoch(epoch)
-            self.train_epoch(scaler, epoch, model_ft, dataloaders['train'], optimizer_ft)
+            self.train_epoch(epoch, model_ft, dataloaders['train'], optimizer_ft, lr_scheduler_ft,None)
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL:
-                acc = self.val_epoch(epoch, model_ft, dataloaders['val'])
+                acc = self.val_epoch(epoch, model_ft, dataloaders['val'] , optimizer_ft, lr_scheduler_ft)
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
                     if best_acc < acc:
-                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
+                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft,amp)
                         best_acc = acc
                         continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft,amp)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -339,7 +444,7 @@ class Trainer:
         dist.destroy_process_group() if cfg.local_rank!=0 else None
         torch.cuda.empty_cache()
 
-    def train_epoch(self, scaler, epoch, model, dataloader, optimizer, prefix="train"):
+    def train_epoch(self, epoch, model, dataloader, optimizer, lr_scheduler, grad_normalizer=None,prefix="train"):
         model.train()
 
         _timer = Timer()
@@ -363,9 +468,7 @@ class Trainer:
             else:
                 targets = targets.cuda()
 
-            # Autocast
-            with amp.autocast(enabled=True):
-                out = model(imgs, targets, prefix)
+            out = model(imgs, targets, prefix)
 
             if not isinstance(out, tuple):
                 losses, performances = out, None
@@ -374,18 +477,12 @@ class Trainer:
 
             self.n_iters_elapsed += 1
 
-            # Scales loss.  Calls backward() on scaled loss to create scaled gradients.
-            # Backward passes under autocast are not recommended.
-            # Backward ops run in the same dtype autocast chose for corresponding forward ops.
-            scaler.scale(losses["loss"]).backward()
-            # scaler.step() first unscales the gradients of the optimizer's assigned params.
-            # If these gradients do not contain infs or NaNs, optimizer.step() is then called,
-            # otherwise, optimizer.step() is skipped.
-            scaler.step(optimizer)
-            # Updates the scale for next iteration.
-            scaler.update()
+            with amp.scale_loss(losses["loss"], optimizer) as scaled_loss:
+                scaled_loss.backward()
 
-            # torch.cuda.synchronize()
+            optimizer.step()
+
+            torch.cuda.synchronize()
             _timer.toc()
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
@@ -393,7 +490,6 @@ class Trainer:
                     # reduce losses over all GPUs for logging purposes
                     loss_dict_reduced = reduce_dict(losses)
                     lossLogger.update(**loss_dict_reduced)
-                    del loss_dict_reduced
                 else:
                     lossLogger.update(**losses)
 
@@ -402,10 +498,8 @@ class Trainer:
                         # reduce performances over all GPUs for logging purposes
                         performance_dict_reduced = reduce_dict(performances)
                         performanceLogger.update(**performance_dict_reduced)
-                        del performance_dict_reduced
                     else:
                         performanceLogger.update(**performances)
-                    del performances
 
                 if self.cfg.local_rank == 0:
                     template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
@@ -414,12 +508,12 @@ class Trainer:
                             epoch, self.cfg.N_MAX_EPOCHS, i,
                             round(get_current_lr(optimizer), 6),
                             lossLogger.meters["loss"].value,
-                            self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS /  _timer.diff,
+                            self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS /  _timer.total_time,
                             "\n".join(["{}: {:.4f}".format(n, l.value) for n, l in lossLogger.meters.items() if n != "loss"]),
                         )
                     )
 
-            del imgs, targets, losses
+            del imgs, targets
 
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
@@ -434,7 +528,7 @@ class Trainer:
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataloader,prefix="val"):
+    def val_epoch(self, epoch, model, dataloader, optimizer=None, lr_scheduler=None,prefix="val"):
         model.eval()
 
         lossLogger = MetricLogger(delimiter="  ")
@@ -461,7 +555,6 @@ class Trainer:
                     # reduce losses over all GPUs for logging purposes
                     loss_dict_reduced = reduce_dict(losses)
                     lossLogger.update(**loss_dict_reduced)
-                    del loss_dict_reduced
                 else:
                     lossLogger.update(**losses)
 
@@ -470,12 +563,10 @@ class Trainer:
                         # reduce performances over all GPUs for logging purposes
                         performance_dict_reduced = reduce_dict(performances)
                         performanceLogger.update(**performance_dict_reduced)
-                        del performance_dict_reduced
                     else:
                         performanceLogger.update(**performances)
-                    del performances
 
-                del imgs, targets, losses
+                del imgs, targets
 
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
@@ -506,7 +597,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/hymenoptera.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/voc.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)
