@@ -81,7 +81,7 @@ def produceImgList():
 
     stages = ['train', 'val']
     for stage in stages:
-        seg_txt = open(root_path + stage + '_1.txt', 'a')
+        seg_txt = open(root_path + stage + '_2.txt', 'a')
 
         imgpath = glob(os.path.join(root_path, stage,'images/*.png'))
 
@@ -91,4 +91,4 @@ def produceImgList():
 
         seg_txt.close()
 
-produceImgList()
+# produceImgList()

@@ -56,10 +56,9 @@ class DiceLoss(nn.Module):
         return loss
 
 
-class FocalLoss(nn.Module):
+class BatchFocalLoss(nn.Module):
     def __init__(self, gamma=2, alpha=None, ignore_index=255, size_average=True):
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
+        super(BatchFocalLoss, self).__init__()
         self.size_average = size_average
         self.CE_loss = nn.CrossEntropyLoss(reduce=False, ignore_index=ignore_index, weight=alpha)
 

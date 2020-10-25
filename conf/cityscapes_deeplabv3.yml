@@ -50,10 +50,10 @@ INIT_LR: 0.01
 OPTIMIZER:
   TYPE: 'Adam' # Adam, RMSprop
   BIAS_PARAMS:
-    momentum: 0
+    momentum: 0.9
     weight_decay: 0.00000001
   WEIGHT_PARAMS:
-    momentum: 0
+    momentum: 0.9
     weight_decay: 0.00000001
   BIAS_LR_MULTIPLIER: 1
 

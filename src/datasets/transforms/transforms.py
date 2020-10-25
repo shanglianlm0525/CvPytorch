@@ -105,6 +105,7 @@ class RandomHorizontallyFlip(object):
             return img.transpose(Image.FLIP_LEFT_RIGHT), mask.transpose(Image.FLIP_LEFT_RIGHT)
         return img, mask
 
+
 class Scale(object):
     def __init__(self, size):
         self.size = size
@@ -122,6 +123,7 @@ class Scale(object):
             oh = self.size
             ow = int(self.size * w / h)
             return img.resize((ow, oh), Image.BILINEAR), mask.resize((ow, oh), Image.NEAREST)
+
 
 class RandomSizedCrop(object):
     def __init__(self, size):
@@ -156,6 +158,7 @@ class RandomSizedCrop(object):
         crop = CenterCrop(self.size)
         return crop(*scale(img, mask))
 
+
 class RandomRotate(object):
     def __init__(self, degree):
         self.degree = degree
@@ -163,6 +166,7 @@ class RandomRotate(object):
     def __call__(self, img, mask):
         rotate_degree = random.random() * 2 * self.degree - self.degree
         return img.rotate(rotate_degree, Image.BILINEAR), mask.rotate(rotate_degree, Image.NEAREST)
+
 
 class RandomSized(object):
     def __init__(self, size):
@@ -179,6 +183,7 @@ class RandomSized(object):
         img, mask = img.resize((w, h), Image.BILINEAR), mask.resize((w, h), Image.NEAREST)
 
         return self.crop(*self.scale(img, mask))
+
 
 class SlidingCropOld(object):
     def __init__(self, crop_size, stride_rate, ignore_label):

@@ -117,7 +117,6 @@ class Deeplabv3Plus(nn.Module):
         self.decoder = Decoder(self._num_classes, self.backbone.low_level_inplanes)
 
         self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
-        self._evaluator = SegmentationEvaluator(self._num_classes)
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
         x, low_level_feat = self.backbone(imgs)

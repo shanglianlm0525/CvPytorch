@@ -62,9 +62,24 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         img, target = sample['image'], sample['target']
+
+        img = np.array(img).astype(np.float32).transpose((2, 0, 1))
+        target = np.array(target).astype(np.float32)
+        if len(target.shape) == 2:
+            target = np.expand_dims(target, axis=0)
+
+        img = torch.from_numpy(img).float()
+        target = torch.from_numpy(target).float()
+
+
+        '''
         img = TF.to_tensor(img)
         if target is not None:
-            target = TF.to_tensor(target)
+            target = np.array(target, dtype=np.uint8)
+            if len(target.shape) == 2:
+                target = np.expand_dims(target, axis=2)
+            target = torch.from_numpy(target)
+        '''
         return {'image': img, 'target': target}
 
 
@@ -210,7 +225,7 @@ class ColorJitter(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        img = T.ColorJitter(self.brightness, self.contrast, self.saturation,self.hue)[img]
+        img = T.ColorJitter(self.brightness, self.contrast, self.saturation,self.hue)(img)
         return {'image': img, 'target': target}
 
 
@@ -326,8 +341,6 @@ class Relabel(object):
         assert (isinstance(target, torch.FloatTensor) or isinstance(target, torch.ByteTensor)) , 'tensor needs to be LongTensor'
         target[target == self.olabel] = self.nlabel
         return {'image': img, 'target': target}
-
-
 
 
 

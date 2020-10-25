@@ -29,10 +29,8 @@ def produceImgAndLabel():
     for i,(imgline,txtline) in enumerate(zip(imgpath,txtpath)):
         print(imgline.replace(root_path, ''))
         print(txtline.replace(root_path, ''))
-        if i%5 != 0:
-            train_seg_txt.write(imgline.replace(root_path, '') + ' ' + txtline.replace(root_path, '') + '\n')
-        else:
-            val_seg_txt.write(imgline.replace(root_path, '') + ' ' + txtline.replace(root_path, '') + '\n')
+        train_seg_txt.write(imgline.replace(root_path, '') + ' ' + txtline.replace(root_path, '') + '\n')
+        val_seg_txt.write(imgline.replace(root_path, '') + ' ' + txtline.replace(root_path, '') + '\n')
 
     train_seg_txt.close()
     val_seg_txt.close()
@@ -284,5 +282,5 @@ def voc2coco():
     parseXmlFiles(xml_path)  # 只需要改动这两个参数就行了
     json.dump(coco, open(json_file, 'w'))
 
-voc2coco()
+# voc2coco()
 print('finished!')

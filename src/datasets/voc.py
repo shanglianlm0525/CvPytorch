@@ -161,7 +161,7 @@ data_transforms = {
     'train': tf.Compose([
         ctf.RandomHorizontalFlip(p=0.5),
         ctf.RandomScaleCrop(512,512),
-        ctf.RandomGaussianBlur(),
+        ctf.RandomGaussianBlur(p=0.2),
         ctf.ToTensor(),
         ctf.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     ]),
@@ -220,9 +220,13 @@ class VOCSegmentation(Dataset):
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx]).convert('P')
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+            _target = self.encode_segmap(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
+
+    def encode_segmap(self, mask):
+        return mask
 
     def __len__(self):
         return len(self._imgs)

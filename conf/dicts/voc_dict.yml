@@ -41,7 +41,7 @@ DET_CLASSES:
   - 'train': 1
   - 'tvmonitor': 1
 SEG_CLASSES:
-  # - 'background': 1
+  - 'background': 1
   - 'aeroplane': 1
   - 'bicycle': 1
   - 'bird': 1

@@ -90,6 +90,8 @@ class SegNet(nn.Module):
 
         self.outconv = nn.Conv2d(64, self._num_classes, kernel_size=3, padding=1)
 
+        self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
+
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
         # Stage 1
         x1 = self.conv_down1(imgs)
@@ -132,9 +134,6 @@ class SegNet(nn.Module):
 
             return outputs
         else:
-            print('targets',targets.shape)
-            print('outputs',outputs.shape)
-
             losses = {}
             losses['bce_loss'] = 0
 

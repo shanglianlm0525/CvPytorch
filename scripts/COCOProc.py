@@ -71,5 +71,43 @@ def procJson():
         json.dump(data, f)
 
 
-procJson()
+# procJson()
+
+def validJson():
+    data = None
+    with open('/home/lmin/data/coco/annotations/instances_val2017.json', 'r', encoding='utf-8') as load_f:
+        strF = load_f.read()
+        if len(strF) > 0:
+            data = json.loads(strF)
+
+    info = data['info']
+    licenses = data['licenses']
+    images = data['images']
+    annotations = data['annotations']
+    categories = data['categories']
+
+
+    validpath = glob(os.path.join('/home/lmin/data/coco/images/val2017','*.jpg'))
+    valid = [os.path.basename(path) for path in validpath]
+
+    images_valid = []
+    annotations_valid = []
+    for ig in images:
+        if ig['file_name'] in valid:
+            # print(ig)
+            images_valid.append(ig)
+            for an in annotations:
+                if ig['id'] == an['image_id']:
+                    # print(an)
+                    annotations_valid.append(an)
+
+    data['images'] = images_valid
+    data['annotations'] = annotations_valid
+
+    with open("/home/lmin/data/coco/annotations2/instances_val2017.json", "w") as f:
+        json.dump(data, f)
+
+
+# validJson()
+
 print('finished!')

@@ -11,28 +11,37 @@ import cv2
 from glob import glob
 
 
-root_path = '/home/lmin/data/VOCdevkit/20200730/'
+def produceImgAndLabelList():
+    root_path = '/home/lmin/data/VOCdevkit/'
 
-stages = ['train','val']
-years = ['VOC2007','VOC2012']
+    stages = ['train','val']
+    years = ['VOC2007','VOC2012']
 
-for stage in stages:
-    det_txt = open(root_path+stage+'_det.txt','a')
-    seg_txt = open(root_path+stage+'_seg.txt','a')
+    for stage in stages:
+        det_txt = open(root_path+stage+'_det.txt','a')
+        seg_txt = open(root_path+stage+'_seg.txt','a')
 
-    for year in years:
-        txtpath = os.path.join(root_path,year,'ImageSets/Main/'+stage+'.txt')
-        imgpath = os.path.join(root_path,year,'JPEGImages','%s.jpg')
-        xmlpath = os.path.join(root_path,year,'Annotations','%s.xml')
-        pngpath = os.path.join(root_path,year,'SegmentationClass','%s.png')
-        for line in open(txtpath):
-            print((imgpath % line.strip()).replace(root_path,''))
-            print((xmlpath % line.strip()).replace(root_path,''))
-            print((pngpath % line.strip()).replace(root_path,''))
-            det_txt.write((imgpath % line.strip()).replace(root_path,'')+' '+(xmlpath % line.strip()).replace(root_path,'')+'\n')
-            seg_txt.write((imgpath % line.strip()).replace(root_path,'')+' '+(pngpath % line.strip()).replace(root_path,'')+'\n')
+        for year in years:
+            txtpath = os.path.join(root_path,year,'ImageSets/Main/'+stage+'.txt')
+            imgpath = os.path.join(root_path,year,'JPEGImages','%s.jpg')
+            xmlpath = os.path.join(root_path,year,'Annotations','%s.xml')
+            for line in open(txtpath):
+                print((imgpath % line.strip()).replace(root_path,''))
+                print((xmlpath % line.strip()).replace(root_path,''))
+                det_txt.write((imgpath % line.strip()).replace(root_path,'')+' '+(xmlpath % line.strip()).replace(root_path,'')+'\n')
 
-    det_txt.close()
-    seg_txt.close()
+        for year in years:
+            txtpath = os.path.join(root_path,year,'ImageSets/Segmentation/'+stage+'.txt')
+            imgpath = os.path.join(root_path,year,'JPEGImages','%s.jpg')
+            pngpath = os.path.join(root_path,year,'SegmentationClass','%s.png')
+            for line in open(txtpath):
+                print((imgpath % line.strip()).replace(root_path,''))
+                print((pngpath % line.strip()).replace(root_path,''))
+                seg_txt.write((imgpath % line.strip()).replace(root_path,'')+' '+(pngpath % line.strip()).replace(root_path,'')+'\n')
 
+
+        det_txt.close()
+        seg_txt.close()
+
+produceImgAndLabelList()
 print('finished!')
