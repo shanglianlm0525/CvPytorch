@@ -53,6 +53,11 @@ class PortraitSegmentation(Dataset):
         self.target_transform = None
         self.stage = stage
 
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.name2id = dict(zip(self.category, range(self.num_classes)))
+        self.id2name = {v: k for k, v in self.name2id.items()}
+
         self._imgs = []
         self._targets = []
         if self.stage == 'infer':
