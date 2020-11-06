@@ -26,34 +26,39 @@ class FCOS(nn.Module):
         self.target_layer = GenTargets()
         self.loss_layer = ClsCntRegLoss()
 
-        # inference
-        score_threshold = 0.05
-        nms_iou_threshold = 0.6
-        max_detection_boxes_num = 1000
         # mode == "infer":
         self.detection_head = DetectHead(0.05, 0.6,1000, [8,16,32,64,128])
         self.clip_boxes = ClipBoxes()
 
-    def forward(self, inputs, mode='infer'):
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
         '''
         inputs
         [training] list  batch_imgs,batch_boxes,batch_classes
         [inference] img
         '''
 
-        if self.mode == "train":
-            batch_imgs, batch_boxes, batch_classes = inputs
-            out = self.fcos_body(batch_imgs)
-            targets = self.target_layer([out, batch_boxes, batch_classes])
-            losses = self.loss_layer([out, targets])
-            return losses
-        elif self.mode == "infer":
-            # raise NotImplementedError("no implement inference model")
+        if mode == 'infer':
             '''
-            for inference mode, img should preprocessed before feeding in net 
+                for inference mode, img should preprocessed before feeding in net 
             '''
-            batch_imgs = inputs
-            out = self.fcos_body(batch_imgs)
+            out = self.fcos_body(imgs)
             scores, classes, boxes = self.detection_head(out)
-            boxes = self.clip_boxes(batch_imgs, boxes)
+            boxes = self.clip_boxes(imgs, boxes)
             return scores, classes, boxes
+        else:
+            losses = {}
+            batch_boxes, batch_classes = torch.split(targets, 4, 2)
+            batch_classes = batch_classes.squeeze(2)
+            out = self.fcos_body(imgs)
+            targets = self.target_layer([out, batch_boxes, batch_classes])
+            loss_tuple = self.loss_layer([out, targets])
+
+            losses['cls_loss'] = loss_tuple[0]
+            losses['cnt_loss'] = loss_tuple[1]
+            losses['reg_loss'] = loss_tuple[2]
+            losses['loss'] = loss_tuple[-1]
+
+            if mode == 'val':
+                pass
+            else:
+                return losses
