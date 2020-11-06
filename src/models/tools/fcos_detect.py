@@ -7,9 +7,9 @@
 import torch
 import torch.nn as nn
 
-from CvPytorch.src.models.backbones.resnet import resnet50
-from CvPytorch.src.models.heads.fcos_head import ClsCntRegHead
-from CvPytorch.src.models.necks.fpn import FPN
+from ..backbones.resnet import ResNet
+from ..heads.fcos_head import ClsCntRegHead
+from ..necks.fpn import FPN
 
 
 def coords_fmap2orig(feature, stride):
@@ -35,7 +35,7 @@ def coords_fmap2orig(feature, stride):
 class FcosBody(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        self.backbone = resnet50(pretrained=True, use_fpn=True)
+        self.backbone = ResNet(backbone='resnet50', backbone_path=None, use_fpn=True)
         self.fpn = FPN(features=256)
         self.head = ClsCntRegHead(256, num_classes, 0.01)
 
@@ -54,10 +54,8 @@ class FcosBody(nn.Module):
 
 
         self.apply(freeze_bn)
-        print("INFO===>success frozen BN")
-
         self.backbone.freeze_stages(1)
-        print("INFO===>success frozen backbone stage1")
+
 
     def forward(self, x):
         '''
