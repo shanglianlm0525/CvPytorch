@@ -55,7 +55,7 @@ $$
 Acc = \frac{\sum_{i=0}^{k}{p_{ii}}}{\sum_{i=0}^{k}{\sum_{j=0}^{k}{p_{ij}}}}
 $$
 
-<p align="center"><img width="35%" src="imgs/Acc.png" /></p>
+![](https://i.loli.net/2020/11/20/V7rzZn5gpDJF6yW.png)
 
 **Mean Pixel Accuracy (mAcc)**: a slightly improved PA in which the ratio of correct pixels is computed
 in a per-class basis and then averaged over the total number of classes.  
@@ -63,28 +63,25 @@ $$
 mAcc = \frac{1}{k+1}\sum_{i=0}^{k}{\frac{{p_{ii}}}{\sum_{j=0}^{k}{p_{ij}}}}
 $$
 
-<p align="center"><img width="40%" src="imgs/mAcc.png" /></p>
+![mAcc](https://i.loli.net/2020/11/20/FEux7jgikOQCRGV.png)
+
+
 
 **Mean Intersection over Union (mIoU)**: this is the standard metric for segmentation purposes. It computes a ratio between the intersection and the union of two sets, in our case the ground truth and our predicted segmentation. That ratio can be reformulated as the number of true positives (intersection) over the sum of true positives, false negatives, and  false positives (union). That IoU is computed on a per-class basis and then averaged.  
 $$
 mIoU = \frac{1}{k+1}\sum_{i=0}^{k}{\frac{{p_{ii}}}{\sum_{j=0}^{k}{p_{ij}}+\sum_{j=0}^{k}p_{ji}-p_{ii}}}
 $$
 
-<p align="center"><img width="50%" src="imgs/mIoU.png" /></p>
+![](https://i.loli.net/2020/11/20/tHyiNDkawcK3FxG.png)
 
 **Frequency Weighted Intersection over Union (FWIoU)**: it is an improved over the raw MIoU which
 weights each class importance depending on their appearance frequency.  
-
 
 $$
 FWIoU = \frac{1}{\sum_{i=0}^{k}\sum_{j=0}^{k}{p_{ij}}}\sum_{i=0}^{k}{\frac{\sum_{j=0}^{k}{p_{ij}p_{ii}}}{\sum_{j=0}^{k}{p_{ij}}+\sum_{j=0}^{k}p_{ji}-p_{ii}}}
 $$
 
-<p align="center"><img width="60%" src="imgs/FWIoU.png" /></p>
-
-
-
-
+![FWIoU](https://i.loli.net/2020/11/20/Wa89rqezxm3PMg6.png)
 
 ## REFERENCES
 
