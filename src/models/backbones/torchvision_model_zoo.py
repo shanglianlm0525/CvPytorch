@@ -49,7 +49,7 @@ class VGGNet(Module):
 
 
 class ResNet(Module):
-    def __init__(self, backbone='resnet50', backbone_path=None):
+    def __init__(self, backbone='resnet50', backbone_path=None, use_fpn=True):
         super().__init__()
         if backbone == 'resnet18':
             backbone = resnet18(pretrained=not backbone_path)

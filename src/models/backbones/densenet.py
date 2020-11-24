@@ -35,6 +35,8 @@ class Densenet(nn.Module):
         else:
             self.out_channels = [1024]
 
+        print(backbone)
+
         self.conv1 = backbone.features.conv0
         self.norm0 = backbone.features.norm0
         self.relu0 = backbone.features.relu0

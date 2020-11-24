@@ -18,6 +18,7 @@ class VGG(nn.Module):
         super(VGG, self).__init__()
         self.use_fpn = use_fpn
 
+        self.out_channels = [256, 512, 512]
         if backbone == 'vgg11':
             backbone = vgg11_bn(pretrained=not backbone_path)
         elif backbone == 'vgg13':
@@ -26,14 +27,11 @@ class VGG(nn.Module):
             backbone = vgg16_bn(pretrained=not backbone_path)
         elif backbone == 'vgg19':
             backbone = vgg19_bn(pretrained=not backbone_path)
+        else:
+            raise NotImplementedError
 
         if backbone_path:
             backbone.load_state_dict(torch.load(backbone_path))
-
-        if self.use_fpn:
-            self.out_channels = [256, 512, 512]
-        else:
-            self.out_channels = [512]
 
         self.conv1 = nn.Sequential(*list(backbone.features.children())[:7])
         self.layer1 = nn.Sequential(*list(backbone.features.children())[7:14])

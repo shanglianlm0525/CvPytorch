@@ -18,6 +18,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.use_fpn = use_fpn
 
+        self.out_channels = [512, 1024, 2048]
         if backbone == 'resnet18':
             backbone = resnet18(pretrained=not backbone_path)
         elif backbone == 'resnet34':
@@ -26,15 +27,13 @@ class ResNet(nn.Module):
             backbone = resnet50(pretrained=not backbone_path)
         elif backbone == 'resnet101':
             backbone = resnet101(pretrained=not backbone_path)
-        else:  # backbone == 'resnet152':
+        elif backbone == 'resnet152':  # backbone == 'resnet152':
             backbone = resnet152(pretrained=not backbone_path)
+        else:
+            raise NotImplementedError
+
         if backbone_path:
             backbone.load_state_dict(torch.load(backbone_path))
-
-        if self.use_fpn:
-            self.out_channels = [512, 1024, 2048]
-        else:
-            self.out_channels = [2048]
 
         self.conv1 = nn.Sequential(list(backbone.children())[0])
         self.bn1 = nn.Sequential(list(backbone.children())[1])
