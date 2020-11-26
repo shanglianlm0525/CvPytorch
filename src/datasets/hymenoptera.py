@@ -73,11 +73,14 @@ class HymenopteraDataset(Dataset):
         if self.transform is not None:
             img = self.transform(img)
         if self.stage=='infer':
-            return img
+            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
+            sample = {'image': img, 'mask': None}
+            return self.transform(sample), img_id
         else:
             if self.target_transform is not None:
                 label = self.target_transform(label)
-            return img, label
+            sample = {'image': img, 'target': label}
+            return sample
 
     def __len__(self):
         return len(self._imgs)
