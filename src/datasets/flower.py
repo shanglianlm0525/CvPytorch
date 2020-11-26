@@ -40,13 +40,18 @@ class FlowerDataset(Dataset):
                     self._labels.extend([self.cls_label.index(fname) for _ in imgs])
 
     def __getitem__(self, idx):
-        img, label = Image.open(self._imgs[idx]).convert('RGB'),self._labels[idx]
+        img, label = Image.open(self._imgs[idx]).convert('RGB'), self._labels[idx]
         if self.transform is not None:
             img = self.transform(img)
-        if self.target_transform is not None:
-            label = self.target_transform(label)
-        return img, label
-
+        if self.stage == 'infer':
+            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
+            sample = {'image': img, 'mask': None}
+            return self.transform(sample), img_id
+        else:
+            if self.target_transform is not None:
+                label = self.target_transform(label)
+            sample = {'image': img, 'target': label}
+            return sample
 
     def __len__(self):
         return len(self._imgs)
