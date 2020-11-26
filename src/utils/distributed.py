@@ -13,6 +13,9 @@ import torch
 import torch.distributed as dist
 from contextlib import contextmanager
 from src.evaluation.eval_segmentation import SegmentationEvaluator
+from src.evaluation.eval_detection import VOCEvaluator, COCOEvaluator
+from src.evaluation.eval_classification import ClassificationEvaluator
+
 
 def get_world_size():
     if not dist.is_available():
@@ -284,25 +287,28 @@ class MetricLogger(object):
     def __init__(self, dictionary, cfg):
         self.dictionary = dictionary
         self.cfg = cfg
-        self._num_classes = len(self.dictionary)
-        self.type = self.cfg.EVAL_NAME
+        self.type = self.cfg.EVAL_FUNC
 
         if self.type == 'segmentation':
-            self._evaluator = SegmentationEvaluator(self._num_classes)
-        elif self.type == 'detection':
-            pass
+            self._evaluator = SegmentationEvaluator(self.dictionary)
+        elif self.type == 'voc_detection':
+            self._evaluator = VOCEvaluator(self.dictionary)
+        elif self.type == 'coco_detection':
+            self._evaluator = COCOEvaluator(self.dictionary)
         elif self.type == 'classification':
-            pass
+            self._evaluator = ClassificationEvaluator(self.dictionary)
         else:
             raise NotImplementedError
 
     def update(self, *kwargs):
         if self.type == 'segmentation':
             self._evaluator.add_batch(*kwargs)
-        elif self.type == 'detection':
-            pass
+        elif self.type == 'voc_detection':
+            self._evaluator.add_batch(*kwargs)
+        elif self.type == 'coco_detection':
+            self._evaluator.add_batch(*kwargs)
         elif self.type == 'classification':
-            pass
+            self._evaluator.add_batch(*kwargs)
         else:
             raise NotImplementedError
 
@@ -316,9 +322,19 @@ class MetricLogger(object):
 
             performances['performance'] = performances['mIoU']
             return performances
-        elif self.type == 'detection':
+        elif self.type == 'voc_detection':
+            performances = {}
+            performances = self._evaluator.Precision()
+            performances['mAP'] = self._evaluator.Mean_Precision()
+            performances['performance'] = performances['mAP']
+            return performances
+        elif self.type == 'coco_detection':
             pass
         elif self.type == 'classification':
-            pass
+            performances = {}
+            performances = self._evaluator.Accuracy()
+            performances['mAcc'] = self._evaluator.Mean_Accuracy()
+            performances['performance'] = self._evaluator.Mean_Accuracy()
+            return performances
         else:
             raise NotImplementedError
