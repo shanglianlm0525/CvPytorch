@@ -1,61 +1,22 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/6/12 16:15
+# @Time : 2020/11/24 17:55
 # @Author : liumin
 # @File : cls_model.py
 
+import numpy as np
 import torch
 import torch.nn as nn
-from torchvision import models as modelsT
-import numpy as np
-import torch.nn.functional as torchF
+import torchvision
+import torch.nn.functional as TF
 
-
-
-def Conv3x3BNReLU(in_channels,out_channels):
-    return nn.Sequential(
-        nn.Conv2d(in_channels=in_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU6(inplace=True)
-    )
-
-class VGGNet(nn.Module):
-    def __init__(self, block_nums,num_classes=1000):
-        super(VGGNet, self).__init__()
-
-        self.stage1 = self._make_layers(in_channels=3, out_channels=64, block_num=block_nums[0])
-        self.stage2 = self._make_layers(in_channels=64, out_channels=128, block_num=block_nums[1])
-        self.stage3 = self._make_layers(in_channels=128, out_channels=256, block_num=block_nums[2])
-        self.stage4 = self._make_layers(in_channels=256, out_channels=512, block_num=block_nums[3])
-        self.stage5 = self._make_layers(in_channels=512, out_channels=512, block_num=block_nums[4])
-
-        self.classifier = nn.Sequential(
-            nn.Linear(in_features=512*7*7,out_features=4096),
-            nn.ReLU6(inplace=True),
-            nn.Dropout(p=0.2),
-            nn.Linear(in_features=4096, out_features=4096),
-            nn.ReLU6(inplace=True),
-            nn.Dropout(p=0.2),
-            nn.Linear(in_features=4096, out_features=num_classes)
-        )
-
-    def _make_layers(self, in_channels, out_channels, block_num):
-        layers = []
-        layers.append(Conv3x3BNReLU(in_channels,out_channels))
-        for i in range(1,block_num):
-            layers.append(Conv3x3BNReLU(out_channels,out_channels))
-        layers.append(nn.MaxPool2d(kernel_size=2,stride=2))
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.stage1(x)
-        x = self.stage2(x)
-        x = self.stage3(x)
-        x = self.stage4(x)
-        x = self.stage5(x)
-        x = x.view(x.size(0),-1)
-        out = self.classifier(x)
-        return out
+available_models = ['vgg11_bn','vgg13_bn','vgg16_bn','vgg19_bn'
+                    ,'resnet18','resnet34','resnet50','resnet101','resnet152'
+                    ,'resnext50_32x4d','resnext101_32x8d'
+                    ,'densenet121','densenet161','densenet169','densenet201'
+                    ,'shufflenet_v2_x0_5','shufflenet_v2_x1_0,','shufflenet_v2_x1_5','shufflenet_v2_x2_0'
+                    ,'mobilenet_v2'
+                    ,'squeezenet1_1']
 
 class ClsModel(nn.Module):
     def __init__(self,dictionary):
@@ -67,20 +28,12 @@ class ClsModel(nn.Module):
         self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
         self._num_classes = len(self.dictionary)
 
-
-        self._model = modelsT.resnet18(pretrained=True)
+        self._model = torchvision.models.__dict__['resnet18'](pretrained=True)
         num_fc_fea = self._model.fc.in_features
         self._model.fc = nn.Linear(num_fc_fea, self._num_classes)
-        '''
-
-        block_nums = [2, 2, 3, 3, 3]
-        self._model = VGGNet(block_nums,num_classes=2)
-        '''
 
         self.softmax =  nn.Softmax(dim=1)
-
         self._criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array(self._weight)).float(),ignore_index=-1).cuda()
-
 
         # self.init_params()
 
@@ -107,26 +60,13 @@ class ClsModel(nn.Module):
             losses['loss'] = self._criterion(outputs, labels)
 
             if mode == 'val':
-                performances = {}
                 _, preds = torch.max(outputs, 1)
-                performances['performance'] = preds.eq(labels).sum() *1.0 / imgs.size(0)
-
-                for idx, d in enumerate(self.dictionary):
-                    for _label, _weight in d.items():
-                        cognize = labels == idx
-                        if labels[cognize].size(0):
-                            losses['loss_'+_label] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
-                            performances['performance_'+_label] = preds[cognize].eq(labels[cognize]).sum() * 1.0 / torch.nonzero(cognize,as_tuple=False).size(0)
-
-                return losses, performances
+                return losses, preds
             else:
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
                         cognize = labels == idx
                         if labels[cognize].size(0):
-                            losses['loss_'+_label] = torchF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
+                            losses['loss_'+_label] = TF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
 
                 return losses
-
-
-
