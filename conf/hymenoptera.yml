@@ -3,6 +3,7 @@ EXPERIMENT_NAME: 'Hymenoptera'
 DATASET:
   CLASS: 'src.datasets.hymenoptera.HymenopteraDataset'
   DICTIONARY: 'conf/dicts/hymenoptera_dict.yml'
+  DICTIONARY_NAME: 'CLS_CLASSES'
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/hymenoptera/train'
@@ -38,7 +39,7 @@ DATASET:
     ImageSubtract128:
 
 USE_MODEL: 'src.models.cls_model.ClsModel'
-
+EVAL_FUNC: 'classification'
 
 ## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'
@@ -79,9 +80,6 @@ LR_SCHEDULER:
   PATIENCE: 10
 
 SYNC_BN: True
-
-APEX: True
-APEX_LEVEL: 'O0' # 'O0':fp32 train 'O1': Mixed Precision (recommended)  'O2': almost fp16 'O3': fp16 training
 
 #########################################
 # Logging / Visualization Configurations

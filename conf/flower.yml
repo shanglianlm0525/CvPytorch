@@ -1,8 +1,9 @@
 EXPERIMENT_NAME: 'Flower'
 
 DATASET:
-  CLASS: 'src.datasets.Flower.FlowerDataset'
+  CLASS: 'src.datasets.flower.FlowerDataset'
   DICTIONARY: 'conf/dicts/flower_dict.yml'
+  DICTIONARY_NAME: 'CLS_CLASSES'
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/Flower17/train'
@@ -38,43 +39,54 @@ DATASET:
     ImageSubtract128:
 
 USE_MODEL: 'src.models.cls_model.ClsModel'
+EVAL_FUNC: 'classification'
 
-RESUME_TRAINING: False
+
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 2
 #PRETRAIN_MODEL: 'checkpoints/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
-CHECKPOINT_SAVE_DIR: 'checkpoints'
-USE_GLOBAL_BN_STATS: False
+RESUME: False
 
 
-GPU_IDS: [0,1]
+GPU_IDS: [1]
 BATCH_SIZE: 16
 NUM_WORKERS: 8
 N_MAX_EPOCHS: 60
 INIT_LR: 0.1
 # MILESTONES: [20, 40, 55]
 GAMMA: 0.5  # controls how much lr to reduce each time the epoch reaches a milestone
+
+
+## OPTIMIZER
 OPTIMIZER:
-  TYPE: 'sgd'
+  TYPE: 'SGD' # Adam, RMSprop
   BIAS_PARAMS:
     momentum: 0
     weight_decay: 0
   WEIGHT_PARAMS:
     momentum: 0
-    weight_decay: 0.0000
+    weight_decay: 0
   BIAS_LR_MULTIPLIER: 1
-HALF: False
-#GRAD_CLIP:
-#  TYPE: 'norm'
-#  VALUE: 5
+
+## LR_SCHEDULER
 LR_SCHEDULER:
   TYPE: 'MultiStepLR'
   MILESTONES: [10, 20, 30, 40, 50, 60]
   GAMMA: 0.1
   PATIENCE: 10
 
+#GRAD_CLIP:
+#  TYPE: 'norm'
+#  VALUE: 5
+
+
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 2000
-N_ITERS_TO_SAVE_MODEL: 1000
+N_ITERS_TO_DISPLAY_STATUS: 10
+
+## tensorboard
 TENSORBOARD: True
 TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: True
+TENSORBOARD_WEIGHT: True
