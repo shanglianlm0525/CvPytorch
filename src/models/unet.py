@@ -155,6 +155,7 @@ class UNet(nn.Module):
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':
+                '''
                 probs = torch.sigmoid(outputs)
                 outs = (probs > threshold).float()
                 performances = {}
@@ -169,6 +170,7 @@ class UNet(nn.Module):
                         performances['performance'] += performances[_label + '_performance']
 
                 performances['performance'] = performances['performance'] / len(self.dictionary)
-                return losses, performances
+                '''
+                return losses, torch.argmax(outputs, dim=1).unsqueeze(1)
             else:
                 return losses
