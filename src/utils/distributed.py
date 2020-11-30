@@ -314,27 +314,12 @@ class MetricLogger(object):
 
     def get(self):
         if self.type == 'segmentation':
-            performances = {}
-            performances['Acc'] = self._evaluator.Pixel_Accuracy()
-            performances['mAcc'] = self._evaluator.Mean_Pixel_Accuracy()
-            performances['mIoU'] = self._evaluator.Mean_Intersection_over_Union()
-            performances['FWIoU'] = self._evaluator.Frequency_Weighted_Intersection_over_Union()
-
-            performances['performance'] = performances['mIoU']
-            return performances
+            return self._evaluator.get()
         elif self.type == 'voc_detection':
-            performances = {}
-            performances = self._evaluator.Precision()
-            performances['mAP'] = self._evaluator.Mean_Precision()
-            performances['performance'] = performances['mAP']
-            return performances
+            return self._evaluator.get()
         elif self.type == 'coco_detection':
             pass
         elif self.type == 'classification':
-            performances = {}
-            performances = self._evaluator.Accuracy()
-            performances['mAcc'] = self._evaluator.Mean_Accuracy()
-            performances['performance'] = self._evaluator.Mean_Accuracy()
-            return performances
+            return self._evaluator.get()
         else:
             raise NotImplementedError

@@ -5,6 +5,7 @@
 # @File : eval_segmentation.py
 
 import torch
+import numpy as np
 
 def torch_nanmean(x):
     num = torch.where(torch.isnan(x), torch.full_like(x, 0), torch.full_like(x, 1)).sum()
@@ -13,48 +14,60 @@ def torch_nanmean(x):
 
 
 class SegmentationEvaluator(object):
-    def __init__(self, num_class):
-        self.num_class = num_class
-        self.confusion_matrix = torch.zeros([self.num_class,self.num_class]).cuda()
+    def __init__(self, dictionary):
+        self.dictionary = dictionary
+        self.num_class = len(self.dictionary)
+        self.confusion_matrix = np.zeros((self.num_class,)*2)
 
     def Pixel_Accuracy(self):
-        Acc = torch.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
+        Acc = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
         return Acc
 
     def Mean_Pixel_Accuracy(self):
-        Acc = torch.diag(self.confusion_matrix) / self.confusion_matrix.sum(dim=1)
-        Acc = torch_nanmean(Acc)
+        Acc = np.diag(self.confusion_matrix) / self.confusion_matrix.sum(axis=1)
+        Acc = np.nanmean(Acc)
         return Acc
 
     def Mean_Intersection_over_Union(self):
-        MIoU = torch.diag(self.confusion_matrix) / (
-                    torch.sum(self.confusion_matrix, dim=1) + torch.sum(self.confusion_matrix, dim=0) -
-                    torch.diag(self.confusion_matrix))
-        MIoU = torch_nanmean(MIoU)
+        MIoU = np.diag(self.confusion_matrix) / (
+                    np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
+                    np.diag(self.confusion_matrix))
+        MIoU = np.nanmean(MIoU)
         return MIoU
 
     def Frequency_Weighted_Intersection_over_Union(self):
-        freq = torch.sum(self.confusion_matrix, dim=1) / torch.sum(self.confusion_matrix)
-        iu = torch.diag(self.confusion_matrix) / (
-                    torch.sum(self.confusion_matrix, dim=1) + torch.sum(self.confusion_matrix, dim=0) -
-                    torch.diag(self.confusion_matrix))
+        freq = np.sum(self.confusion_matrix, axis=1) / np.sum(self.confusion_matrix)
+        iu = np.diag(self.confusion_matrix) / (
+                    np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
+                    np.diag(self.confusion_matrix))
 
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
         return FWIoU
 
     def _generate_matrix(self, gt_image, pre_image):
         mask = (gt_image >= 0) & (gt_image < self.num_class)
-        label = self.num_class * gt_image[mask].int() + pre_image[mask]
-        count = torch.bincount(label, minlength=self.num_class ** 2)
+        label = self.num_class * gt_image[mask].astype('int') + pre_image[mask]
+        count = np.bincount(label, minlength=self.num_class**2)
         confusion_matrix = count.reshape(self.num_class, self.num_class)
         return confusion_matrix
 
+    def get(self):
+        performances = {}
+        performances['Acc'] = self.Pixel_Accuracy()
+        performances['mAcc'] = self.Mean_Pixel_Accuracy()
+        performances['mIoU'] = self.Mean_Intersection_over_Union()
+        performances['FWIoU'] = self.Frequency_Weighted_Intersection_over_Union()
+        performances['performance'] = performances['mIoU']
+        return performances
+
     def add_batch(self, gt_image, pre_image):
         assert gt_image.shape == pre_image.shape
+        gt_image = gt_image.data.cpu().numpy()
+        pre_image = pre_image.data.cpu().numpy()
         self.confusion_matrix += self._generate_matrix(gt_image, pre_image)
 
     def reset(self):
-        self.confusion_matrix = torch.zeros([self.num_class, self.num_class]).cuda()
+        self.confusion_matrix = np.zeros((self.num_class,) * 2)
 
 
 
