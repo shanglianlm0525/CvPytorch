@@ -284,6 +284,7 @@ class LossLogger(object):
 
 
 class MetricLogger(object):
+    'Using adapter design patterns'
     def __init__(self, dictionary, cfg):
         self.dictionary = dictionary
         self.cfg = cfg
@@ -301,25 +302,8 @@ class MetricLogger(object):
             raise NotImplementedError
 
     def update(self, *kwargs):
-        if self.type == 'segmentation':
-            self._evaluator.add_batch(*kwargs)
-        elif self.type == 'voc_detection':
-            self._evaluator.add_batch(*kwargs)
-        elif self.type == 'coco_detection':
-            self._evaluator.add_batch(*kwargs)
-        elif self.type == 'classification':
-            self._evaluator.add_batch(*kwargs)
-        else:
-            raise NotImplementedError
+        self._evaluator.add_batch(*kwargs)
 
     def get(self):
-        if self.type == 'segmentation':
-            return self._evaluator.get()
-        elif self.type == 'voc_detection':
-            return self._evaluator.get()
-        elif self.type == 'coco_detection':
-            pass
-        elif self.type == 'classification':
-            return self._evaluator.get()
-        else:
-            raise NotImplementedError
+        return self._evaluator.get()
+
