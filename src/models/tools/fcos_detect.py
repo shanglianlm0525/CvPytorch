@@ -309,6 +309,7 @@ class DetectHead(nn.Module):
             inter = (xmax - xmin).clamp(min=0) * (ymax - ymin).clamp(min=0)
             iou = inter / (areas[i] + areas[order[1:]] - inter)
             idx = (iou <= thr).nonzero().squeeze()
+            # torch.gt(a, 0.2))
             if idx.numel() == 0:
                 break
             order = order[idx + 1]
