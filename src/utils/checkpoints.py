@@ -43,7 +43,7 @@ class Checkpoints():
         # create checkpoint folder to save model
         if not os.path.exists(checkpoint_path):
             os.makedirs(checkpoint_path)
-        checkpoint_path = os.path.join(checkpoint_path, self.experiment_id+'#{type}#{epoch}.pth')
+        checkpoint_path = os.path.join(checkpoint_path, self.experiment_id+'#{type}.pth')
         return checkpoint_path
 
 
@@ -95,10 +95,13 @@ class Checkpoints():
 
     def autosave_checkpoint(self,model, epoch,type, optimizer, lr_scheduler):
         if is_main_process():
+            '''
             if type=='best':
                 checkpoint_path = os.path.join(self.checkpoint_dir,self.experiment_id, self.experiment_id+'#best.pth')
             else:
-                checkpoint_path = self.checkpoint_path.format(epoch=epoch, type=type)
+                checkpoint_path = self.checkpoint_path.format(type=type)
+            '''
+            checkpoint_path = self.checkpoint_path.format(type=type)
             self.save_checkpoint(
                 checkpoint_path=checkpoint_path,
                 epoch=epoch,
