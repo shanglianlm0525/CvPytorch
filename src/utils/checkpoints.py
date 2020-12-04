@@ -43,7 +43,7 @@ class Checkpoints():
         # create checkpoint folder to save model
         if not os.path.exists(checkpoint_path):
             os.makedirs(checkpoint_path)
-        checkpoint_path = os.path.join(checkpoint_path, self.experiment_id+'#{type}.pth')
+        checkpoint_path = os.path.join(checkpoint_path, '{type}.pth')
         return checkpoint_path
 
 
@@ -82,7 +82,7 @@ class Checkpoints():
         return start_epoch
 
 
-    def save_checkpoint(self, model,checkpoint_path, epoch=-1, optimizer=None, lr_scheduler=None):
+    def save_checkpoint(self, model, checkpoint_path, epoch=-1,type='last', optimizer=None, lr_scheduler=None):
         checkpoint_state = {
             "epoch": epoch,
             "model": model.state_dict(),
@@ -91,24 +91,31 @@ class Checkpoints():
         }
 
         torch.save(checkpoint_state, checkpoint_path)
+        if type=='best':
+            torch.save(model.state_dict(), checkpoint_path.replace('best','deploy'))
         self.logger.info("Checkpoint saved to {}".format(checkpoint_path))
 
-    def autosave_checkpoint(self,model, epoch,type, optimizer, lr_scheduler):
+    def autosave_checkpoint(self,model, epoch, type, optimizer, lr_scheduler):
         if is_main_process():
-            '''
-            if type=='best':
-                checkpoint_path = os.path.join(self.checkpoint_dir,self.experiment_id, self.experiment_id+'#best.pth')
-            else:
-                checkpoint_path = self.checkpoint_path.format(type=type)
-            '''
-            checkpoint_path = self.checkpoint_path.format(type=type)
+            checkpoint_path = self.checkpoint_path.format(type='last')
             self.save_checkpoint(
                 checkpoint_path=checkpoint_path,
                 epoch=epoch,
+                type=type,
                 model=model,
                 optimizer=optimizer,
                 lr_scheduler=lr_scheduler,
             )
+            if type=='best':
+                checkpoint_path = self.checkpoint_path.format(type=type)
+                self.save_checkpoint(
+                    checkpoint_path=checkpoint_path,
+                    epoch=epoch,
+                    type = type,
+                    model=model,
+                    optimizer=optimizer,
+                    lr_scheduler=lr_scheduler,
+                )
 
 
 
