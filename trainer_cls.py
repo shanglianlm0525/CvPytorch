@@ -268,14 +268,6 @@ class Trainer:
         ## parser_model
         model_ft = self._parser_model(dictionary)
 
-        test_only = False
-        if test_only:
-            '''
-            confmat = evaluate(model_ft, data_loader_test, device=device, num_classes=num_classes)
-            print(confmat)
-            '''
-            return
-
         ## parser_optimizer
         # Scale learning rate based on global batch size
         # cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size_all) / 256
@@ -331,11 +323,11 @@ class Trainer:
                     if best_acc < acc:
                         self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
                         best_acc = acc
-                        continue
+                        ## continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
