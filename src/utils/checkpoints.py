@@ -97,25 +97,15 @@ class Checkpoints():
 
     def autosave_checkpoint(self,model, epoch, type, optimizer, lr_scheduler):
         if is_main_process():
-            checkpoint_path = self.checkpoint_path.format(type='last')
+            checkpoint_path = self.checkpoint_path.format(type=type)
             self.save_checkpoint(
                 checkpoint_path=checkpoint_path,
                 epoch=epoch,
-                type=type,
+                type = type,
                 model=model,
                 optimizer=optimizer,
                 lr_scheduler=lr_scheduler,
             )
-            if type=='best':
-                checkpoint_path = self.checkpoint_path.format(type=type)
-                self.save_checkpoint(
-                    checkpoint_path=checkpoint_path,
-                    epoch=epoch,
-                    type = type,
-                    model=model,
-                    optimizer=optimizer,
-                    lr_scheduler=lr_scheduler,
-                )
 
 
 
