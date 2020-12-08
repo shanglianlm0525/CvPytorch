@@ -59,6 +59,12 @@ def _compute_ap(recall, precision):
     ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
 
+def sort_by_score(pred_boxes, pred_labels, pred_scores):
+    score_seq = [(-score).argsort() for index, score in enumerate(pred_scores)]
+    pred_boxes = [sample_boxes[mask] for sample_boxes, mask in zip(pred_boxes, score_seq)]
+    pred_labels = [sample_boxes[mask] for sample_boxes, mask in zip(pred_labels, score_seq)]
+    pred_scores = [sample_boxes[mask] for sample_boxes, mask in zip(pred_scores, score_seq)]
+    return pred_boxes, pred_labels, pred_scores
 
 class VOCEvaluator(object):
     def __init__(self, dictionary, iou_thread=0.5):
@@ -73,13 +79,13 @@ class VOCEvaluator(object):
 
     def add_batch(self, gt_targets, preds):
         gt_targets = gt_targets.cpu().numpy()
-        gt_bbox, gt_label = np.split(gt_targets,[4],2)
-        pred_label, pred_score, pred_bbox = preds[0].cpu().numpy(),preds[1].cpu().numpy(),preds[2].cpu().numpy()
-        self.gt_labels.append(gt_label)
+        gt_bbox, gt_label = np.split(gt_targets.squeeze(0), [4], 1)
+        pred_score, pred_label, pred_bbox = preds[0].cpu().numpy(), preds[1].cpu().numpy(), preds[2].cpu().numpy()
+        self.gt_labels.append(np.squeeze(gt_label, 1))
         self.gt_bboxes.append(gt_bbox)
-        self.pred_labels.append(pred_label)
-        self.pred_scores.append(pred_score)
-        self.pred_bboxes.append(pred_bbox)
+        self.pred_scores.append(pred_score[0])
+        self.pred_labels.append(pred_label[0])
+        self.pred_bboxes.append(pred_bbox[0])
 
     def Precision(self):
         """
@@ -92,13 +98,16 @@ class VOCEvaluator(object):
             :param num_cls: eg. 4, total number of class including background which is equal to 0
             :return: a dict containing average precision for each cls
             """
+        self.pred_bboxes, self.pred_labels, self.pred_scores = sort_by_score(self.pred_bboxes, self.pred_labels, self.pred_scores)
         self.all_ap = {}
-        for idx, d in enumerate(self.dictionary[1:]):
+        for idx, d in enumerate(self.dictionary):
             for _label, _weight in d.items():
+                if _label=='background':
+                    continue
                 # get samples with specific label
                 true_label_loc = [sample_labels == idx for sample_labels in self.gt_labels]
-                gt_single_cls = [sample_boxes[mask.squeeze(2), :] for sample_boxes, mask in
-                                 zip(self.gt_bboxes, true_label_loc)]
+                gt_single_cls = [sample_boxes[mask] for sample_boxes, mask in zip(self.gt_bboxes, true_label_loc)]
+                # gt_single_cls = [sample_boxes[mask.squeeze(2), :] for sample_boxes, mask in zip(self.gt_bboxes, true_label_loc)]
 
                 pred_label_loc = [sample_labels == idx for sample_labels in self.pred_labels]
                 bbox_single_cls = [sample_boxes[mask] for sample_boxes, mask in zip(self.pred_bboxes, pred_label_loc)]
@@ -154,7 +163,7 @@ class VOCEvaluator(object):
         mAP /= (self.num_class - 1)
         return mAP
 
-    def get(self):
+    def compute(self):
         performances = self.Precision()
         performances['mAP'] = self.Mean_Precision()
         performances['performance'] = performances['mAP']
