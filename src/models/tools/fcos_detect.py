@@ -200,6 +200,7 @@ class GenTargets(nn.Module):
 
         return cls_targets, cnt_targets, reg_targets
 
+
 class ClipBoxes(nn.Module):
     def __init__(self):
         super().__init__()
@@ -209,6 +210,7 @@ class ClipBoxes(nn.Module):
         batch_boxes[...,[0,2]]=batch_boxes[...,[0,2]].clamp_(max=w-1)
         batch_boxes[...,[1,3]]=batch_boxes[...,[1,3]].clamp_(max=h-1)
         return batch_boxes
+
 
 class DetectHead(nn.Module):
     def __init__(self, score_threshold, nms_iou_threshold, max_detection_boxes_num, strides):
