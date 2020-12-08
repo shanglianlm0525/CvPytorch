@@ -59,8 +59,6 @@ class FCOS(nn.Module):
             losses['loss'] = loss_tuple[-1]
 
             if mode == 'val':
-                performances = {}
-
                 scores, classes, boxes = self.detection_head(out)
                 boxes = self.clip_boxes(imgs, boxes)
                 '''
@@ -69,7 +67,7 @@ class FCOS(nn.Module):
                 print('classes',classes.shape)
                 print('boxes',boxes.shape)
                 '''
-                performances['performance'] = 1000-losses['loss']
+                # performances['performance'] = 1000-losses['loss']
                 return losses, (classes, scores, boxes)
             else:
                 return losses
