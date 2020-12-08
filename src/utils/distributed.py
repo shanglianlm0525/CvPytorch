@@ -304,6 +304,6 @@ class MetricLogger(object):
     def update(self, *kwargs):
         self._evaluator.add_batch(*kwargs)
 
-    def get(self):
-        return self._evaluator.get()
+    def compute(self):
+        return self._evaluator.compute()
 
