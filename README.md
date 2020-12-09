@@ -104,4 +104,8 @@ $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'co
 
 - [ ] ONNX and TorchScript Export
 
+- [ ] Class Activation Mapping (CAM)
+
+- [ ] Test-Time Augmentation (TTA)
+
   
