@@ -51,7 +51,7 @@ class SegmentationEvaluator(object):
         confusion_matrix = count.reshape(self.num_class, self.num_class)
         return confusion_matrix
 
-    def get(self):
+    def compute(self):
         performances = {}
         performances['Acc'] = self.Pixel_Accuracy()
         performances['mAcc'] = self.Mean_Pixel_Accuracy()

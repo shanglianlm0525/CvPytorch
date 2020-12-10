@@ -98,7 +98,7 @@ class VOCEvaluator(object):
             :param num_cls: eg. 4, total number of class including background which is equal to 0
             :return: a dict containing average precision for each cls
             """
-        self.pred_bboxes, self.pred_labels, self.pred_scores = sort_by_score(self.pred_bboxes, self.pred_labels, self.pred_scores)
+        # self.pred_bboxes, self.pred_labels, self.pred_scores = sort_by_score(self.pred_bboxes, self.pred_labels, self.pred_scores)
         self.all_ap = {}
         for idx, d in enumerate(self.dictionary):
             for _label, _weight in d.items():
@@ -149,7 +149,7 @@ class VOCEvaluator(object):
                 fp = np.cumsum(fp)
                 tp = np.cumsum(tp)
                 # compute recall and precision
-                recall = tp / (total_gts + np.finfo(np.float64).eps)
+                recall = tp / (total_gts+np.finfo(np.float64).eps)
                 precision = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
                 ap = _compute_ap(recall, precision)
                 self.all_ap[_label] = ap

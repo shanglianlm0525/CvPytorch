@@ -27,7 +27,7 @@ class ClassificationEvaluator(object):
         accuracy = correct/(len(self.gt_labels)+1e-6)
         return accuracy
 
-    def get(self):
+    def compute(self):
         performances = self.Accuracy()
         performances['mAcc'] = self.Mean_Accuracy()
         performances['performance'] = self.Mean_Accuracy()
