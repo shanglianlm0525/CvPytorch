@@ -210,18 +210,17 @@ class Trainer:
             self.tb_writer = DummyWriter(log_dir="%s/%s" % (self.cfg.TENSORBOARD_LOG_DIR, self.experiment_id))
 
     def experiment_id(self, cfg):
-        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{cfg.OPTIMIZER.TYPE}#{cfg.LR_SCHEDULER.TYPE}" \
-               f"#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
+        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
 
     def _parser_dict(self):
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
         return dictionary[cfg.DATASET.DICTIONARY_NAME]
 
-    def _parser_datasets(self,dictionary):
+    def _parser_datasets(self):
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
-        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=dictionary, transform=None,
+        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=self.dictionary, transform=None,
                                      target_transform=None, stage=x) for x in ['train', 'val']}
 
         data_samplers = defaultdict()
@@ -231,16 +230,16 @@ class Trainer:
             data_samplers['train'] = RandomSampler(datasets['train'])
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
-        dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=dataset_class.collate_fn if hasattr(dataset_class, 'collate_fn') else default_collate, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
+        dataloaders = {x: DataLoader(datasets[x], batch_size=batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
+                                      collate_fn=dataset_class.collate_fn if hasattr(dataset_class, 'collate_fn') else default_collate, pin_memory=True,drop_last=True) for x, batch_size in zip(['train', 'val'],[self.batch_size,1])} # collate_fn=detection_collate,
 
         return datasets, dataloaders, data_samplers
 
 
-    def _parser_model(self,dictionary):
+    def _parser_model(self):
         *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.split(".")
         model_class = getattr(import_module(".".join(model_mod_str_parts)), model_class_str)
-        model = model_class(dictionary=dictionary)
+        model = model_class(dictionary=self.dictionary)
 
         if self.cfg.distributed:
             model = SyncBatchNorm.convert_sync_batchnorm(model).cuda()
@@ -257,16 +256,15 @@ class Trainer:
         # cfg.print()
 
         ## parser_dict
-        dictionary = self._parser_dict()
-        self.dictionary = dictionary
+        self.dictionary = self._parser_dict()
 
         ## parser_datasets
-        datasets, dataloaders,data_samplers = self._parser_datasets(dictionary)
+        datasets, dataloaders,data_samplers = self._parser_datasets()
         # dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         # class_names = datasets['train'].classes
 
         ## parser_model
-        model_ft = self._parser_model(dictionary)
+        model_ft = self._parser_model()
 
         ## parser_optimizer
         # Scale learning rate based on global batch size
@@ -323,11 +321,11 @@ class Trainer:
                     if best_acc < acc:
                         self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
                         best_acc = acc
-                        continue
+                        # continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -398,7 +396,7 @@ class Trainer:
                         performanceLogger.update(targets, predicts_dict_reduced)
                         del predicts_dict_reduced
                     else:
-                        performanceLogger.update(**predicts)
+                        performanceLogger.update(targets, predicts)
                     del predicts
 
                 if self.cfg.local_rank == 0:
@@ -419,7 +417,7 @@ class Trainer:
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            performances = performanceLogger.get()
+            performances = performanceLogger.compute()
             if len(performances):
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
@@ -470,7 +468,7 @@ class Trainer:
 
                 del imgs, targets, losses
 
-        performances = performanceLogger.get()
+        performances = performanceLogger.compute()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
