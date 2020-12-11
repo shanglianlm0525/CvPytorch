@@ -12,8 +12,7 @@ __avalible__ = {
    'LeakyReLU': nn.LeakyReLU,
    'ReLU6': nn.ReLU6,
    'SELU': nn.SELU,
-   'ELU': nn.ELU,
-   None: nn.Identity
+   'ELU': nn.ELU
 }
 
 
