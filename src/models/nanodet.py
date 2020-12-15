@@ -56,26 +56,15 @@ class NANODET(nn.Module):
             x = self.head(x)
             preds = tuple(x)
 
-            loss, loss_states = self.head.loss(imgs, preds, targets)
-            print('loss',loss)
-            print('loss_states',loss_states)
+            loss, loss_states = self.head.loss(preds, targets)
 
-            '''
-            loss tensor(2.3488, device='cuda:0', grad_fn=<AddBackward0>)
-loss_states {'loss_qfl': tensor(0.6034, device='cuda:0', grad_fn=<AddBackward0>),
- 'loss_bbox': tensor(1.2239, device='cuda:0', grad_fn=<AddBackward0>), 
- 'loss_dfl': tensor(0.5215, device='cuda:0', grad_fn=<AddBackward0>)}
-
-            '''
-
-            losses['cls_loss'] = loss_tuple[0]
-            losses['cnt_loss'] = loss_tuple[1]
-            losses['reg_loss'] = loss_tuple[2]
-            losses['loss'] = loss_tuple[-1]
+            losses['qfl_loss'] = loss_states['loss_qfl']
+            losses['bbox_loss'] = loss_states['loss_bbox']
+            losses['dfl_loss'] = loss_states['loss_dfl']
+            losses['loss'] = loss.mean()
 
             if mode == 'val':
-                scores, classes, boxes = self.detection_head(out)
-                boxes = self.clip_boxes(imgs, boxes)
-                return losses, (scores, classes, boxes)
+                dets = self.head.post_process(preds, targets)
+                return losses, dets
             else:
                 return losses
