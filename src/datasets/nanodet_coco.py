@@ -83,8 +83,7 @@ class CocoDetection(Dataset):
             return self.get_val_data(idx)
         else:
             meta = self.get_train_data(idx)
-            target = np.hstack((meta['gt_bboxes'], np.expand_dims(meta['gt_labels'], 1)))
-            sample = {'image': meta['img'], 'target': target}
+            sample = {'image': meta['img'], 'target': meta}
             return sample
 
     def get_data_info(self, ann_path):
