@@ -3,10 +3,12 @@
 # @Time : 2020/11/16 14:18
 # @Author : liumin
 # @File : eval_detection.py
-
+import copy
+import os
+import json
 import numpy as np
 import torch
-
+from pycocotools.cocoeval import COCOeval
 
 def iou_2d(cubes_a, cubes_b):
     """
@@ -67,9 +69,10 @@ def sort_by_score(pred_boxes, pred_labels, pred_scores):
     return pred_boxes, pred_labels, pred_scores
 
 class VOCEvaluator(object):
-    def __init__(self, dictionary, iou_thread=0.5):
-        self.dictionary = dictionary
-        self.num_class = len(self.dictionary)
+    def __init__(self, dataset, iou_thread=0.5):
+        self.dataset = dataset
+        self.num_class = dataset.num_classes
+        self.dictionary = dataset.dictionary
         self.iou_thread = iou_thread
         self.gt_labels = []
         self.gt_bboxes = []
@@ -163,7 +166,7 @@ class VOCEvaluator(object):
         mAP /= (self.num_class - 1)
         return mAP
 
-    def compute(self):
+    def evaluate(self):
         performances = self.Precision()
         performances['mAP'] = self.Mean_Precision()
         performances['performance'] = performances['mAP']
@@ -177,27 +180,75 @@ class VOCEvaluator(object):
         self.pred_bboxes = []
 
 
+def xyxy2xywh(bbox):
+    """
+    change bbox to coco format
+    :param bbox: [x1, y1, x2, y2]
+    :return: [x, y, w, h]
+    """
+    return [
+        bbox[0],
+        bbox[1],
+        bbox[2] - bbox[0],
+        bbox[3] - bbox[1],
+    ]
+
 class COCOEvaluator(object):
-    def __init__(self, num_class):
-        self.num_class = num_class
-        self.gt_labels = []
-        self.gt_bboxes = []
-        self.pred_labels = []
-        self.pred_scores = []
-        self.pred_bboxes = []
+    def __init__(self, dataset, iou_thread=0.5):
+        self.dataset = dataset
+        self.num_class = dataset.num_classes
+        self.dictionary = dataset.dictionary
+        self.iou_thread = iou_thread
+        self.rsts = {}
+        assert hasattr(dataset, 'coco_api')
+        self.coco_api = dataset.coco_api
+        self.cat_ids = dataset.cat_ids
+        self.metric_names = ['mAP', 'AP_50', 'AP_75', 'AP_small', 'AP_m', 'AP_l']
 
-    def add_batch(self, gt_label,gt_bbox, pred_label,pred_score,pred_bbox):
-        pass
+    def add_batch(self, gt, preds):
+        self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
 
-    def Average_Precision(self):
-        pass
+    def rsts2json(self, results):
+        """
+        results: {image_id: {label: [bboxes...] } }
+        :return coco json format: {image_id:
+                                   category_id:
+                                   bbox:
+                                   score: }
+        """
+        json_rsts = []
+        for image_id, dets in results.items():
+            for label, bboxes in dets.items():
+                category_id = self.cat_ids[label]
+                for bbox in bboxes:
+                    score = float(bbox[4])
+                    detection = dict(
+                        image_id=int(image_id),
+                        category_id=int(category_id),
+                        bbox=xyxy2xywh(bbox),
+                        score=score)
+                    json_rsts.append(detection)
+        return json_rsts
 
-    def Mean_Average_Precision(self):
-        pass
+    def CocoEvaluate(self):
+        rsts_json = self.rsts2json(self.rsts)
+        json_path = 'rst_coco.json'
+        json.dump(rsts_json, open(json_path, 'w'))
+        coco_dets = self.coco_api.loadRes(json_path)
+        coco_eval = COCOeval(copy.deepcopy(self.coco_api), copy.deepcopy(coco_dets), "bbox")
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+        coco_eval.summarize()
+        aps = coco_eval.stats[:6]
+        eval_results = {}
+        for k, v in zip(self.metric_names, aps):
+            eval_results[k] = v
+        return eval_results
+
+    def evaluate(self):
+        performances = self.CocoEvaluate()
+        performances['performance'] = performances['mAP']
+        return performances
 
     def reset(self):
-        self.gt_labels = []
-        self.gt_bboxes = []
-        self.pred_labels = []
-        self.pred_scores = []
-        self.pred_bboxes = []
+        self.rsts = {}

@@ -189,11 +189,11 @@ class Trainer:
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
                 dataloaders['train'].sampler.set_epoch(epoch)
-            self.train_epoch(scaler, epoch, model_ft, dataloaders['train'], optimizer_ft)
+            self.train_epoch(scaler, epoch, model_ft, datasets['train'], dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL:
-                acc = self.val_epoch(epoch, model_ft, dataloaders['val'])
+                acc = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
@@ -212,12 +212,12 @@ class Trainer:
         dist.destroy_process_group() if cfg.local_rank!=0 else None
         torch.cuda.empty_cache()
 
-    def train_epoch(self, scaler, epoch, model, dataloader, optimizer, prefix="train"):
+    def train_epoch(self, scaler, epoch, model, dataset, dataloader, optimizer, prefix="train"):
         model.train()
 
         _timer = Timer()
         lossLogger = LossLogger()
-        performanceLogger = MetricLogger(self.dictionary, self.cfg)
+        performanceLogger = MetricLogger(dataset, self.cfg)
 
         for i, sample in enumerate(dataloader):
             imgs, targets = sample['image'], sample['target']
@@ -226,6 +226,7 @@ class Trainer:
             optimizer.zero_grad()
 
             imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
+            '''
             if isinstance(targets, list):
                 if isinstance(targets[0], torch.Tensor):
                     targets = [t.cuda() for t in targets]
@@ -235,6 +236,7 @@ class Trainer:
                     targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
             else:
                 targets = targets.cuda()
+            '''
 
             # Autocast
             with amp.autocast(enabled=True):
@@ -298,7 +300,7 @@ class Trainer:
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            performances = performanceLogger.compute()
+            performances = performanceLogger.evaluate()
             if len(performances):
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
@@ -309,16 +311,17 @@ class Trainer:
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataloader, prefix="val"):
+    def val_epoch(self, epoch, model, dataset, dataloader, prefix="val"):
         model.eval()
 
         lossLogger = LossLogger()
-        performanceLogger = MetricLogger(self.dictionary, self.cfg)
+        performanceLogger = MetricLogger(dataset, self.cfg)
 
         with torch.no_grad():
             for sample in dataloader:
                 imgs, targets = sample['image'], sample['target']
                 imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
+                '''
                 if isinstance(targets, list):
                     if isinstance(targets[0], torch.Tensor):
                         targets = [t.cuda() for t in targets]
@@ -328,6 +331,7 @@ class Trainer:
                         targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
                 else:
                     targets = targets.cuda()
+                '''
 
                 losses, predicts = model(imgs, targets, prefix)
 
@@ -351,7 +355,7 @@ class Trainer:
 
                 del imgs, targets, losses
 
-        performances = performanceLogger.compute()
+        performances = performanceLogger.evaluate()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
