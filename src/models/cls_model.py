@@ -47,7 +47,7 @@ class ClsModel(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, imgs, labels=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
         outputs = self._model(imgs)
 
         if mode == 'infer':
@@ -56,8 +56,9 @@ class ClsModel(nn.Module):
 
             return out
         else:
+            targets = targets.cuda()
             losses = {}
-            losses['loss'] = self._criterion(outputs, labels)
+            losses['loss'] = self._criterion(outputs, targets)
 
             if mode == 'val':
                 _, preds = torch.max(outputs, 1)
@@ -65,8 +66,8 @@ class ClsModel(nn.Module):
             else:
                 for idx, d in enumerate(self.dictionary):
                     for _label, _weight in d.items():
-                        cognize = labels == idx
-                        if labels[cognize].size(0):
-                            losses['loss_'+_label] = TF.cross_entropy(outputs[cognize], labels[cognize]) * _weight
+                        cognize = targets == idx
+                        if targets[cognize].size(0):
+                            losses['loss_'+_label] = TF.cross_entropy(outputs[cognize], targets[cognize]) * _weight
 
                 return losses
