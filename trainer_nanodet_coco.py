@@ -301,7 +301,7 @@ class Trainer:
             # Logging train losses
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
             performances = performanceLogger.evaluate()
-            if len(performances):
+            if performances is not None and len(performances):
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
         if self.cfg.TENSORBOARD_WEIGHT and False:
@@ -359,7 +359,7 @@ class Trainer:
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            if len(performances):
+            if performances is not None and len(performances):
                 # Logging val performances
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
