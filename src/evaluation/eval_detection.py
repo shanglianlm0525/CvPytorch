@@ -246,6 +246,8 @@ class COCOEvaluator(object):
         return eval_results
 
     def evaluate(self):
+        if len(self.rsts)<1:
+            return None
         performances = self.CocoEvaluate()
         performances['performance'] = performances['mAP']
         return performances
