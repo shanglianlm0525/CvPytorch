@@ -11,13 +11,10 @@ from collections import defaultdict
 import math
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 import torchvision
 from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import default_collate_err_msg_format, np_str_obj_array_pattern
 from torch.utils.data.dataloader import default_collate
-from torchvision import transforms as transformsT
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
@@ -47,6 +44,7 @@ from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
 from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
 
+from CvPytorch.src.evaluation import build_evaluator
 from CvPytorch.src.utils.distributed import LossLogger
 
 torch.backends.cudnn.enabled = True
@@ -73,126 +71,6 @@ def clip_grad(cfg, model):
     clip_method(model.parameters(), cfg.GRAD_CLIP.VALUE)
 
 
-def detection_collate(batch):
-    """Custom collate fn for dealing with batches of images that have a different
-    number of associated object annotations (bounding boxes).
-
-    Arguments:
-        batch: (tuple) A tuple of tensor images and lists of annotations
-
-    Return:
-        A tuple containing:
-            1) (tensor) batch of images stacked on their 0 dim
-            2) (list of tensors) annotations for a given image are stacked on
-                                 0 dim
-    """
-    targets = []
-    imgs = []
-    for sample in batch:
-        imgs.append(sample[0])
-        targets.append(torch.FloatTensor(sample[1]))
-    return torch.stack(imgs, 0), targets
-
-from torch._six import container_abcs, string_classes, int_classes
-
-def default_collate1(batch):
-    r"""Puts each data field into a tensor with outer dimension batch size"""
-    elem = batch[0]
-    elem_type = type(elem)
-    if isinstance(elem, torch.Tensor):
-        out = None
-        if torch.utils.data.get_worker_info() is not None:
-            # If we're in a background process, concatenate directly into a
-            # shared memory tensor to avoid an extra copy
-            numel = sum([x.numel() for x in batch])
-            storage = elem.storage()._new_shared(numel)
-            out = elem.new(storage)
-        return torch.stack(batch, 0, out=out)
-    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-            and elem_type.__name__ != 'string_':
-        elem = batch[0]
-        if elem_type.__name__ == 'ndarray':
-            # array of string classes and object
-            if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                raise TypeError(default_collate_err_msg_format.format(elem.dtype))
-
-            return default_collate([torch.as_tensor(b) for b in batch])
-        elif elem.shape == ():  # scalars
-            return torch.as_tensor(batch)
-    elif isinstance(elem, float):
-        return torch.tensor(batch, dtype=torch.float64)
-    elif isinstance(elem, int_classes):
-        return torch.tensor(batch)
-    elif isinstance(elem, string_classes):
-        return batch
-    elif isinstance(elem, container_abcs.Mapping):
-        return {key: default_collate([d[key] for d in batch]) for key in elem}
-    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-        return elem_type(*(default_collate(samples) for samples in zip(*batch)))
-    elif isinstance(elem, container_abcs.Sequence):
-        if elem_type.__name__ == 'tuple':
-            if isinstance(elem[1],torch.Tensor):
-                pass
-            elif type(batch[1]).__name__ == 'tuple': # if type(batch[1]).__name__ == 'tuple':
-                return tuple(zip(*batch))
-            else:
-                targets = []
-                imgs = []
-                for sample in batch:
-                    imgs.append(sample[0])
-                    targets.append(torch.FloatTensor(sample[1])) # torch.FloatTensor(sample[1])
-                return torch.stack(imgs, 0), targets
-        else:
-            transposed = zip(*batch)
-            return [default_collate(samples) for samples in transposed]
-    raise TypeError(default_collate_err_msg_format.format(elem_type))
-
-def default_collate2(batch):
-    r"""Puts each data field into a tensor with outer dimension batch size"""
-
-    elem = batch[0]
-    elem_type = type(elem)
-    if isinstance(elem, torch.Tensor):
-        out = None
-        if torch.utils.data.get_worker_info() is not None:
-            # If we're in a background process, concatenate directly into a
-            # shared memory tensor to avoid an extra copy
-            numel = sum([x.numel() for x in batch])
-            storage = elem.storage()._new_shared(numel)
-            out = elem.new(storage)
-        return torch.stack(batch, 0, out=out)
-    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-            and elem_type.__name__ != 'string_':
-        elem = batch[0]
-        if elem_type.__name__ == 'ndarray':
-            # array of string classes and object
-            if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                raise TypeError(default_collate_err_msg_format.format(elem.dtype))
-
-            return default_collate([torch.as_tensor(b) for b in batch])
-        elif elem.shape == ():  # scalars
-            return torch.as_tensor(batch)
-    elif isinstance(elem, float):
-        return torch.tensor(batch, dtype=torch.float64)
-    elif isinstance(elem, int_classes):
-        return torch.tensor(batch)
-    elif isinstance(elem, string_classes):
-        return batch
-    elif isinstance(elem, container_abcs.Mapping):
-        return {key: default_collate([d[key] for d in batch]) for key in elem}
-    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-        return elem_type(*(default_collate(samples) for samples in zip(*batch)))
-    elif isinstance(elem, container_abcs.Sequence):
-        # check to make sure that the elements in batch have consistent size
-        it = iter(batch)
-        elem_size = len(next(it))
-        if not all(len(elem) == elem_size for elem in it):
-            raise RuntimeError('each element in list of batch should be of equal size')
-        transposed = zip(*batch)
-        return [default_collate(samples) for samples in transposed]
-
-    raise TypeError(default_collate_err_msg_format.format(elem_type))
-
 # logger = logging.getLogger("pytorch")
 
 class Trainer:
@@ -210,18 +88,17 @@ class Trainer:
             self.tb_writer = DummyWriter(log_dir="%s/%s" % (self.cfg.TENSORBOARD_LOG_DIR, self.experiment_id))
 
     def experiment_id(self, cfg):
-        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{cfg.OPTIMIZER.TYPE}#{cfg.LR_SCHEDULER.TYPE}" \
-               f"#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
+        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
 
     def _parser_dict(self):
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
         return dictionary[cfg.DATASET.DICTIONARY_NAME]
 
-    def _parser_datasets(self,dictionary):
+    def _parser_datasets(self):
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
-        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=dictionary, transform=None,
+        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=self.dictionary, transform=None,
                                      target_transform=None, stage=x) for x in ['train', 'val']}
 
         data_samplers = defaultdict()
@@ -231,16 +108,17 @@ class Trainer:
             data_samplers['train'] = RandomSampler(datasets['train'])
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
-        dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=dataset_class.collate_fn if hasattr(dataset_class, 'collate_fn') else default_collate, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
+        dataloaders = {x: DataLoader(datasets[x], batch_size=batch_size, sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
+                          collate_fn=dataset_class.collate_fn if hasattr(dataset_class,'collate_fn') else default_collate,
+                          pin_memory=True, drop_last=True) for x, batch_size in zip(['train', 'val'], [self.batch_size, 1])}  # collate_fn=detection_collate,
 
         return datasets, dataloaders, data_samplers
 
 
-    def _parser_model(self,dictionary):
+    def _parser_model(self):
         *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.split(".")
         model_class = getattr(import_module(".".join(model_mod_str_parts)), model_class_str)
-        model = model_class(dictionary=dictionary)
+        model = model_class(dictionary=self.dictionary)
 
         if self.cfg.distributed:
             model = SyncBatchNorm.convert_sync_batchnorm(model).cuda()
@@ -252,21 +130,19 @@ class Trainer:
     def run(self):
         ## init distributed
         self.cfg = init_distributed(self.cfg)
-
         cfg = self.cfg
         # cfg.print()
 
         ## parser_dict
-        dictionary = self._parser_dict()
-        self.dictionary = dictionary
+        self.dictionary = self._parser_dict()
 
         ## parser_datasets
-        datasets, dataloaders,data_samplers = self._parser_datasets(dictionary)
+        datasets, dataloaders,data_samplers = self._parser_datasets()
         # dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         # class_names = datasets['train'].classes
 
         ## parser_model
-        model_ft = self._parser_model(dictionary)
+        model_ft = self._parser_model()
 
         ## parser_optimizer
         # Scale learning rate based on global batch size
@@ -312,18 +188,18 @@ class Trainer:
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
                 dataloaders['train'].sampler.set_epoch(epoch)
-            self.train_epoch(scaler, epoch, model_ft, dataloaders['train'], optimizer_ft)
+            self.train_epoch(scaler, epoch, model_ft,datasets['train'], dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL:
-                acc = self.val_epoch(epoch, model_ft, dataloaders['val'])
+                acc = self.val_epoch(epoch, model_ft,datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
                     if best_acc < acc:
                         self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
                         best_acc = acc
-                        ## continue
+                        # continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
@@ -335,12 +211,12 @@ class Trainer:
         dist.destroy_process_group() if cfg.local_rank!=0 else None
         torch.cuda.empty_cache()
 
-    def train_epoch(self, scaler, epoch, model, dataloader, optimizer, prefix="train"):
+    def train_epoch(self, scaler, epoch, model, dataset, dataloader, optimizer, prefix="train"):
         model.train()
 
         _timer = Timer()
         lossLogger = LossLogger()
-        performanceLogger = MetricLogger(self.dictionary, self.cfg)
+        performanceLogger = build_evaluator(self.cfg, dataset)
 
         for i, sample in enumerate(dataloader):
             imgs, targets = sample['image'], sample['target']
@@ -398,7 +274,7 @@ class Trainer:
                         performanceLogger.update(targets, predicts_dict_reduced)
                         del predicts_dict_reduced
                     else:
-                        performanceLogger.update(**predicts)
+                        performanceLogger.update(targets,predicts)
                     del predicts
 
                 if self.cfg.local_rank == 0:
@@ -419,8 +295,8 @@ class Trainer:
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            performances = performanceLogger.get()
-            if len(performances):
+            performances = performanceLogger.evaluate()
+            if performances is not None and len(performances):
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
         if self.cfg.TENSORBOARD_WEIGHT and False:
@@ -430,11 +306,11 @@ class Trainer:
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataloader, prefix="val"):
+    def val_epoch(self, epoch, model, dataset, dataloader, prefix="val"):
         model.eval()
 
         lossLogger = LossLogger()
-        performanceLogger = MetricLogger(self.dictionary, self.cfg)
+        performanceLogger = build_evaluator(self.cfg, dataset)
 
         with torch.no_grad():
             for sample in dataloader:
@@ -470,11 +346,11 @@ class Trainer:
 
                 del imgs, targets, losses
 
-        performances = performanceLogger.get()
+        performances = performanceLogger.evaluate()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            if len(performances):
+            if performances is not None and len(performances):
                 # Logging val performances
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
 
