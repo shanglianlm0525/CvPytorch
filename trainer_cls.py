@@ -42,10 +42,10 @@ from src.utils.logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
-from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
+from src.utils.distributed import init_distributed,i s_main_process, reduce_dict
 
-from CvPytorch.src.evaluation import build_evaluator
-from CvPytorch.src.utils.distributed import LossLogger
+from src.evaluation import build_evaluator
+from src.utils.distributed import LossLogger
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -225,13 +225,6 @@ class Trainer:
             optimizer.zero_grad()
 
             imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-            if isinstance(targets, list):
-                if isinstance(targets[0], torch.Tensor):
-                    targets = [t.cuda() for t in targets]
-                else:
-                    targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
-            else:
-                targets = targets.cuda()
 
             # Autocast
             with amp.autocast(enabled=True):
@@ -316,13 +309,6 @@ class Trainer:
             for sample in dataloader:
                 imgs, targets = sample['image'], sample['target']
                 imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                if isinstance(targets, list):
-                    if isinstance(targets[0], torch.Tensor):
-                        targets = [t.cuda() for t in targets]
-                    else:
-                        targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
-                else:
-                    targets = targets.cuda()
 
                 losses, predicts = model(imgs, targets, prefix)
 
