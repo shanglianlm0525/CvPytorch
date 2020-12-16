@@ -8,7 +8,7 @@ import glob
 import os
 
 import torch
-import torchvision.transforms as transformsT
+import torchvision.transforms as T
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder
@@ -16,25 +16,25 @@ from torchvision.datasets import ImageFolder
 
 
 data_transforms = {
-    'train': transformsT.Compose([
-        transformsT.RandomResizedCrop(224),
-        transformsT.RandomHorizontalFlip(),
-        transformsT.ToTensor(),
-        transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    'train': T.Compose([
+        T.RandomResizedCrop(224),
+        T.RandomHorizontalFlip(),
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ]),
 
-    'val': transformsT.Compose([
-        transformsT.Resize(256),
-        transformsT.CenterCrop(224),
-        transformsT.ToTensor(),
-        transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    'val': T.Compose([
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ]),
 
-    'test': transformsT.Compose([
-        transformsT.Resize(256),
-        transformsT.CenterCrop(224),
-        transformsT.ToTensor(),
-        transformsT.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    'test': T.Compose([
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     ])
 }
 
@@ -51,6 +51,7 @@ class HymenopteraDataset(Dataset):
         self.transform = data_transforms[stage]
         self.target_transform = None
         self.stage = stage
+        self.num_classes = len(self.dictionary)
 
         self._imgs = []
         self._labels = []
