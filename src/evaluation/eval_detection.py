@@ -203,7 +203,8 @@ class COCOEvaluator(object):
         assert hasattr(dataset, 'coco_api')
         self.coco_api = dataset.coco_api
         self.cat_ids = dataset.cat_ids
-        self.metric_names = ['mAP', 'AP_50', 'AP_75', 'AP_small', 'AP_m', 'AP_l']
+        self.metric_names = ['mAP', 'AP_50', 'AP_75', 'AP_small', 'AP_medium', 'AP_large'
+                             ,'Recall_1', 'Recall_10', 'Recall_100', 'Recall_small', 'Recall_medium', 'Recall_large']
 
     def add_batch(self, gt, preds):
         self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
@@ -239,7 +240,8 @@ class COCOEvaluator(object):
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
-        aps = coco_eval.stats[:6]
+        # aps = coco_eval.stats[:6]
+        aps = coco_eval.stats
         eval_results = {}
         for k, v in zip(self.metric_names, aps):
             eval_results[k] = v

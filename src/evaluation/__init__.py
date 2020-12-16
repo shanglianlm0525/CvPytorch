@@ -11,6 +11,7 @@ from .eval_segmentation import SegmentationEvaluator
 __all__ = ['ClassificationEvaluator', 'VOCEvaluator', 'COCOEvaluator','SegmentationEvaluator']
 
 def build_evaluator(cfg, dataset):
+    'Using adapter design patterns'
     if cfg.evaluator.name == 'classification':
         return ClassificationEvaluator(dataset)
     elif cfg.evaluator.name == 'voc_detection':
