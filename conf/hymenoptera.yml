@@ -39,7 +39,9 @@ DATASET:
     ImageSubtract128:
 
 USE_MODEL: 'src.models.cls_model.ClsModel'
-EVAL_FUNC: 'classification'
+EVALUATOR:
+  NAME: 'classification'
+  EVAL_TYPE: mAP
 
 ## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'
@@ -90,5 +92,5 @@ N_ITERS_TO_DISPLAY_STATUS: 10
 ## tensorboard
 TENSORBOARD: True
 TENSORBOARD_LOG_DIR: 'runs'
-TENSORBOARD_MODEL: True
-TENSORBOARD_WEIGHT: True
+TENSORBOARD_MODEL: False
+TENSORBOARD_WEIGHT: False
