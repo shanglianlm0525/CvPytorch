@@ -80,7 +80,7 @@ class VOCEvaluator(object):
         self.pred_scores = []
         self.pred_bboxes = []
 
-    def add_batch(self, gt_targets, preds):
+    def update(self, gt_targets, preds):
         gt_targets = gt_targets.cpu().numpy()
         gt_bbox, gt_label = np.split(gt_targets.squeeze(0), [4], 1)
         pred_score, pred_label, pred_bbox = preds[0].cpu().numpy(), preds[1].cpu().numpy(), preds[2].cpu().numpy()
@@ -206,7 +206,7 @@ class COCOEvaluator(object):
         self.metric_names = ['mAP', 'AP_50', 'AP_75', 'AP_small', 'AP_medium', 'AP_large'
                              ,'Recall_1', 'Recall_10', 'Recall_100', 'Recall_small', 'Recall_medium', 'Recall_large']
 
-    def add_batch(self, gt, preds):
+    def update(self, gt, preds):
         self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
 
     def rsts2json(self, results):

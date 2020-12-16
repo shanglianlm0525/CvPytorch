@@ -61,7 +61,7 @@ class SegmentationEvaluator(object):
         performances['performance'] = performances['mIoU']
         return performances
 
-    def add_batch(self, gt_image, pre_image):
+    def update(self, gt_image, pre_image):
         assert gt_image.shape == pre_image.shape
         gt_image = gt_image.data.cpu().numpy()
         pre_image = pre_image.data.cpu().numpy()

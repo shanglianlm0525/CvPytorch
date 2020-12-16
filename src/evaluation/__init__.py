@@ -12,13 +12,13 @@ __all__ = ['ClassificationEvaluator', 'VOCEvaluator', 'COCOEvaluator','Segmentat
 
 def build_evaluator(cfg, dataset):
     'Using adapter design patterns'
-    if cfg.evaluator.name == 'classification':
+    if cfg.EVALUATOR.NAME == 'classification':
         return ClassificationEvaluator(dataset)
-    elif cfg.evaluator.name == 'voc_detection':
+    elif cfg.EVALUATOR.NAME == 'voc_detection':
         return VOCEvaluator(dataset)
-    elif cfg.evaluator.name == 'coco_detection':
+    elif cfg.EVALUATOR.NAME == 'coco_detection':
         return COCOEvaluator(dataset)
-    elif cfg.evaluator.name == 'segmentation':
+    elif cfg.EVALUATOR.NAME == 'segmentation':
         return SegmentationEvaluator(dataset)
     else:
         raise NotImplementedError

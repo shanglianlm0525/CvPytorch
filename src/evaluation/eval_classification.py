@@ -37,7 +37,7 @@ class ClassificationEvaluator(object):
         performances['performance'] = self.Mean_Accuracy()
         return performances
 
-    def add_batch(self, gt_label, pred_label):
+    def update(self, gt_label, pred_label):
         assert gt_label.shape == pred_label.shape
         gt_label = gt_label.data.cpu().tolist()
         pred_label = pred_label.data.cpu().tolist()
