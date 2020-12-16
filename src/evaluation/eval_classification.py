@@ -9,8 +9,10 @@ import torch
 
 
 class ClassificationEvaluator(object):
-    def __init__(self, dictionary):
-        self.dictionary = dictionary
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.num_class = dataset.num_classes
+        self.dictionary = dataset.dictionary
         self.gt_labels = []
         self.pred_labels = []
 
@@ -28,6 +30,8 @@ class ClassificationEvaluator(object):
         return accuracy
 
     def evaluate(self):
+        if len(self.gt_labels)<1:
+            return None
         performances = self.Accuracy()
         performances['mAcc'] = self.Mean_Accuracy()
         performances['performance'] = self.Mean_Accuracy()

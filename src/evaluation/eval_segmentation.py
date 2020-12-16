@@ -14,9 +14,10 @@ def torch_nanmean(x):
 
 
 class SegmentationEvaluator(object):
-    def __init__(self, dictionary):
-        self.dictionary = dictionary
-        self.num_class = len(self.dictionary)
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.num_class = dataset.num_classes
+        self.dictionary = dataset.dictionary
         self.confusion_matrix = np.zeros((self.num_class,)*2)
 
     def Pixel_Accuracy(self):
