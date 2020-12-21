@@ -51,7 +51,7 @@ DATASET:
 USE_MODEL: 'src.models.cls_model.ClsModel'
 EVALUATOR:
   NAME: 'classification'
-  EVAL_TYPE: 'mAP'
+  EVAL_TYPE: 'mAcc'
   EVAL_INTERVALS: 2
 
 ## CHECKPOINT
@@ -70,7 +70,7 @@ GPU_IDS: [0]
 N_MAX_EPOCHS: 25
 
 INIT_LR: 0.001
-SCALE_LR: True # Scale learning rate based on global batch size
+SCALE_LR: False # Scale learning rate based on global batch size
 OPTIMIZER:
   TYPE: 'SGD' # Adam, RMSprop
   BIAS_PARAMS:
