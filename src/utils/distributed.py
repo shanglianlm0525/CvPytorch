@@ -285,10 +285,10 @@ class LossLogger(object):
 
 class MetricLogger(object):
     'Using adapter design patterns'
-    def __init__(self, dictionary, cfg):
-        self.dictionary = dictionary
+    def __init__(self, cfg, dictionary):
         self.cfg = cfg
         self.type = self.cfg.EVAL_FUNC
+        self.dictionary = dictionary
 
         if self.type == 'segmentation':
             self._evaluator = SegmentationEvaluator(self.dictionary)
