@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2020/12/16 15:38
 # @Author : liumin
-# @File : __init__bak.py
+# @File : __init__.py
 
 from copy import deepcopy
 from torch.optim import SGD, Adam, RMSprop
