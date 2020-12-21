@@ -56,7 +56,6 @@ class ClsModel(nn.Module):
 
             return out
         else:
-            targets = targets.cuda()
             losses = {}
             losses['loss'] = self._criterion(outputs, targets)
 
