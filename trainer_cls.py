@@ -40,7 +40,7 @@ from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
 from src.utils.distributed import init_distributed, is_main_process, reduce_dict
-from src.evaluation import build_evaluator
+from src.evaluator import build_evaluator
 from src.utils.distributed import LossLogger
 from src.optimizers import build_optimizer
 from src.lr_schedulers import build_lr_scheduler
@@ -159,9 +159,9 @@ class Trainer:
 
         if self.cfg.PRETRAIN_MODEL is not None:
             if self.cfg.RESUME:
-                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft, lr_scheduler_ft)
+                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft)
             else:
-                self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft)
+                self.ckpts.resume_checkpoint(model_ft, optimizer_ft)
 
         ## vis net graph
         if self.cfg.TENSORBOARD_MODEL and False:
@@ -183,13 +183,13 @@ class Trainer:
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
                     if best_acc < acc:
-                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
+                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft)
                         best_acc = acc
                         # continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
