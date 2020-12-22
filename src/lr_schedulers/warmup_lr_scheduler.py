@@ -20,35 +20,19 @@ def AssemblyParams(f):
         assert isinstance(cfg.WARMUP.NAME, str), 'cfg.WARMUP.ITERS must be str type'
         assert cfg.WARMUP.NAME, 'cfg.WARMUP.NAME must in ["linear","exponent","sine"]'
         assert isinstance(cfg.WARMUP.ITERS, int), 'cfg.WARMUP.ITERS must be int type'
+        assert isinstance(cfg.WARMUP.FACTOR, float), 'cfg.WARMUP.FACTOR must be float type'
         args[0].warmup_method = cfg.WARMUP.NAME
         args[0].warmup_iters = cfg.WARMUP.ITERS
+        args[0].warmup_factor = cfg.WARMUP.FACTOR
         f(*args, **kwargs)
     return info
 
-def _get_warmup_factor_at_iter(method: str, warmup_iters: int, iter: int):
-    """
-    Return the learning rate warmup factor at a specific iteration.
-    See :paper:`in1k1h` for more details.
-    Args:
-        method (str): warmup method; either "constant" or "linear".
-        iter (int): iteration at which to calculate the warmup factor.
-        warmup_iters (int): the number of warmup iterations.
-    Returns:
-        float: the effective warmup factor at the given iteration.
-    """
-    if iter >= warmup_iters:
-        return 1.0
-
-    if method == "linear":
-        return (iter+1) / warmup_iters
-    elif method == "exponent":
-        return 1.0 - math.exp(-(iter+1) / warmup_iters)
-    else:
-        return 1.0
-
-
 
 class _WarmupLRScheduler(_LRScheduler):
+    @AssemblyParams
+    def __init__(self, optimizer, last_epoch=-1, cfg=None):
+        super(_WarmupLRScheduler, self).__init__(optimizer, last_epoch)
+
     def step(self, epoch=None):
         # Raise a warning if old pattern is detected
         # https://github.com/pytorch/pytorch/issues/20124
@@ -75,6 +59,29 @@ class _WarmupLRScheduler(_LRScheduler):
         for param_group, lr in zip(self.optimizer.param_groups, self.get_lr(self._step_count)):
             param_group['lr'] = lr
 
+    def get_warmup_factor_at_iter(self, iter):
+        """
+        Return the learning rate warmup factor at a specific iteration.
+        See :paper:`in1k1h` for more details.
+        Args:
+            method (str): warmup method; either "constant" or "linear".
+            iter (int): iteration at which to calculate the warmup factor.
+            warmup_iters (int): the number of warmup iterations.
+        Returns:
+            float: the effective warmup factor at the given iteration.
+        """
+        if iter >= self.warmup_iters:
+            return 1.0
+
+        if self.warmup_method == "constant":
+            return self.warmup_factor
+        elif self.warmup_method == "linear":
+            return (iter + 1) / self.warmup_iters
+        elif self.warmup_method == "exponent":
+            return 1.0 - math.exp(-(iter + 1) / self.warmup_iters)
+        else:
+            return 1.0
+
 
 class WarmupStepLR(_WarmupLRScheduler):
     """Sets the learning rate of each parameter group to the initial lr
@@ -100,15 +107,13 @@ class WarmupStepLR(_WarmupLRScheduler):
             >>>     validate(...)
             >>>     scheduler.step()
         """
-
-    @AssemblyParams
     def __init__(self, optimizer, step_size, gamma=0.1, last_epoch=-1, cfg=None):
         self.step_size = step_size
         self.gamma = gamma
         super(WarmupStepLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
-        warmup_factor = _get_warmup_factor_at_iter(self.warmup_method, self.warmup_iters, iter)
+        warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
             return [self.eta_min + warmup_factor * (base_lr - self.eta_min) for base_lr in self.base_lrs]
 
@@ -140,8 +145,6 @@ class WarmupMultiStepLR(_WarmupLRScheduler):
             >>>     validate(...)
             >>>     scheduler.step()
         """
-
-    @AssemblyParams
     def __init__(self, optimizer, milestones, gamma=0.1, last_epoch=-1, cfg=None):
         if not list(milestones) == sorted(milestones):
             raise ValueError('Milestones should be a list of'
@@ -151,7 +154,7 @@ class WarmupMultiStepLR(_WarmupLRScheduler):
         super(WarmupMultiStepLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
-        warmup_factor = _get_warmup_factor_at_iter(self.warmup_method, self.warmup_iters, iter)
+        warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
             return [self.eta_min + warmup_factor * (base_lr - self.eta_min) for base_lr in self.base_lrs]
 
@@ -168,14 +171,12 @@ class WarmupExponentialLR(_WarmupLRScheduler):
             gamma (float): Multiplicative factor of learning rate decay.
             last_epoch (int): The index of last epoch. Default: -1.
         """
-
-    @AssemblyParams
     def __init__(self, optimizer, gamma, last_epoch=-1, cfg=None):
         self.gamma = gamma
         super(WarmupExponentialLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
-        warmup_factor = _get_warmup_factor_at_iter(self.warmup_method, self.warmup_iters, iter)
+        warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
             return [self.eta_min + warmup_factor * (base_lr - self.eta_min) for base_lr in self.base_lrs]
 
@@ -207,22 +208,13 @@ class WarmupCosineAnnealingLR(_WarmupLRScheduler):
         .. _SGDR\: Stochastic Gradient Descent with Warm Restarts:
             https://arxiv.org/abs/1608.03983
         """
-    @AssemblyParams
     def __init__(self, optimizer,T_max, eta_min=0, last_epoch=-1, cfg=None):
         self.T_max = T_max
         self.eta_min = eta_min
-        '''
-        assert cfg is not None, 'cfg is not None'
-        assert isinstance(cfg.WARMUP.NAME, str), 'cfg.WARMUP.ITERS must be str type'
-        assert cfg.WARMUP.NAME, 'cfg.WARMUP.NAME must in ["linear","exponent","sine"]'
-        assert isinstance(cfg.WARMUP.ITERS, int), 'cfg.WARMUP.ITERS must be int type'
-        self.warmup_method = cfg.WARMUP.NAME
-        self.warmup_iters = cfg.WARMUP.ITERS
-        '''
         super(WarmupCosineAnnealingLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
-        warmup_factor = _get_warmup_factor_at_iter(self.warmup_method, self.warmup_iters, iter)
+        warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
             return [self.eta_min + warmup_factor*(base_lr - self.eta_min) for base_lr in self.base_lrs]
 
