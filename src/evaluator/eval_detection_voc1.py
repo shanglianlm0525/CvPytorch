@@ -54,11 +54,11 @@ def eval_detection_voc(
         gt_difficults=None,
         iou_thresh=0.5,
         use_07_metric=False):
-    """Calculate average precisions based on evaluation code of PASCAL VOC.
+    """Calculate average precisions based on evaluator code of PASCAL VOC.
 
     This function evaluates predicted bounding boxes obtained from a dataset
     which has :math:`N` images by using average precision for each class.
-    The code is based on the evaluation code used in PASCAL VOC Challenge.
+    The code is based on the evaluator code used in PASCAL VOC Challenge.
 
     Args:
         pred_bboxes (iterable of numpy.ndarray): An iterable of :math:`N`
@@ -93,7 +93,7 @@ def eval_detection_voc(
             considers all bounding boxes to be not difficult.
         iou_thresh (float): A prediction is correct if its Intersection over
             Union with the ground truth is above this value.
-        use_07_metric (bool): Whether to use PASCAL VOC 2007 evaluation metric
+        use_07_metric (bool): Whether to use PASCAL VOC 2007 evaluator metric
             for calculating average precision. The default value is
             :obj:`False`.
 
@@ -129,12 +129,12 @@ def calc_detection_voc_prec_rec(
         pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels,
         gt_difficults=None,
         iou_thresh=0.5):
-    """Calculate precision and recall based on evaluation code of PASCAL VOC.
+    """Calculate precision and recall based on evaluator code of PASCAL VOC.
 
     This function calculates precision and recall of
     predicted bounding boxes obtained from a dataset which has :math:`N`
     images.
-    The code is based on the evaluation code used in PASCAL VOC Challenge.
+    The code is based on the evaluator code used in PASCAL VOC Challenge.
 
     Args:
         pred_bboxes (iterable of numpy.ndarray): An iterable of :math:`N`
@@ -230,7 +230,7 @@ def calc_detection_voc_prec_rec(
                 match[l].extend((0,) * pred_bbox_l.shape[0])
                 continue
 
-            # VOC evaluation follows integer typed bounding boxes.
+            # VOC evaluator follows integer typed bounding boxes.
             pred_bbox_l = pred_bbox_l.copy()
             pred_bbox_l[:, 2:] += 1
             gt_bbox_l = gt_bbox_l.copy()
@@ -287,11 +287,11 @@ def calc_detection_voc_prec_rec(
 
 
 def calc_detection_voc_ap(prec, rec, use_07_metric=False):
-    """Calculate average precisions based on evaluation code of PASCAL VOC.
+    """Calculate average precisions based on evaluator code of PASCAL VOC.
 
     This function calculates average precisions
     from given precisions and recalls.
-    The code is based on the evaluation code used in PASCAL VOC Challenge.
+    The code is based on the evaluator code used in PASCAL VOC Challenge.
 
     Args:
         prec (list of numpy.array): A list of arrays.
@@ -302,7 +302,7 @@ def calc_detection_voc_ap(prec, rec, use_07_metric=False):
             :obj:`rec[l]` indicates recall for class :math:`l`.
             If :obj:`rec[l]` is :obj:`None`, this function returns
             :obj:`numpy.nan` for class :math:`l`.
-        use_07_metric (bool): Whether to use PASCAL VOC 2007 evaluation metric
+        use_07_metric (bool): Whether to use PASCAL VOC 2007 evaluator metric
             for calculating average precision. The default value is
             :obj:`False`.
 
