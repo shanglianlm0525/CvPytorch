@@ -37,17 +37,17 @@ from torch.cuda import amp
 from torch.nn import SyncBatchNorm
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-
-from src.lr_schedulers.lr_scheduler import parser_lr_scheduler
-from src.optimizers.optimizer import parser_optimizer
 from src.utils.config import CommonConfiguration
 from src.utils.logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
-from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
-
-from CvPytorch.src.utils.distributed import LossLogger
+from src.utils.distributed import init_distributed, is_main_process, reduce_dict
+from src.utils.distributed import LossLogger
+from src.evaluator import build_evaluator
+from src.optimizers import build_optimizer
+from src.lr_schedulers import build_lr_scheduler
+from src.utils.freeze import freeze_models
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -80,7 +80,7 @@ class Trainer:
         self.start_epoch = -1
         self.n_iters_elapsed = 0
         self.device = self.cfg.GPU_IDS
-        self.batch_size = self.cfg.BATCH_SIZE * len(self.cfg.GPU_IDS)
+        self.batch_size = self.cfg.DATASET.TRAIN.BATCH_SIZE * len(self.cfg.GPU_IDS)
 
         self.n_steps_per_epoch = None
         if cfg.local_rank == 0:
@@ -109,10 +109,12 @@ class Trainer:
             data_samplers['train'] = RandomSampler(datasets['train'])
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
-        dataloaders = {x: DataLoader(datasets[x], batch_size=batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=dataset_class.collate_fn if hasattr(dataset_class, 'collate_fn') else default_collate, pin_memory=True,drop_last=True) for x, batch_size in zip(['train', 'val'],[self.batch_size,1])} # collate_fn=detection_collate,
+        dataloaders = {x: DataLoader(datasets[x], batch_size=cfg.DATASET[x.upper()].BATCH_SIZE, sampler=data_samplers[x],
+                          num_workers=cfg.DATASET[x.upper()].NUM_WORKER, collate_fn=dataset_class.collate_fn if hasattr(dataset_class,'collate_fn') else default_collate,
+                          pin_memory=True, drop_last=True) for x in ['train', 'val']}
 
-        return datasets, dataloaders, data_samplers
+        dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
+        return datasets, dataloaders, data_samplers, dataset_sizes
 
 
     def _parser_model(self):
@@ -138,53 +140,40 @@ class Trainer:
         self.dictionary = self._parser_dict()
 
         ## parser_datasets
-        datasets, dataloaders,data_samplers = self._parser_datasets()
-        # dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
-        # class_names = datasets['train'].classes
+        datasets, dataloaders,data_samplers, dataset_sizes = self._parser_datasets()
 
         ## parser_model
         model_ft = self._parser_model()
 
         ## parser_optimizer
         # Scale learning rate based on global batch size
-        # cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size_all) / 256
-        optimizer_ft = parser_optimizer(cfg,model_ft)
+        if cfg.SCALE_LR:
+            cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / 256
+        optimizer_ft = build_optimizer(cfg, model_ft)
 
         ## parser_lr_scheduler
-        lr_scheduler_ft = parser_lr_scheduler(cfg, optimizer_ft)
-
-        '''
-        # Scheduler https://arxiv.org/pdf/1812.01187.pdf
-        # https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#OneCycleLR
-        lf = lambda x: (((1 + math.cos(x * math.pi / self.cfg.N_MAX_EPOCHS)) / 2) ** 1.0) * 0.8 + 0.2  # cosine
-        lr_scheduler_ft = lr_scheduler.LambdaLR(optimizer_ft, lr_lambda=lf)
-        '''
+        lr_scheduler_ft = build_lr_scheduler(cfg, optimizer_ft)
 
         if cfg.distributed:
             model_ft = DDP(model_ft, device_ids=[cfg.local_rank], output_device=(cfg.local_rank))
 
         # Freeze
-        freeze = ['', ]  # parameter names to freeze (full or partial)
-        if any(freeze):
-            for k, v in model_ft.named_parameters():
-                if any(x in k for x in freeze):
-                    print('freezing %s' % k)
-                    v.requires_grad = False
-
+        freeze_models(model_ft)
 
         if self.cfg.PRETRAIN_MODEL is not None:
             if self.cfg.RESUME:
-                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft, lr_scheduler_ft)
+                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft)
             else:
-                self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft)
+                self.ckpts.resume_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft)
 
         ## vis net graph
         if self.cfg.TENSORBOARD_MODEL and False:
             self.tb_writer.add_graph(model_ft, (model_ft.dummy_input.cuda(),))
 
-        # self.n_steps_per_epoch = int(ceil(sum(len(t) for t in datasets['train'])))
+        self.steps_per_epoch = int(dataset_sizes['train']//self.batch_size)
 
-        best_acc = 0.0
+        best_metric = 0.0
+        best_perf_rst = None
         scaler = amp.GradScaler(enabled=True)
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
@@ -192,19 +181,23 @@ class Trainer:
             self.train_epoch(scaler, epoch, model_ft, datasets['train'], dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
-            if self.cfg.DATASET.VAL:
-                acc = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'])
+            if self.cfg.DATASET.VAL and (not epoch % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1):
+                metric, perf_rst = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
-                    if best_acc < acc:
-                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
-                        best_acc = acc
+                    if best_metric < metric:
+                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft)
+                        best_metric = metric
+                        best_perf_rst = perf_rst
                         # continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft)
+
+        if best_perf_rst is not None:
+            logger.info(best_perf_rst.replace("(val)","(best)"))
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -217,7 +210,7 @@ class Trainer:
 
         _timer = Timer()
         lossLogger = LossLogger()
-        performanceLogger = MetricLogger(dataset, self.cfg)
+        performanceLogger = build_evaluator(self.cfg, dataset)
 
         for i, sample in enumerate(dataloader):
             imgs, targets = sample['image'], sample['target']
@@ -226,7 +219,6 @@ class Trainer:
             optimizer.zero_grad()
 
             imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-            '''
             if isinstance(targets, list):
                 if isinstance(targets[0], torch.Tensor):
                     targets = [t.cuda() for t in targets]
@@ -234,9 +226,17 @@ class Trainer:
                     targets = [torch.from_numpy(t).cuda() for t in targets]
                 else:
                     targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
+            elif isinstance(targets, dict):
+                for (k, v) in targets.items():
+                    if isinstance(v, torch.Tensor):
+                        targets[k] = v.cuda()
+                    elif isinstance(v, list):
+                        if isinstance(v[0], torch.Tensor):
+                            targets[k] = [t.cuda() for t in v]
+                        elif isinstance(v[0], np.ndarray):
+                            targets[k] = [torch.from_numpy(t).cuda() for t in v]
             else:
                 targets = targets.cuda()
-            '''
 
             # Autocast
             with amp.autocast(enabled=True):
@@ -286,7 +286,7 @@ class Trainer:
                     template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
                     logger.info(
                         template.format(
-                            epoch, self.cfg.N_MAX_EPOCHS, i,
+                            epoch, self.cfg.N_MAX_EPOCHS-1, i,
                             round(get_current_lr(optimizer), 6),
                             lossLogger.meters["loss"].value,
                             self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / _timer.diff,
@@ -315,13 +315,12 @@ class Trainer:
         model.eval()
 
         lossLogger = LossLogger()
-        performanceLogger = MetricLogger(dataset, self.cfg)
+        performanceLogger = build_evaluator(self.cfg, dataset)
 
         with torch.no_grad():
             for sample in dataloader:
                 imgs, targets = sample['image'], sample['target']
                 imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                '''
                 if isinstance(targets, list):
                     if isinstance(targets[0], torch.Tensor):
                         targets = [t.cuda() for t in targets]
@@ -329,9 +328,17 @@ class Trainer:
                         targets = [torch.from_numpy(t).cuda() for t in targets]
                     else:
                         targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
+                elif isinstance(targets, dict):
+                    for (k, v) in targets.items():
+                        if isinstance(v, torch.Tensor):
+                            targets[k] = v.cuda()
+                        elif isinstance(v, list):
+                            if isinstance(v[0], torch.Tensor):
+                                targets[k] = [t.cuda() for t in v]
+                            elif isinstance(v[0], np.ndarray):
+                                targets[k] = [torch.from_numpy(t).cuda() for t in v]
                 else:
                     targets = targets.cuda()
-                '''
 
                 losses, predicts = model(imgs, targets, prefix)
 
@@ -373,15 +380,15 @@ class Trainer:
                 )
             )
 
-            perf_log_str = f"\n------------ Performances ({prefix}) ----------\n"
+            perf_log = f"\n------------ Performances ({prefix}) ----------\n"
             for k, v in performances.items():
-                perf_log_str += "{:}: {:.4f}\n".format(k, v)
-            perf_log_str += "------------------------------------\n"
-            logger.info(perf_log_str)
+                perf_log += "{:}: {:.4f}\n".format(k, v)
+            perf_log += "------------------------------------\n"
+            logger.info(perf_log)
 
         acc = performances['performance']
 
-        return acc
+        return acc, perf_log
 
 
 if __name__ == '__main__':

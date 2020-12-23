@@ -170,6 +170,7 @@ class Trainer:
         self.steps_per_epoch = int(dataset_sizes['train']//self.batch_size)
 
         best_acc = 0.0
+        best_perf_rst = None
         scaler = amp.GradScaler(enabled=True)
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
@@ -178,18 +179,22 @@ class Trainer:
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL and (not epoch % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1):
-                acc = self.val_epoch(epoch, model_ft,datasets['val'], dataloaders['val'])
+                acc, perf_rst = self.val_epoch(epoch, model_ft,datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
                     if best_acc < acc:
                         self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft)
                         best_acc = acc
+                        best_perf_rst = perf_rst
                         # continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
                     self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft)
+
+        if best_perf_rst is not None:
+            logger.info(best_perf_rst.replace("(val)", "(best)"))
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -218,6 +223,15 @@ class Trainer:
                     targets = [torch.from_numpy(t).cuda() for t in targets]
                 else:
                     targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
+            elif isinstance(targets, dict):
+                for (k, v) in targets.items():
+                    if isinstance(v, torch.Tensor):
+                        targets[k] = v.cuda()
+                    elif isinstance(v, list):
+                        if isinstance(v[0], torch.Tensor):
+                            targets[k] = [t.cuda() for t in v]
+                        elif isinstance(v[0], np.ndarray):
+                            targets[k] = [torch.from_numpy(t).cuda() for t in v]
             else:
                 targets = targets.cuda()
 
@@ -311,6 +325,15 @@ class Trainer:
                         targets = [torch.from_numpy(t).cuda() for t in targets]
                     else:
                         targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
+                elif isinstance(targets, dict):
+                    for (k, v) in targets.items():
+                        if isinstance(v, torch.Tensor):
+                            targets[k] = v.cuda()
+                        elif isinstance(v, list):
+                            if isinstance(v[0], torch.Tensor):
+                                targets[k] = [t.cuda() for t in v]
+                            elif isinstance(v[0], np.ndarray):
+                                targets[k] = [torch.from_numpy(t).cuda() for t in v]
                 else:
                     targets = targets.cuda()
 
@@ -354,15 +377,15 @@ class Trainer:
                 )
             )
 
-            perf_log_str = f"\n------------ Performances ({prefix}) ----------\n"
+            perf_log = f"\n------------ Performances ({prefix}) ----------\n"
             for k, v in performances.items():
-                perf_log_str += "{:}: {:.4f}\n".format(k, v)
-            perf_log_str += "------------------------------------\n"
-            logger.info(perf_log_str)
+                perf_log += "{:}: {:.4f}\n".format(k, v)
+            perf_log += "------------------------------------\n"
+            logger.info(perf_log)
 
         acc = performances['performance']
 
-        return acc
+        return acc, perf_log
 
 
 if __name__ == '__main__':
