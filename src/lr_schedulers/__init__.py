@@ -19,7 +19,7 @@ __all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR'
 '''
 
 def build_lr_scheduler(cfg, optimizer):
-    if cfg.WARMUP.NAME is None or True:
+    if cfg.WARMUP.NAME is None:
         if cfg.LR_SCHEDULER.TYPE == "StepLR":
             lr_scheduler_ft = StepLR(
                 optimizer, step_size=cfg.LR_SCHEDULER.STEP, gamma=cfg.LR_SCHEDULER.GAMMA or 0.1
