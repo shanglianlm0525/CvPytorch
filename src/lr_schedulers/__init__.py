@@ -11,10 +11,16 @@ from .warmup_lr_scheduler import WarmupStepLR, WarmupMultiStepLR, WarmupExponent
 __all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR'
     ,'WarmupStepLR', 'WarmupMultiStepLR', 'WarmupCosineAnnealingLR']
 
+'''
+        schedule_cfg = copy.deepcopy(self.cfg.schedule.lr_schedule)
+        name = schedule_cfg.pop('name')
+        Scheduler = getattr(torch.optim.lr_scheduler, name)
+        self.lr_scheduler = Scheduler(optimizer=self.optimizer, **schedule_cfg)
+'''
 
 def build_lr_scheduler(cfg, optimizer):
-    if cfg.WARMUP.NAME is not None:
-        if cfg.LR_SCHEDULER.TYPE == "MultiStepLR":
+    if cfg.WARMUP.NAME is None or True:
+        if cfg.LR_SCHEDULER.TYPE == "StepLR":
             lr_scheduler_ft = StepLR(
                 optimizer, step_size=cfg.LR_SCHEDULER.STEP, gamma=cfg.LR_SCHEDULER.GAMMA or 0.1
             )
@@ -44,7 +50,7 @@ def build_lr_scheduler(cfg, optimizer):
         else:
             raise ValueError("Unsupported lr_scheduler type: {}".format(cfg.LR_SCHEDULER.TYPE))
     else:
-        if cfg.LR_SCHEDULER.TYPE == "MultiStepLR":
+        if cfg.LR_SCHEDULER.TYPE == "StepLR":
             lr_scheduler_ft = WarmupStepLR(
                 optimizer, step_size=cfg.LR_SCHEDULER.STEP, gamma=cfg.LR_SCHEDULER.GAMMA or 0.1, cfg=cfg
             )
