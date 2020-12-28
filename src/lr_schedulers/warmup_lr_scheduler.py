@@ -10,7 +10,8 @@ from functools import partial, wraps
 from bisect import bisect_right
 
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import _LRScheduler, MultiStepLR, StepLR, ExponentialLR, CosineAnnealingLR
+
 
 def AssemblyParams(f):
     @wraps(f)
@@ -29,7 +30,7 @@ def AssemblyParams(f):
 
 
 class _WarmupLRScheduler(_LRScheduler):
-    @AssemblyParams
+    # @AssemblyParams
     def __init__(self, optimizer, last_epoch=-1, cfg=None):
         super(_WarmupLRScheduler, self).__init__(optimizer, last_epoch)
 
@@ -107,15 +108,17 @@ class WarmupStepLR(_WarmupLRScheduler):
             >>>     validate(...)
             >>>     scheduler.step()
         """
+
+    @AssemblyParams
     def __init__(self, optimizer, step_size, gamma=0.1, last_epoch=-1, cfg=None):
         self.step_size = step_size
         self.gamma = gamma
-        super(WarmupStepLR, self).__init__(optimizer, last_epoch)
+        super(_WarmupLRScheduler, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
         warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
-            return [self.eta_min + warmup_factor * (base_lr - self.eta_min) for base_lr in self.base_lrs]
+            return [warmup_factor * base_lr for base_lr in self.base_lrs]
 
         return [base_lr * self.gamma ** (self.last_epoch // self.step_size)
                 for base_lr in self.base_lrs]
@@ -145,6 +148,7 @@ class WarmupMultiStepLR(_WarmupLRScheduler):
             >>>     validate(...)
             >>>     scheduler.step()
         """
+    @AssemblyParams
     def __init__(self, optimizer, milestones, gamma=0.1, last_epoch=-1, cfg=None):
         if not list(milestones) == sorted(milestones):
             raise ValueError('Milestones should be a list of'
@@ -156,7 +160,7 @@ class WarmupMultiStepLR(_WarmupLRScheduler):
     def get_lr(self, iter):
         warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
-            return [self.eta_min + warmup_factor * (base_lr - self.eta_min) for base_lr in self.base_lrs]
+            return [warmup_factor * base_lr for base_lr in self.base_lrs]
 
         return [base_lr * self.gamma ** bisect_right(self.milestones, self.last_epoch)
                 for base_lr in self.base_lrs]
@@ -171,14 +175,16 @@ class WarmupExponentialLR(_WarmupLRScheduler):
             gamma (float): Multiplicative factor of learning rate decay.
             last_epoch (int): The index of last epoch. Default: -1.
         """
+
+    @AssemblyParams
     def __init__(self, optimizer, gamma, last_epoch=-1, cfg=None):
         self.gamma = gamma
-        super(WarmupExponentialLR, self).__init__(optimizer, last_epoch)
+        super(_WarmupLRScheduler, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
         warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
-            return [self.eta_min + warmup_factor * (base_lr - self.eta_min) for base_lr in self.base_lrs]
+            return [warmup_factor * base_lr for base_lr in self.base_lrs]
 
         return [base_lr * self.gamma ** self.last_epoch
                 for base_lr in self.base_lrs]
@@ -208,10 +214,12 @@ class WarmupCosineAnnealingLR(_WarmupLRScheduler):
         .. _SGDR\: Stochastic Gradient Descent with Warm Restarts:
             https://arxiv.org/abs/1608.03983
         """
+
+    @AssemblyParams
     def __init__(self, optimizer,T_max, eta_min=0, last_epoch=-1, cfg=None):
         self.T_max = T_max
         self.eta_min = eta_min
-        super(WarmupCosineAnnealingLR, self).__init__(optimizer, last_epoch)
+        super(_WarmupLRScheduler, self).__init__(optimizer, last_epoch)
 
     def get_lr(self, iter):
         warmup_factor = self.get_warmup_factor_at_iter(iter)
