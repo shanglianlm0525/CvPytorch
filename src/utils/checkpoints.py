@@ -27,7 +27,7 @@ class Checkpoints():
         return checkpoint_path
 
 
-    def load_checkpoint(self,save_path, model, optimizer=None):
+    def load_checkpoint(self, save_path, model, optimizer=None):
         """Loads the checkpoint from the given file."""
         error_str = "Checkpoint '{}' not found"
         assert os.path.exists(save_path), error_str.format(save_path)

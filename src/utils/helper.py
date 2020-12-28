@@ -123,7 +123,7 @@ def prepare_transforms(transform_cfg):
             train_transforms.append(transform)
         if phase.lower() in ["val", "validation", "validate", "all", "train_val", "train_val_eval", "val_eval"]:
             val_transforms.append(transform)
-        if phase.lower() in ["eval", "evaluation", "evaluate", "all", "train_val_eval", "val_eval"]:
+        if phase.lower() in ["eval", "evaluator", "evaluate", "all", "train_val_eval", "val_eval"]:
             eval_transforms.append(transform)
 
     train_transforms = [ToRGB()] + train_transforms + [GetData()]

@@ -12,9 +12,18 @@ import time
 import torch
 import torch.distributed as dist
 from contextlib import contextmanager
-from src.evaluation.eval_segmentation import SegmentationEvaluator
-from src.evaluation.eval_detection import VOCEvaluator, COCOEvaluator
-from src.evaluation.eval_classification import ClassificationEvaluator
+from src.evaluator.eval_segmentation import SegmentationEvaluator
+from src.evaluator.eval_detection import VOCEvaluator, COCOEvaluator
+from src.evaluator.eval_classification import ClassificationEvaluator
+
+
+def rank_filter(func):
+    def func_filter(local_rank=-1, *args, **kwargs):
+        if local_rank < 1:
+            return func(*args, **kwargs)
+        else:
+            pass
+    return func_filter
 
 
 def get_world_size():
