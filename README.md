@@ -96,6 +96,8 @@ $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'co
 
 - [x] Mixed Precision Training
 
+- [x] Warm-Up
+
 - [ ] Model Pruning/Sparsity
 
 - [ ] Quantization
