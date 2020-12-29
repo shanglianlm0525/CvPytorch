@@ -6,61 +6,76 @@
 
 import torch
 import torch.nn as nn
-from torchvision.models.densenet import densenet121,densenet161,densenet169,densenet201
+from torchvision.models.densenet import densenet121, densenet161, densenet169, densenet201
 
+"""
+    Densely Connected Convolutional Networks
+    https://arxiv.org/pdf/1608.06993.pdf
+"""
 
 class Densenet(nn.Module):
-    '''
-        Densely Connected Convolutional Networks
-        https://arxiv.org/pdf/1608.06993.pdf
-    '''
-    def __init__(self, backbone='densenet121', backbone_path=None, use_fpn=True):
+
+    def __init__(self, name='densenet121', out_stages=(1, 2, 3, 4), backbone_path=None):
         super(Densenet, self).__init__()
-        self.use_fpn = use_fpn
+        self.out_stages = out_stages
+        self.backbone_path = backbone_path
 
-        if backbone == 'densenet121':
-            backbone = densenet121(pretrained=not backbone_path)
-        elif backbone == 'densenet161':
-            backbone = densenet161(pretrained=not backbone_path)
-        elif backbone == 'densenet169':
-            backbone = densenet169(pretrained=not backbone_path)
-        elif backbone == 'densenet201':
-            backbone = densenet201(pretrained=not backbone_path)
+        self.out_channels = [128, 256, 512, 1024]
+        if name == 'densenet121':
+            features = densenet121(pretrained=not backbone_path).features
+        elif name == 'densenet161':
+            features = densenet161(pretrained=not backbone_path).features
+        elif name == 'densenet169':
+            features = densenet169(pretrained=not backbone_path).features
+        elif name == 'densenet201':
+            features = densenet201(pretrained=not backbone_path).features
 
-        if backbone_path:
-            backbone.load_state_dict(torch.load(backbone_path))
+        self.conv1 = nn.Sequential(
+                features.conv0,
+                features.norm0,
+                features.relu0,
+                features.pool0
+            )
+        self.layer1 = nn.Sequential(
+            features.denseblock1,
+            features.transition1
+            )
+        self.layer2 = nn.Sequential(
+            features.denseblock2,
+            features.transition2
+            )
+        self.layer3 = nn.Sequential(
+            features.denseblock3,
+            features.transition3
+            )
+        self.layer4 = features.denseblock4
 
-        if self.use_fpn:
-            self.out_channels = [256, 512, 1024]
-        else:
-            self.out_channels = [1024]
+        self.init_weights()
 
-        print(backbone)
+        if self.backbone_path:
+            self.features.load_state_dict(torch.load(self.backbone_path))
 
-        self.conv1 = backbone.features.conv0
-        self.norm0 = backbone.features.norm0
-        self.relu0 = backbone.features.relu0
-        self.pool0 = backbone.features.pool0
-        self.layer1 = backbone.features.denseblock1
-        self.trans_layer1 = backbone.features.transition1
-        self.layer2 = backbone.features.denseblock2
-        self.trans_layer2 = backbone.features.transition2
-        self.layer3 = backbone.features.denseblock3
-        self.trans_layer3 = backbone.features.transition3
-        self.layer4 = backbone.features.denseblock4
 
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.normal_(m.weight, std=0.001)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0.0001)
 
     def forward(self, x):
-        x = self.pool0(self.relu0(self.norm0(self.conv1(x))))
-        x = self.layer1(x)
-        out3 = self.layer2(self.trans_layer1(x))
-        out4 = self.layer3(self.trans_layer2(out3))
-        out5 = self.layer4(self.trans_layer3(out4))
+        x = self.conv1(x)
+        output = []
+        for i in range(1, 5):
+            res_layer = getattr(self, 'layer{}'.format(i))
+            x = res_layer(x)
+            if i in self.out_stages:
+                output.append(x)
 
-        if self.use_fpn:
-            return out3, out4, out5
-        else:
-            return out5
+        return tuple(output)
 
     def freeze_bn(self):
         for layer in self.modules():
@@ -71,3 +86,8 @@ class Densenet(nn.Module):
 if __name__=="__main__":
     model =Densenet('densenet121')
     print(model)
+
+    input = torch.randn(1, 3, 224, 224)
+    out = model(input)
+    for o in out:
+        print(o.shape)

@@ -8,12 +8,13 @@ import torch
 import torch.nn as nn
 from torchvision.models.mobilenet import mobilenet_v2
 
+"""
+    MobileNetV2: Inverted Residuals and Linear Bottlenecks
+    https://arxiv.org/abs/1801.04381
+"""
 
 class MobileNetV2(nn.Module):
-    '''
-        MobileNetV2: Inverted Residuals and Linear Bottlenecks
-        https://arxiv.org/abs/1801.04381
-    '''
+
     def __init__(self, name='mobilenet_v2', out_stages=(2, 3, 5, 7), backbone_path=None):
         super(MobileNetV2, self).__init__()
         self.out_stages = out_stages
@@ -47,7 +48,7 @@ class MobileNetV2(nn.Module):
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
-                m.bias.data.zero_()
+                nn.init.constant_(m.bias, 0.0001)
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 if m.bias is not None:
