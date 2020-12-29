@@ -10,6 +10,10 @@ from torch.optim import SGD, Adam, RMSprop
 __all__ = ['SGD','Adam','RMSprop']
 
 
+def get_current_lr(optimizer):
+    return min(g["lr"] for g in optimizer.param_groups)
+
+
 def build_optimizer(cfg, model):
     # params = [p for p in model.parameters() if p.requires_grad]
     _params = []
@@ -35,3 +39,5 @@ def build_optimizer(cfg, model):
         raise ValueError("Unsupported optimizer type: {}".format(cfg.OPTIMIZER.TYPE))
 
     return optimizer
+
+
