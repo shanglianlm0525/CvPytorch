@@ -14,45 +14,43 @@ class ShuffleNetV2(nn.Module):
         ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design
         https://arxiv.org/abs/1807.11164
     '''
-    def __init__(self, backbone='shufflenet_v2_x1_0', backbone_path=None, use_fpn=True):
+    def __init__(self, name='shufflenet_v2_x1_0', out_stages=(2,3,4), backbone_path=None):
         super(ShuffleNetV2, self).__init__()
-        self.use_fpn = use_fpn
+        self.out_stages = out_stages
+        self.backbone_path = backbone_path
 
-        if backbone == 'shufflenet_v2_x0_5':
-            backbone = shufflenet_v2_x0_5(pretrained=not backbone_path)
-            self.out_channels = [48, 96, 192]
-        elif backbone == 'shufflenet_v2_x1_0':
-            backbone = shufflenet_v2_x1_0(pretrained=not backbone_path)
-            self.out_channels = [116, 232, 464]
-        elif backbone == 'shufflenet_v2_x1_5':
-            backbone = shufflenet_v2_x1_5(pretrained=not backbone_path)
-            self.out_channels = [176, 352, 704]
-        elif backbone == 'shufflenet_v2_x2_0':
-            backbone = shufflenet_v2_x2_0(pretrained=not backbone_path)
-            self.out_channels = [244, 488, 976]
+        if name == 'shufflenet_v2_x0_5':
+            self.backbone = shufflenet_v2_x0_5(pretrained=not self.backbone_path)
+            self.out_channels = [24, 48, 96, 192, 1024]
+        elif name == 'shufflenet_v2_x1_0':
+            self.backbone = shufflenet_v2_x1_0(pretrained=not self.backbone_path)
+            self.out_channels = [24, 116, 232, 464, 1024]
+        elif name == 'shufflenet_v2_x1_5':
+            self.backbone = shufflenet_v2_x1_5(pretrained=not self.backbone_path)
+            self.out_channels = [24, 176, 352, 704, 1024]
+        elif name == 'shufflenet_v2_x2_0':
+            self.backbone = shufflenet_v2_x2_0(pretrained=not self.backbone_path)
+            self.out_channels = [24, 244, 488, 976, 2048]
         else:
             raise NotImplementedError
 
-        if backbone_path:
-            backbone.load_state_dict(torch.load(backbone_path))
+        self.init_weights()
 
-        self.conv1 = backbone.conv1
-        self.maxpool = backbone.maxpool
-        self.layer2 = backbone.stage2
-        self.layer3 = backbone.stage3
-        self.layer4 = backbone.stage4
+        if self.backbone_path:
+            self.backbone.load_state_dict(torch.load(self.backbone_path))
+
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.maxpool(x)
-        out3 = self.layer2(x)
-        out4 = self.layer3(out3)
-        out5 = self.layer4(out4)
+        x = self.backbone.conv1(x)
+        x = self.backbone.maxpool(x)
+        output = []
+        for i in range(2, 5):
+            stage = getattr(self.backbone, 'stage{}'.format(i))
+            x = stage(x)
+            if i in self.out_stages:
+                output.append(x)
+        return tuple(output)
 
-        if self.use_fpn:
-            return out3, out4, out5
-        else:
-            return out5
 
     def freeze_bn(self):
         for layer in self.modules():
@@ -60,6 +58,36 @@ class ShuffleNetV2(nn.Module):
                 layer.eval()
 
 
+    def init_weights(self):
+        for name, m in self.named_modules():
+            if isinstance(m, nn.Conv2d):
+                if 'first' in name:
+                    nn.init.normal_(m.weight, 0, 0.01)
+                else:
+                    nn.init.normal_(m.weight, 0, 1.0 / m.weight.shape[1])
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0001)
+                nn.init.constant_(m.running_mean, 0)
+            elif isinstance(m, nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0001)
+                nn.init.constant_(m.running_mean, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+
 if __name__=="__main__":
     model =ShuffleNetV2('shufflenet_v2_x1_0')
     print(model)
+
+    input = torch.randn(1, 3, 224, 224)
+    out = model(input)
+    for o in out:
+        print(o.shape)
