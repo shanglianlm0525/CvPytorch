@@ -161,7 +161,6 @@ class WarmupMultiStepLR(_WarmupLRScheduler):
         warmup_factor = self.get_warmup_factor_at_iter(iter)
         if iter <= self.warmup_iters:
             return [warmup_factor * base_lr for base_lr in self.base_lrs]
-
         return [base_lr * self.gamma ** bisect_right(self.milestones, self.last_epoch)
                 for base_lr in self.base_lrs]
 

@@ -11,13 +11,10 @@ from collections import defaultdict
 import math
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 import torchvision
 from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import default_collate_err_msg_format, np_str_obj_array_pattern
 from torch.utils.data.dataloader import default_collate
-from torchvision import transforms as transformsT
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
@@ -43,20 +40,18 @@ from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
 from src.utils.distributed import init_distributed, is_main_process, reduce_dict
-from src.utils.distributed import LossLogger
 from src.evaluator import build_evaluator
-from src.optimizers import build_optimizer
+from src.utils.distributed import LossLogger
+from src.optimizers import build_optimizer, get_current_lr
 from src.lr_schedulers import build_lr_scheduler
 from src.utils.freeze import freeze_models
+from src.lr_schedulers.warmup import get_warmup_lr
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
 
 torch.set_default_tensor_type(torch.FloatTensor)
-
-def get_current_lr(optimizer):
-    return min(g["lr"] for g in optimizer.param_groups)
 
 def get_class_name(full_class_name):
     return full_class_name.split(".")[-1]
@@ -71,6 +66,7 @@ def clip_grad(cfg, model):
         raise NotImplementedError
 
     clip_method(model.parameters(), cfg.GRAD_CLIP.VALUE)
+
 
 # logger = logging.getLogger("pytorch")
 
@@ -110,8 +106,8 @@ class Trainer:
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
         dataloaders = {x: DataLoader(datasets[x], batch_size=cfg.DATASET[x.upper()].BATCH_SIZE, sampler=data_samplers[x],
-                          num_workers=cfg.DATASET[x.upper()].NUM_WORKER, collate_fn=dataset_class.collate_fn if hasattr(dataset_class,'collate_fn') else default_collate,
-                          pin_memory=True, drop_last=True) for x in ['train', 'val']}
+                                     num_workers=cfg.DATASET[x.upper()].NUM_WORKER, collate_fn=dataset_class.collate_fn if hasattr(dataset_class,'collate_fn') else default_collate,
+                          pin_memory=True, drop_last=True) for x in ['train', 'val']}  # collate_fn=detection_collate,
 
         dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         return datasets, dataloaders, data_samplers, dataset_sizes
@@ -129,10 +125,117 @@ class Trainer:
 
         return model
 
+    def run_step(self, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
+        '''
+            Training step including forward
+            :param model: model to train
+            :param sample: a batch of input data
+            :param optimizer:
+            :param lossLogger:
+            :param performanceLogger:
+            :param prefix: train or val or infer
+            :return: losses, predicts
+        '''
+        imgs, targets = sample['image'], sample['target']
+        imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
+        if isinstance(targets, list):
+            if isinstance(targets[0], torch.Tensor):
+                targets = [t.cuda() for t in targets]
+            elif isinstance(targets[0], np.ndarray):
+                targets = [torch.from_numpy(t).cuda() for t in targets]
+            else:
+                targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
+        elif isinstance(targets, dict):
+            for (k, v) in targets.items():
+                if isinstance(v, torch.Tensor):
+                    targets[k] = v.cuda()
+                elif isinstance(v, list):
+                    if isinstance(v[0], torch.Tensor):
+                        targets[k] = [t.cuda() for t in v]
+                    elif isinstance(v[0], np.ndarray):
+                        targets[k] = [torch.from_numpy(t).cuda() for t in v]
+        else:
+            targets = targets.cuda()
+
+        if prefix=='train':
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # Autocast
+            with amp.autocast(enabled=True):
+                out = model(imgs, targets, prefix)
+                if not isinstance(out, tuple):
+                    losses, predicts = out, None
+                else:
+                    losses, predicts = out
+
+            # Scales loss.  Calls backward() on scaled loss to create scaled gradients.
+            # Backward passes under autocast are not recommended.
+            # Backward ops run in the same dtype autocast chose for corresponding forward ops.
+            scaler.scale(losses["loss"]).backward()
+            # scaler.step() first unscales the gradients of the optimizer's assigned params.
+            # If these gradients do not contain infs or NaNs, optimizer.step() is then called,
+            # otherwise, optimizer.step() is skipped.
+            scaler.step(optimizer)
+            # Updates the scale for next iteration.
+            scaler.update()
+        else:
+            losses, predicts = model(imgs, targets, prefix)
+
+        if lossLogger is not None:
+            if self.cfg.distributed:
+                # reduce losses over all GPUs for logging purposes
+                loss_dict_reduced = reduce_dict(losses)
+                lossLogger.update(**loss_dict_reduced)
+                del loss_dict_reduced
+            else:
+                lossLogger.update(**losses)
+
+        if performanceLogger is not None:
+            if predicts is not None:
+                if self.cfg.distributed:
+                    # reduce performances over all GPUs for logging purposes
+                    predicts_dict_reduced = reduce_dict(predicts)
+                    performanceLogger.update(targets, predicts_dict_reduced)
+                    del predicts_dict_reduced
+                else:
+                    performanceLogger.update(targets, predicts)
+                del predicts
+
+        del imgs, targets
+        return losses
+
+    def warm_up(self, scaler, model, dataloader, cfg, prefix='train'):
+        optimizer = build_optimizer(cfg, model)
+        model.train()
+
+        cur_iter = 0
+        while cur_iter < cfg.WARMUP.ITERS:
+            for i, sample in enumerate(dataloader):
+                cur_iter += 1
+                if cur_iter >= cfg.WARMUP.ITERS:
+                    break
+                lr = get_warmup_lr(cur_iter, cfg)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr
+                losses = self.run_step(scaler, model, sample, optimizer, None, None, prefix)
+
+                if self.cfg.local_rank == 0:
+                    template = "[iter {}, lr {}] Total train loss: {:.4f} \n" "{}"
+                    logger.info(
+                        template.format(
+                            cur_iter, round(get_current_lr(optimizer), 6),
+                            losses["loss"].item(),
+                            "\n".join(
+                                ["{}: {:.4f}".format(n, l.item()) for n, l in losses.items() if n != "loss"]),
+                        )
+                    )
+        del optimizer
+
+
     def run(self):
         ## init distributed
         self.cfg = init_distributed(self.cfg)
-
         cfg = self.cfg
         # cfg.print()
 
@@ -145,10 +248,17 @@ class Trainer:
         ## parser_model
         model_ft = self._parser_model()
 
-        ## parser_optimizer
         # Scale learning rate based on global batch size
-        if cfg.SCALE_LR:
-            cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / 256
+        if cfg.SCALE_LR.ENABLED:
+            cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / cfg.SCALE_LR.VAL
+
+        scaler = amp.GradScaler(enabled=True)
+        if cfg.WARMUP.NAME is not None:
+            logger.info('Start warm-up ... ')
+            self.warm_up(scaler, model_ft, dataloaders['train'], cfg)
+            logger.info('finish warm-up!')
+
+        ## parser_optimizer
         optimizer_ft = build_optimizer(cfg, model_ft)
 
         ## parser_lr_scheduler
@@ -162,33 +272,32 @@ class Trainer:
 
         if self.cfg.PRETRAIN_MODEL is not None:
             if self.cfg.RESUME:
-                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft)
+                self.start_epoch = self.ckpts.resume_checkpoint(model_ft, optimizer_ft)
             else:
-                self.ckpts.resume_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft)
+                self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL, model_ft, optimizer_ft)
 
-        ## vis net graph
+        ## vis network graph
         if self.cfg.TENSORBOARD_MODEL and False:
             self.tb_writer.add_graph(model_ft, (model_ft.dummy_input.cuda(),))
 
         self.steps_per_epoch = int(dataset_sizes['train']//self.batch_size)
 
-        best_metric = 0.0
+        best_acc = 0.0
         best_perf_rst = None
-        scaler = amp.GradScaler(enabled=True)
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
                 dataloaders['train'].sampler.set_epoch(epoch)
-            self.train_epoch(scaler, epoch, model_ft, datasets['train'], dataloaders['train'], optimizer_ft)
+            self.train_epoch(scaler, epoch, model_ft,datasets['train'], dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL and (not epoch % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1):
-                metric, perf_rst = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'])
+                acc, perf_rst = self.val_epoch(epoch, model_ft,datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
-                    if best_metric < metric:
+                    if best_acc < acc:
                         self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft)
-                        best_metric = metric
+                        best_acc = acc
                         best_perf_rst = perf_rst
                         # continue
 
@@ -197,7 +306,7 @@ class Trainer:
                     self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft)
 
         if best_perf_rst is not None:
-            logger.info(best_perf_rst.replace("(val)","(best)"))
+            logger.info(best_perf_rst.replace("(val)", "(best)"))
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -213,75 +322,13 @@ class Trainer:
         performanceLogger = build_evaluator(self.cfg, dataset)
 
         for i, sample in enumerate(dataloader):
-            imgs, targets = sample['image'], sample['target']
-            _timer.tic()
-            # zero the parameter gradients
-            optimizer.zero_grad()
-
-            imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-            if isinstance(targets, list):
-                if isinstance(targets[0], torch.Tensor):
-                    targets = [t.cuda() for t in targets]
-                elif isinstance(targets[0], np.ndarray):
-                    targets = [torch.from_numpy(t).cuda() for t in targets]
-                else:
-                    targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
-            elif isinstance(targets, dict):
-                for (k, v) in targets.items():
-                    if isinstance(v, torch.Tensor):
-                        targets[k] = v.cuda()
-                    elif isinstance(v, list):
-                        if isinstance(v[0], torch.Tensor):
-                            targets[k] = [t.cuda() for t in v]
-                        elif isinstance(v[0], np.ndarray):
-                            targets[k] = [torch.from_numpy(t).cuda() for t in v]
-            else:
-                targets = targets.cuda()
-
-            # Autocast
-            with amp.autocast(enabled=True):
-                out = model(imgs, targets, prefix)
-
-            if not isinstance(out, tuple):
-                losses, predicts = out, None
-            else:
-                losses, predicts = out
-
             self.n_iters_elapsed += 1
-
-            # Scales loss.  Calls backward() on scaled loss to create scaled gradients.
-            # Backward passes under autocast are not recommended.
-            # Backward ops run in the same dtype autocast chose for corresponding forward ops.
-            scaler.scale(losses["loss"]).backward()
-            # scaler.step() first unscales the gradients of the optimizer's assigned params.
-            # If these gradients do not contain infs or NaNs, optimizer.step() is then called,
-            # otherwise, optimizer.step() is skipped.
-            scaler.step(optimizer)
-            # Updates the scale for next iteration.
-            scaler.update()
-
+            _timer.tic()
+            self.run_step(scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix)
             # torch.cuda.synchronize()
             _timer.toc()
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
-                if self.cfg.distributed:
-                    # reduce losses over all GPUs for logging purposes
-                    loss_dict_reduced = reduce_dict(losses)
-                    lossLogger.update(**loss_dict_reduced)
-                    del loss_dict_reduced
-                else:
-                    lossLogger.update(**losses)
-
-                if predicts is not None:
-                    if self.cfg.distributed:
-                        # reduce performances over all GPUs for logging purposes
-                        predicts_dict_reduced = reduce_dict(predicts)
-                        performanceLogger.update(targets, predicts_dict_reduced)
-                        del predicts_dict_reduced
-                    else:
-                        performanceLogger.update(targets, predicts)
-                    del predicts
-
                 if self.cfg.local_rank == 0:
                     template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
                     logger.info(
@@ -294,8 +341,6 @@ class Trainer:
                                 ["{}: {:.4f}".format(n, l.value) for n, l in lossLogger.meters.items() if n != "loss"]),
                         )
                     )
-
-            del imgs, targets, losses
 
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
@@ -319,53 +364,12 @@ class Trainer:
 
         with torch.no_grad():
             for sample in dataloader:
-                imgs, targets = sample['image'], sample['target']
-                imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-                if isinstance(targets, list):
-                    if isinstance(targets[0], torch.Tensor):
-                        targets = [t.cuda() for t in targets]
-                    elif isinstance(targets[0], np.ndarray):
-                        targets = [torch.from_numpy(t).cuda() for t in targets]
-                    else:
-                        targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
-                elif isinstance(targets, dict):
-                    for (k, v) in targets.items():
-                        if isinstance(v, torch.Tensor):
-                            targets[k] = v.cuda()
-                        elif isinstance(v, list):
-                            if isinstance(v[0], torch.Tensor):
-                                targets[k] = [t.cuda() for t in v]
-                            elif isinstance(v[0], np.ndarray):
-                                targets[k] = [torch.from_numpy(t).cuda() for t in v]
-                else:
-                    targets = targets.cuda()
+                self.run_step(None, model, sample, None, lossLogger, performanceLogger, prefix)
 
-                losses, predicts = model(imgs, targets, prefix)
-
-                if self.cfg.distributed:
-                    # reduce losses over all GPUs for logging purposes
-                    loss_dict_reduced = reduce_dict(losses)
-                    lossLogger.update(**loss_dict_reduced)
-                    del loss_dict_reduced
-                else:
-                    lossLogger.update(**losses)
-
-                if predicts is not None:
-                    if self.cfg.distributed:
-                        # reduce performances over all GPUs for logging purposes
-                        predicts_dict_reduced = reduce_dict(predicts)
-                        performanceLogger.update(targets, predicts_dict_reduced)
-                        del predicts_dict_reduced
-                    else:
-                        performanceLogger.update(targets, predicts)
-                    del predicts
-
-                del imgs, targets, losses
-
-        performances = performanceLogger.evaluate()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
+            performances = performanceLogger.evaluate()
             if performances is not None and len(performances):
                 # Logging val performances
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
