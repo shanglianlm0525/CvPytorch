@@ -11,12 +11,15 @@ __avalible__ = {
     'ReLU': nn.ReLU,
    'LeakyReLU': nn.LeakyReLU,
    'ReLU6': nn.ReLU6,
-   'SELU': nn.SELU,
-   'ELU': nn.ELU
+   'PReLU': nn.PReLU,
+    'Tanh': nn.Tanh,
+    'Sigmoid': nn.Sigmoid,
+    'Hardswish': nn.Hardswish,
+    'Hardshrink': nn.Hardshrink
 }
 
 
-def activate_layers(name,**params):
+def build_activate_layer(name, **params):
     assert name in __avalible__.keys()
     if name == 'LeakyReLU':
         return nn.LeakyReLU(**params, inplace=True)

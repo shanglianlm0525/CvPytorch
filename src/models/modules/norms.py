@@ -15,7 +15,7 @@ __avalible__ = {
 }
 
 
-def norm_layers(name,num_features):
+def build_norm_layer(name, num_features):
     assert name in __avalible__.keys()
     if name == 'GroupNorm':
         return __avalible__[name](num_groups=1,num_features=num_features)
