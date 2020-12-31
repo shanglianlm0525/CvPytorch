@@ -24,24 +24,24 @@ model_urls = {
 
 class ResNet(nn.Module):
 
-    def __init__(self, name='resnet50', out_stages=(1, 2, 3, 4), backbone_path=None):
+    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], backbone_path=None):
         super(ResNet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'resnet18':
+        if subtype == 'resnet18':
             backbone = resnet18(pretrained=not self.backbone_path)
             self.out_channels = [64, 128, 256, 512]
-        elif name == 'resnet34':
+        elif subtype == 'resnet34':
             backbone = resnet34(pretrained=not self.backbone_path)
             self.out_channels = [64, 128, 256, 512]
-        elif name == 'resnet50':
+        elif subtype == 'resnet50':
             backbone = resnet50(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
-        elif name == 'resnet101':
+        elif subtype == 'resnet101':
             backbone = resnet101(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
-        elif name == 'resnet152':
+        elif subtype == 'resnet152':
             backbone = resnet152(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
         else:

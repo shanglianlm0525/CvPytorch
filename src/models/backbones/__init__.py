@@ -13,9 +13,9 @@ from .squeezenet import SqueezeNet
 from .mobilenet_v2 import MobileNetV2
 from .shufflenet_v2 import ShuffleNetV2
 from .densenet import Densenet
-from .ghostnet import GhostNet
+# from .ghostnet import GhostNet
 
-__all__ = ['VGG','ResNet','ResNeXt','WideResNet','SqueezeNet','MobileNetV2','ShuffleNetV2','GhostNet']
+__all__ = ['VGG','ResNet','ResNeXt','WideResNet','SqueezeNet','MobileNetV2','ShuffleNetV2']
 
 
 def build_backbone(cfg):
@@ -35,7 +35,5 @@ def build_backbone(cfg):
         return MobileNetV2(**backbone_cfg)
     elif name == 'ShuffleNetV2':
         return ShuffleNetV2(**backbone_cfg)
-    elif name == 'GhostNet':
-        return GhostNet(**backbone_cfg)
     else:
         raise NotImplementedError

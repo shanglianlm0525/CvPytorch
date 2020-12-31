@@ -21,15 +21,15 @@ model_urls = {
 
 class WideResNet(nn.Module):
 
-    def __init__(self, name='wide_resnet50_2', out_stages=(1, 2, 3, 4), backbone_path=None):
+    def __init__(self, subtype='wide_resnet50_2', out_stages=[2, 3, 4], backbone_path=None):
         super(WideResNet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'wide_resnet50_2':
+        if subtype == 'wide_resnet50_2':
             backbone = resnext50_32x4d(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
-        elif name == 'wide_resnet101_2':
+        elif subtype == 'wide_resnet101_2':
             backbone = resnext101_32x8d(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
         else:

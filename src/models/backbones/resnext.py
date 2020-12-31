@@ -21,15 +21,15 @@ model_urls = {
 
 class ResNeXt(nn.Module):
 
-    def __init__(self, name='resnext50_32x4d', out_stages=(1, 2, 3, 4), backbone_path=None):
+    def __init__(self, subtype='resnext50_32x4d', out_stages=[2, 3, 4], backbone_path=None):
         super(ResNeXt, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'resnext50_32x4d':
+        if subtype == 'resnext50_32x4d':
             backbone = resnext50_32x4d(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
-        elif name == 'resnext101_32x8d':
+        elif subtype == 'resnext101_32x8d':
             backbone = resnext101_32x8d(pretrained=not self.backbone_path)
             self.out_channels = [256, 512, 1024, 2048]
         else:

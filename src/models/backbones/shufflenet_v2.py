@@ -13,23 +13,28 @@ from torchvision.models import shufflenet_v2_x0_5, shufflenet_v2_x1_0, shufflene
     https://arxiv.org/abs/1807.11164
 """
 
+model_urls = {
+    'shufflenetv2_x0.5': 'https://download.pytorch.org/models/shufflenetv2_x0.5-f707e7126e.pth',
+    'shufflenetv2_x1.0': 'https://download.pytorch.org/models/shufflenetv2_x1-5666bf0f80.pth',
+}
+
 class ShuffleNetV2(nn.Module):
 
-    def __init__(self, name='shufflenet_v2_x1_0', out_stages=(2,3,4), backbone_path=None):
+    def __init__(self, subtype='shufflenet_v2_x1_0', out_stages=[2,3,4], backbone_path=None):
         super(ShuffleNetV2, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'shufflenet_v2_x0_5':
+        if subtype == 'shufflenet_v2_x0_5':
             self.backbone = shufflenet_v2_x0_5(pretrained=not self.backbone_path)
             self.out_channels = [24, 48, 96, 192, 1024]
-        elif name == 'shufflenet_v2_x1_0':
+        elif subtype == 'shufflenet_v2_x1_0':
             self.backbone = shufflenet_v2_x1_0(pretrained=not self.backbone_path)
             self.out_channels = [24, 116, 232, 464, 1024]
-        elif name == 'shufflenet_v2_x1_5':
+        elif subtype == 'shufflenet_v2_x1_5':
             self.backbone = shufflenet_v2_x1_5(pretrained=not self.backbone_path)
             self.out_channels = [24, 176, 352, 704, 1024]
-        elif name == 'shufflenet_v2_x2_0':
+        elif subtype == 'shufflenet_v2_x2_0':
             self.backbone = shufflenet_v2_x2_0(pretrained=not self.backbone_path)
             self.out_channels = [24, 244, 488, 976, 2048]
         else:
@@ -62,10 +67,7 @@ class ShuffleNetV2(nn.Module):
     def init_weights(self):
         for name, m in self.named_modules():
             if isinstance(m, nn.Conv2d):
-                if 'first' in name:
-                    nn.init.normal_(m.weight, 0, 0.01)
-                else:
-                    nn.init.normal_(m.weight, 0, 1.0 / m.weight.shape[1])
+                nn.init.normal_(m.weight, 0, 1.0 / m.weight.shape[1])
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):

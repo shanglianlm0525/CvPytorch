@@ -15,12 +15,12 @@ from torchvision.models.mobilenet import mobilenet_v2
 
 class MobileNetV2(nn.Module):
 
-    def __init__(self, name='mobilenet_v2', out_stages=(2, 3, 5, 7), backbone_path=None):
+    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], backbone_path=None):
         super(MobileNetV2, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'mobilenet_v2':
+        if subtype == 'mobilenet_v2':
             features = mobilenet_v2(pretrained=not self.backbone_path).features
             self.out_channels = [16, 24, 32, 64, 96, 160, 320]
         else:

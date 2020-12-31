@@ -17,7 +17,7 @@ from .fpn import FPN
 class PAN(FPN):
     '''modified from MMDetection'''
 
-    def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2):
+    def __init__(self, in_channels, out_channels, add_extra_levels=False, extra_levels=2):
         super().__init__(in_channels,out_channels, add_extra_levels, extra_levels)
         self.init_weights()
 

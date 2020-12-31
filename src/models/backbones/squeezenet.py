@@ -19,12 +19,12 @@ model_urls = {
 
 class SqueezeNet(nn.Module):
 
-    def __init__(self, name='squeezenet1_1', out_stages=(1, 2, 3), backbone_path=None):
+    def __init__(self, subtype='squeezenet1_1', out_stages=[1, 2, 3], backbone_path=None):
         super(SqueezeNet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'squeezenet1_1':
+        if subtype == 'squeezenet1_1':
             features = squeezenet1_1(pretrained=not self.backbone_path).features
             self.out_channels = [128, 256, 512]
         else:

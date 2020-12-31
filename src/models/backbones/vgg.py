@@ -26,21 +26,21 @@ model_urls = {
 
 class VGG(nn.Module):
 
-    def __init__(self, name='vgg16', out_stages=(1,2,3,4), backbone_path=None):
+    def __init__(self, subtype='vgg16', out_stages=[2,3,4], backbone_path=None):
         super(VGG, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        if name == 'vgg11':
+        if subtype == 'vgg11':
             features = vgg11_bn(pretrained=not self.backbone_path).features
             self.out_channels = [128, 256, 512, 512]
-        elif name == 'vgg13':
+        elif subtype == 'vgg13':
             features = vgg13_bn(pretrained=not self.backbone_path).features
             self.out_channels = [128, 256, 512, 512]
-        elif name == 'vgg16':
+        elif subtype == 'vgg16':
             features = vgg16_bn(pretrained=not self.backbone_path).features
             self.out_channels = [128, 256, 512, 512]
-        elif name == 'vgg19':
+        elif subtype == 'vgg19':
             features = vgg19_bn(pretrained=not self.backbone_path).features
             self.out_channels = [128, 256, 512, 512]
         else:
