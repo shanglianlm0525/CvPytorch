@@ -15,7 +15,7 @@ from .shufflenet_v2 import ShuffleNetV2
 from .densenet import Densenet
 from .ghostnet import GhostNet
 
-__all__ = ['','','']
+__all__ = ['VGG','ResNet','ResNeXt','WideResNet','SqueezeNet','MobileNetV2','ShuffleNetV2','GhostNet']
 
 
 def build_backbone(cfg):
