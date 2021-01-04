@@ -17,9 +17,9 @@ class ScaleExp(nn.Module):
         return torch.exp(x*self.scale)
 
 
-class ClsCntRegHead(nn.Module):
+class FcosHead(nn.Module):
     def __init__(self, in_channel, class_num, prior=0.01, cnt_on_reg=True):
-        super(ClsCntRegHead, self).__init__()
+        super(FcosHead, self).__init__()
         self.prior = prior
         self.class_num = class_num
         self.cnt_on_reg = cnt_on_reg
