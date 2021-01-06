@@ -14,7 +14,7 @@ from .norms import build_norm_layer
 
 class ConvModule(nn.Module):
     '''A conv block that bundles conv/norm/activation layers.'''
-    def __init__(self,in_channels,out_channels,kernel_size,stride=1,
+    def __init__(self,in_channels,out_channels,kernel_size=3,stride=1,
                  padding=0,dilation=1,groups=1,bias=False,norm=None,activation=None):
         super(ConvModule, self).__init__()
         self.norm = norm
@@ -47,17 +47,18 @@ class ConvModule(nn.Module):
         return out
 
 
-class DepthwiseConvModule(nn.Module):
-    def __init__(self):
-        super(DepthwiseConvModule, self).__init__()
+class DepthwiseConvModule(ConvModule):
+    def __init__(self,in_channels,out_channels,kernel_size=3,stride=1,
+                 padding=0,dilation=1,bias=False,norm=None,activation=None):
+        super(DepthwiseConvModule, self).__init__(in_channels,in_channels,kernel_size,stride,
+                 padding, dilation, in_channels, bias, norm, activation)
 
-    def forward(self, x):
-        pass
+
+class PointwiseConvModule(ConvModule):
+    def __init__(self,in_channels,out_channels,kernel_size=1,stride=1,
+                 padding=0,dilation=1,groups=1,bias=False,norm=None,activation=None):
+        super(PointwiseConvModule, self).__init__(in_channels,out_channels,kernel_size,stride,
+                 padding, dilation, groups, bias, norm, activation)
 
 
-class PointConvModule(nn.Module):
-    def __init__(self):
-        super(PointConvModule, self).__init__()
 
-    def forward(self, x):
-        pass

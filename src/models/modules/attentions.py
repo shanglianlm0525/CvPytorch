@@ -328,7 +328,7 @@ class SplitAttention(nn.Module):
     def forward(self, x):
         pass
 
-'''
+
 class SplAtConv2d(Module):
     """Split-Attention Conv2d
     """
@@ -398,7 +398,7 @@ class SplAtConv2d(Module):
         else:
             out = atten * x
         return out.contiguous()
-'''
+
 
 class FCABlock(nn.Module):
     """
