@@ -46,13 +46,12 @@ class CocoDetection(Dataset):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
         self.stage = stage
-
         self.num_classes = len(self.dictionary)
 
         self.img_path = data_cfg.IMG_DIR
         self.ann_path = os.path.join(data_cfg.LABELS.DET_DIR, 'instances_{}.json'.format(os.path.basename(data_cfg.IMG_DIR)))
 
-        self.input_size = [800, 1333]
+        self.input_size = [320, 320]
         if self.stage=='train':
             pipeline = {'perspective': 0.0,
                       'scale': [0.6, 1.4],
@@ -108,7 +107,30 @@ class CocoDetection(Dataset):
         self.cats = self.coco_api.loadCats(self.cat_ids)
         self.img_ids = sorted(self.coco_api.imgs.keys())
         img_info = self.coco_api.loadImgs(self.img_ids)
+
+        # check annos, filtering invalid data
+        valid_img_ids = []
+        for id in self.img_ids:
+            ann_id = self.coco_api.getAnnIds(imgIds=id, iscrowd=None)
+            ann = self.coco_api.loadAnns(ann_id)
+            if self._has_valid_annotation(ann):
+                valid_img_ids.append(id)
+        self.img_ids = valid_img_ids
+
         return img_info
+
+    def _has_only_empty_bbox(self,annot):
+        return all(any(o <= 1 for o in obj['bbox'][2:]) for obj in annot)
+
+
+    def _has_valid_annotation(self,annot):
+        if len(annot) == 0:
+            return False
+
+        if self._has_only_empty_bbox(annot):
+            return False
+
+        return True
 
     def get_img_annotation(self, idx):
         """
@@ -176,10 +198,7 @@ class CocoDetection(Dataset):
         image_path = os.path.join(self.img_path, file_name)
         img = cv2.imread(image_path)
         ann = self.get_img_annotation(idx)
-        meta = dict(img=img,
-                    img_info=img_info,
-                    gt_bboxes=ann['bboxes'],
-                    gt_labels=ann['labels'])
+        meta = dict(img=img, img_info=img_info, gt_bboxes=ann['bboxes'], gt_labels=ann['labels'])
         if self.use_instance_mask:
             meta['gt_masks'] = ann['masks']
         if self.use_keypoint:
