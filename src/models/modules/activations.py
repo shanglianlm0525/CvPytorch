@@ -22,9 +22,9 @@ __avalible__ = {
 def build_activate_layer(name, **params):
     assert name in __avalible__.keys()
     if name == 'LeakyReLU':
-        return nn.LeakyReLU(**params, inplace=True)
+        return nn.LeakyReLU(**params, inplace=False)
     else:
-        return __avalible__[name](inplace=True)
+        return __avalible__[name](inplace=False)
 
 
 
