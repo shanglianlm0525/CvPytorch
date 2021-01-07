@@ -47,7 +47,9 @@ class ResNet(nn.Module):
         else:
             raise NotImplementedError
 
-        self.conv1 = nn.Sequential(*list(backbone.children())[0:3])
+        self.conv1 = nn.Sequential(list(backbone.children())[0])
+        self.bn1 = nn.Sequential(list(backbone.children())[1])
+        self.act1 = nn.Sequential(list(backbone.children())[2])
         self.maxpool = nn.Sequential(list(backbone.children())[3])
         self.layer1 = nn.Sequential(list(backbone.children())[4])
         self.layer2 = nn.Sequential(list(backbone.children())[5])
