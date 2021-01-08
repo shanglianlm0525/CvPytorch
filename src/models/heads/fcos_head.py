@@ -18,30 +18,30 @@ class ScaleExp(nn.Module):
 
 
 class FcosHead(nn.Module):
-    def __init__(self, in_channel, class_num, prior=0.01, cnt_on_reg=True):
+    def __init__(self, in_channel, num_classes, prior=0.01, cnt_on_reg=True):
         super(FcosHead, self).__init__()
         self.prior = prior
-        self.class_num = class_num
+        self.num_classes = num_classes
         self.cnt_on_reg = cnt_on_reg
 
         cls_branch = []
         reg_branch = []
 
         for i in range(4):
-            cls_branch.append(nn.Conv2d(in_channel, in_channel, kernel_size=3, padding=1, bias=True))
+            cls_branch.append(nn.Conv2d(in_channel, in_channel, kernel_size=3, stride=1, padding=1, bias=True))
             cls_branch.append(nn.GroupNorm(32, in_channel))
             cls_branch.append(nn.ReLU(True))
 
-            reg_branch.append(nn.Conv2d(in_channel, in_channel, kernel_size=3, padding=1, bias=True))
+            reg_branch.append(nn.Conv2d(in_channel, in_channel, kernel_size=3, stride=1, padding=1, bias=True))
             reg_branch.append(nn.GroupNorm(32, in_channel))
             reg_branch.append(nn.ReLU(True))
 
         self.cls_conv = nn.Sequential(*cls_branch)
         self.reg_conv = nn.Sequential(*reg_branch)
 
-        self.cls_logits = nn.Conv2d(in_channel, class_num, kernel_size=3, padding=1)
-        self.cnt_logits = nn.Conv2d(in_channel, 1, kernel_size=3, padding=1)
-        self.reg_pred = nn.Conv2d(in_channel, 4, kernel_size=3, padding=1)
+        self.cls_logits = nn.Conv2d(in_channel, self.num_classes, kernel_size=3, stride=1, padding=1)
+        self.cnt_logits = nn.Conv2d(in_channel, 1, kernel_size=3, stride=1, padding=1)
+        self.reg_pred = nn.Conv2d(in_channel, 4, kernel_size=3, stride=1, padding=1)
 
         self.apply(self.init_conv_RandomNormal)
 
