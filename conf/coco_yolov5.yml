@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'COCO_NANODET'
+EXPERIMENT_NAME: 'COCO_Yolov5'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -15,7 +15,7 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 4
     NUM_WORKER: 4
-    INPUT_SIZE: [320, 320]
+    INPUT_SIZE: [640, 640]
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -29,7 +29,7 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 1
     NUM_WORKER: 1
-    INPUT_SIZE: [320, 320]
+    INPUT_SIZE: [640, 640]
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -38,7 +38,7 @@ DATASET:
 
   TRANSFORMS:
     CenterCrop:
-      crop_size: [600, 800]
+      crop_size: [640, 640]
     ToTensor:
     ToBGR:
     ImageSubtract128:
@@ -47,7 +47,7 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.nanodet.NANODET'
+USE_MODEL: 'src.models.yolov5.YOLOV5'
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mAP'
@@ -57,7 +57,6 @@ EVALUATOR:
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
-## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'
 N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
@@ -67,10 +66,10 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 70
 
-INIT_LR: 0.14
+INIT_LR: 0.01
 SCALE_LR:
   ENABLED: False
   VAL: 256 # Scale learning rate based on global batch size
@@ -96,6 +95,7 @@ WARMUP:
   ITERS: 10
   FACTOR: 0.1
 
+
 #########################################
 # GRAD_CLIP Configurations
 #########################################
@@ -103,11 +103,11 @@ GRAD_CLIP:
   TYPE: 'norm'
   VALUE: 5
 
+
 #########################################
 # Logging / Visualization Configurations
 #########################################
-
-N_ITERS_TO_DISPLAY_STATUS: 100
+N_ITERS_TO_DISPLAY_STATUS: 20
 
 ## TENSORBOARD
 TENSORBOARD: True

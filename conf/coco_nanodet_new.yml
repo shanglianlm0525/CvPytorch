@@ -1,8 +1,6 @@
 EXPERIMENT_NAME: 'COCO_NANODET'
 
-#########################################
-# Dataset / Transforms Configurations
-#########################################
+## DATASET
 DATASET:
   CLASS: 'src.datasets.nanodet_coco.CocoDetection'
   DICTIONARY: 'conf/dicts/coco_dict.yml'
@@ -12,9 +10,9 @@ DATASET:
     IMG_DIR: '/home/lmin/data/coco/images/train2017'
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
-    SHUFFLE: False
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    SHUFFLE: True
+    BATCH_SIZE: 16
+    NUM_WORKER: 8
     INPUT_SIZE: [320, 320]
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
@@ -47,7 +45,7 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.nanodet.NANODET'
+USE_MODEL: 'src.models.nanodet_new.NanoDet'
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mAP'
