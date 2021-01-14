@@ -3,16 +3,179 @@
 # @Time : 2021/1/8 16:15
 # @Author : liumin
 # @File : yolov5.py
+
 from copy import deepcopy
 from pathlib import Path
-
+import time
 import torch
 import torch.nn as nn
 import numpy as np
 import math
+import torchvision
+
 from CvPytorch.src.models.detects.yolov5_detect import Detect
 from CvPytorch.src.models.yolov5_model import parse_model, check_anchor_order, initialize_weights
 
+
+def clip_coords(boxes, img_shape):
+    # Clip bounding xyxy bounding boxes to image shape (height, width)
+    boxes[:, 0].clamp_(0, img_shape[1])  # x1
+    boxes[:, 1].clamp_(0, img_shape[0])  # y1
+    boxes[:, 2].clamp_(0, img_shape[1])  # x2
+    boxes[:, 3].clamp_(0, img_shape[0])  # y2
+
+def box_iou(box1, box2):
+    # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
+    """
+    Return intersection-over-union (Jaccard index) of boxes.
+    Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
+    Arguments:
+        box1 (Tensor[N, 4])
+        box2 (Tensor[M, 4])
+    Returns:
+        iou (Tensor[N, M]): the NxM matrix containing the pairwise
+            IoU values for every element in boxes1 and boxes2
+    """
+
+    def box_area(box):
+        # box = 4xn
+        return (box[2] - box[0]) * (box[3] - box[1])
+
+    area1 = box_area(box1.T)
+    area2 = box_area(box2.T)
+
+    # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
+    inter = (torch.min(box1[:, None, 2:], box2[:, 2:]) - torch.max(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
+    return inter / (area1[:, None] + area2 - inter)  # iou = inter / (area1 + area2 - inter)
+
+def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, merge=False, classes=None, agnostic=False):
+    """Performs Non-Maximum Suppression (NMS) on inference results
+
+    Returns:
+         detections with shape: nx6 (x1, y1, x2, y2, conf, cls)
+    """
+    if prediction.dtype is torch.float16:
+        prediction = prediction.float()  # to FP32
+
+    nc = prediction[0].shape[1] - 5  # number of classes
+    xc = prediction[..., 4] > conf_thres  # candidates
+
+    # Settings
+    min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
+    max_det = 300  # maximum number of detections per image
+    time_limit = 10.0  # seconds to quit after
+    redundant = True  # require redundant detections
+    multi_label = nc > 1  # multiple labels per box (adds 0.5ms/img)
+
+    t = time.time()
+    output = [None] * prediction.shape[0]
+    for xi, x in enumerate(prediction):  # image index, image inference
+        # Apply constraints
+        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
+        x = x[xc[xi]]  # confidence
+
+        # If none remain process next image
+        if not x.shape[0]:
+            continue
+
+        # Compute conf
+        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
+
+        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
+        box = xywh2xyxy(x[:, :4])
+
+        # Detections matrix nx6 (xyxy, conf, cls)
+        if multi_label:
+            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+        else:  # best class only
+            conf, j = x[:, 5:].max(1, keepdim=True)
+            x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
+
+        # Filter by class
+        if classes:
+            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
+
+        # Apply finite constraint
+        # if not torch.isfinite(x).all():
+        #     x = x[torch.isfinite(x).all(1)]
+
+        # If none remain process next image
+        n = x.shape[0]  # number of boxes
+        if not n:
+            continue
+
+        # Sort by confidence
+        # x = x[x[:, 4].argsort(descending=True)]
+
+        # Batched NMS
+        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
+        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
+        i = torchvision.ops.boxes.nms(boxes, scores, iou_thres)
+        if i.shape[0] > max_det:  # limit detections
+            i = i[:max_det]
+        if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+            try:  # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
+                iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
+                weights = iou * scores[None]  # box weights
+                x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
+                if redundant:
+                    i = i[iou.sum(1) > 1]  # require redundancy
+            except:  # possible CUDA error https://github.com/ultralytics/yolov3/issues/1139
+                print(x, i, x.shape, i.shape)
+                pass
+
+        output[xi] = x[i]
+        if (time.time() - t) > time_limit:
+            break  # time limit exceeded
+
+    return output
+
+
+def warp_boxes(boxes, M, width, height):
+    n = len(boxes)
+    if n:
+        # warp points
+        xy = np.ones((n * 4, 3))
+        xy[:, :2] = boxes[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+        xy = xy @ M.T  # nanodet_transform
+        xy = (xy[:, :2] / xy[:, 2:3]).reshape(n, 8)  # rescale
+        # create new boxes
+        x = xy[:, [0, 2, 4, 6]]
+        y = xy[:, [1, 3, 5, 7]]
+        xy = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
+        # clip boxes
+        xy[:, [0, 2]] = xy[:, [0, 2]].clip(0, width)
+        xy[:, [1, 3]] = xy[:, [1, 3]].clip(0, height)
+        return xy.astype(np.float32)
+    else:
+        return boxes
+
+
+def post_process(pred, meta, num_classes):
+    preds = {}
+    warp_matrix = meta['warp_matrix'][0] if isinstance(meta['warp_matrix'], list) else meta['warp_matrix']
+    warp_matrix = warp_matrix.cpu().numpy() if isinstance(warp_matrix, torch.Tensor) else warp_matrix
+    img_height = meta['img_info']['height'].cpu().numpy() \
+        if isinstance(meta['img_info']['height'], torch.Tensor) else meta['img_info']['height']
+    img_width = meta['img_info']['width'].cpu().numpy() \
+        if isinstance(meta['img_info']['width'], torch.Tensor) else meta['img_info']['width']
+    for pd in pred: # (x1, y1, x2, y2, conf, cls)
+        pd = pd.cpu().numpy()
+        print('pd.shape',pd.shape())
+        print('warp_matrix.shape', warp_matrix.shape())
+        print('np.linalg.inv(warp_matrix).shape', np.linalg.inv(warp_matrix))
+        print('img_width',img_width)
+        print('img_height',img_height)
+        pd[:, :4] = warp_boxes(pd[:,:4], np.linalg.inv(warp_matrix), img_width, img_height)
+        for i in range(num_classes):
+            inds = (pd[:,5] == i)
+            preds[i] = np.concatenate([pd[inds, :4].astype(np.float32),
+                pd[inds, 4:5].astype(np.float32)], axis=1).tolist()
+    return preds
+
+
+##########################################################
 
 def xyxy2xywh(x):
     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
@@ -312,16 +475,6 @@ class YOLOV5(nn.Module):
 
             return
         else:
-            losses = {}
-
-            x = imgs
-            y = []  # outputs
-            for i, m in enumerate(self.model):
-                if m.f != -1:  # if not from previous layer
-                    x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
-                x = m(x)  # run
-                y.append(x if m.i in self.save else None)  # save output
-
             bboxes = targets['gt_bboxes']
             for bbox, img in zip(bboxes, imgs):
                 bbox[:, :] = xyxy2xywh(bbox[:, :])  # convert xyxy to xywh
@@ -331,13 +484,31 @@ class YOLOV5(nn.Module):
             gts = None
             for i, (lbl, bbox) in enumerate(zip(targets['gt_labels'], bboxes)):
                 gt = torch.cat([torch.as_tensor(i).to(lbl.device).repeat(lbl.shape[0]).unsqueeze(1),
-                               lbl.unsqueeze(1), bbox], dim=1)
+                                lbl.unsqueeze(1), bbox], dim=1)
                 if i == 0:
                     gts = gt
                 else:
                     gts = torch.cat([gts, gt], dim=0)
 
-            loss, loss_items = compute_loss(x, gts, self.model, self._num_classes)  # scaled by batch_size
+
+            nb, _, height, width = imgs.shape
+
+            losses = {}
+            outs = imgs
+            y = []  # outputs
+            for i, m in enumerate(self.model):
+                if m.f != -1:  # if not from previous layer
+                    outs = y[m.f] if isinstance(m.f, int) else [outs if j == -1 else y[j] for j in m.f]  # from earlier layers
+                outs = m(outs)  # run
+                y.append(outs if m.i in self.save else None)  # save output
+
+
+            if mode == 'val':
+                inf_out, train_out = outs
+                loss, loss_items = compute_loss([t.float() for t in train_out], gts, self.model, self._num_classes)  # scaled by batch_size
+            else:
+                inf_out, train_out = None, outs
+                loss, loss_items = compute_loss(train_out, gts, self.model,self._num_classes)  # scaled by batch_size
 
             losses['bbox_loss'] = loss_items[0]
             losses['obj_loss'] = loss_items[1]
@@ -345,7 +516,18 @@ class YOLOV5(nn.Module):
             losses['loss'] = loss
 
             if mode == 'val':
-                return losses
-            else:
+                conf_thres = 0.001
+                iou_thres = 0.6  # for NMS
+                merge = False
+                # output (x1, y1, x2, y2, conf, cls)
+                output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres, merge=merge)
 
+                for si, pred in enumerate(output):
+                    # Clip boxes to image bounds
+                    clip_coords(pred, (height, width))
+                    dets = post_process(pred,targets,self._num_classes)
+                return losses, dets
+            else:
                 return losses
+
+
