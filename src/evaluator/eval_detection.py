@@ -207,9 +207,14 @@ class COCOEvaluator(object):
                              ,'Recall_1', 'Recall_10', 'Recall_100', 'Recall_small', 'Recall_medium', 'Recall_large']
 
     def update(self, gt, preds):
-        self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
+        # self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
+        if isinstance(preds, list):
+            for i, pred in enumerate(preds):
+                self.rsts[gt['img_info']['id'].cpu().numpy()[i]] = pred
+        else:
+            self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
 
-    def rsts2json(self, results):
+    def rsts2json(self):
         """
         results: {image_id: {label: [bboxes...] } }
         :return coco json format: {image_id:
@@ -218,7 +223,9 @@ class COCOEvaluator(object):
                                    score: }
         """
         json_rsts = []
-        for image_id, dets in results.items():
+        for image_id, dets in self.rsts.items():
+            if dets is None:
+                continue
             for label, bboxes in dets.items():
                 category_id = self.cat_ids[label]
                 for bbox in bboxes:
@@ -232,7 +239,7 @@ class COCOEvaluator(object):
         return json_rsts
 
     def CocoEvaluate(self):
-        rsts_json = self.rsts2json(self.rsts)
+        rsts_json = self.rsts2json()
         json_path = 'rst_coco.json'
         json.dump(rsts_json, open(json_path, 'w'))
         coco_dets = self.coco_api.loadRes(json_path)

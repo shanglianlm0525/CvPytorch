@@ -152,26 +152,13 @@ def warp_boxes(boxes, M, width, height):
         return boxes
 
 
-def post_process(pred, meta, num_classes):
+def post_process(pred, warp_matrix,height,width, num_classes):
     preds = {}
-    warp_matrix = meta['warp_matrix'][0] if isinstance(meta['warp_matrix'], list) else meta['warp_matrix']
-    warp_matrix = warp_matrix.cpu().numpy() if isinstance(warp_matrix, torch.Tensor) else warp_matrix
-    img_height = meta['img_info']['height'].cpu().numpy() \
-        if isinstance(meta['img_info']['height'], torch.Tensor) else meta['img_info']['height']
-    img_width = meta['img_info']['width'].cpu().numpy() \
-        if isinstance(meta['img_info']['width'], torch.Tensor) else meta['img_info']['width']
-    for pd in pred: # (x1, y1, x2, y2, conf, cls)
-        pd = pd.cpu().numpy()
-        print('pd.shape',pd.shape())
-        print('warp_matrix.shape', warp_matrix.shape())
-        print('np.linalg.inv(warp_matrix).shape', np.linalg.inv(warp_matrix))
-        print('img_width',img_width)
-        print('img_height',img_height)
-        pd[:, :4] = warp_boxes(pd[:,:4], np.linalg.inv(warp_matrix), img_width, img_height)
-        for i in range(num_classes):
-            inds = (pd[:,5] == i)
-            preds[i] = np.concatenate([pd[inds, :4].astype(np.float32),
-                pd[inds, 4:5].astype(np.float32)], axis=1).tolist()
+    pred[:, :4] = warp_boxes(pred[:,:4], np.linalg.inv(warp_matrix), width, height)
+    for i in range(num_classes):
+        inds = (pred[:,5] == i)
+        preds[i] = np.concatenate([pred[inds, :4].astype(np.float32),
+            pred[inds, 4:5].astype(np.float32)], axis=1).tolist()
     return preds
 
 
@@ -470,7 +457,13 @@ class YOLOV5(nn.Module):
         [training] list  batch_imgs,batch_boxes,batch_classes
         [inference] img
         '''
+        imgs0 = torch.load('/home/lmin/pythonCode/yolov5/img.pt')
+        targets0 = torch.load('/home/lmin/pythonCode/yolov5/targets.pt')
+        inf_out0 = torch.load('/home/lmin/pythonCode/yolov5/inf_out.pt')
+        train_out0 = torch.load('/home/lmin/pythonCode/yolov5/train_out.pt')
+        output0 = torch.load('/home/lmin/pythonCode/yolov5/output.pt')
 
+        nb, _, img_height, img_width = imgs.shape  # batch size, channels, height, width
         if mode == 'infer':
 
             return
@@ -491,8 +484,6 @@ class YOLOV5(nn.Module):
                     gts = torch.cat([gts, gt], dim=0)
 
 
-            nb, _, height, width = imgs.shape
-
             losses = {}
             outs = imgs
             y = []  # outputs
@@ -502,7 +493,7 @@ class YOLOV5(nn.Module):
                 outs = m(outs)  # run
                 y.append(outs if m.i in self.save else None)  # save output
 
-
+            # gts = targets0
             if mode == 'val':
                 inf_out, train_out = outs
                 loss, loss_items = compute_loss([t.float() for t in train_out], gts, self.model, self._num_classes)  # scaled by batch_size
@@ -522,11 +513,20 @@ class YOLOV5(nn.Module):
                 # output (x1, y1, x2, y2, conf, cls)
                 output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres, merge=merge)
 
-                for si, pred in enumerate(output):
-                    # Clip boxes to image bounds
-                    clip_coords(pred, (height, width))
-                    dets = post_process(pred,targets,self._num_classes)
-                return losses, dets
+                dets_list = []
+                for si,(pred, warp_matrix,height,width) in enumerate(zip(output, targets['warp_matrix'], targets['img_info']['height'],targets['img_info']['width'])):
+                    dets = None
+                    if pred is not None:
+                        # Clip boxes to image bounds
+                        clip_coords(pred, (img_height, img_width))
+                        pred = pred.cpu().numpy()
+                        warp_matrix = warp_matrix.cpu().numpy() if isinstance(warp_matrix, torch.Tensor) else warp_matrix
+                        height = height.cpu().numpy() if isinstance(height, torch.Tensor) else height
+                        width = width.cpu().numpy() if isinstance(width, torch.Tensor) else width
+
+                        dets = post_process(pred,warp_matrix,height,width,self._num_classes)
+                    dets_list.append(dets)
+                return losses, dets_list
             else:
                 return losses
 
