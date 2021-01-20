@@ -107,13 +107,14 @@ class YOLOv5Neck(nn.Module):
 
 
 if __name__ == '__main__':
-    import torch
-    in_channels = [2, 3, 5, 7]
-    scales = [340, 170, 84, 43]
+    in_channels = [256, 512, 1024]
+    out_channels = [128, 256, 512]
+    scales = [32, 16, 8]
     inputs = [torch.rand(1, c, s, s) for c, s in zip(in_channels, scales)]
     for i in range(len(inputs)):
         print(f'inputs[{i}].shape = {inputs[i].shape}')
-    self = YOLOv5Neck(in_channels, 11, True).eval()
-    outputs = self.forward(inputs)
+    model = YOLOv5Neck(in_channels, out_channels)
+    print(model)
+    outputs = model(inputs)
     for i in range(len(outputs)):
         print(f'outputs[{i}].shape = {outputs[i].shape}')
