@@ -35,10 +35,10 @@ class MobileNetV2(nn.Module):
         self.stage6 = nn.Sequential(*list(features.children())[14:17])
         self.stage7 = nn.Sequential(list(features.children())[17])
 
-        self.init_weights()
-
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

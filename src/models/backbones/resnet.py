@@ -56,10 +56,10 @@ class ResNet(nn.Module):
         self.layer3 = nn.Sequential(list(backbone.children())[6])
         self.layer4 = nn.Sequential(list(backbone.children())[7])
 
-        self.init_weights()
-
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

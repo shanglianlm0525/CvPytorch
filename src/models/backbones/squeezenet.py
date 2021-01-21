@@ -35,10 +35,10 @@ class SqueezeNet(nn.Module):
         self.layer2 = nn.Sequential(*list(features.children())[5:8])
         self.layer3 = nn.Sequential(*list(features.children())[8:13])
 
-        self.init_weights()
-
         if self.backbone_path:
             self.features.load_state_dict(torch.load(self.backbone_path))
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

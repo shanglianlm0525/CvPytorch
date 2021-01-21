@@ -52,10 +52,10 @@ class VGG(nn.Module):
         self.layer3 = nn.Sequential(*list(features.children())[24:34])
         self.layer4 = nn.Sequential(*list(features.children())[34:43])
 
-        self.init_weights()
-
         if self.backbone_path:
             self.features.load_state_dict(torch.load(self.backbone_path))
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

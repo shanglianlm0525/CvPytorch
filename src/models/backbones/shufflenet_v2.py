@@ -40,10 +40,10 @@ class ShuffleNetV2(nn.Module):
         else:
             raise NotImplementedError
 
-        self.init_weights()
-
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
+        else:
+            self.init_weights()
 
 
     def forward(self, x):
