@@ -57,17 +57,6 @@ def get_class_name(full_class_name):
     return full_class_name.split(".")[-1]
 
 
-def clip_grad(cfg, model):
-    if cfg.GRAD_CLIP.TYPE == "norm":
-        clip_method = clip_grad_norm_
-    elif cfg.GRAD_CLIP.TYPE == "value":
-        clip_method = clip_grad_value_
-    else:
-        raise NotImplementedError
-
-    clip_method(model.parameters(), cfg.GRAD_CLIP.VALUE)
-
-
 # logger = logging.getLogger("pytorch")
 
 class Trainer:
@@ -125,6 +114,18 @@ class Trainer:
 
         return model
 
+    def clip_grad(self, model):
+        if self.cfg.GRAD_CLIP.TYPE == "norm":
+            clip_method = clip_grad_norm_
+        elif self.cfg.GRAD_CLIP.TYPE == "value":
+            clip_method = clip_grad_value_
+        else:
+            raise ValueError(
+                f"Only support 'norm' and 'value' as the grad_clip type, but {self.cfg.GRAD_CLIP.TYPE} is given."
+            )
+
+        clip_method(model.parameters(), self.cfg.GRAD_CLIP.VALUE)
+
     def run_step(self, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
         '''
             Training step including forward
@@ -173,6 +174,10 @@ class Trainer:
             # Backward passes under autocast are not recommended.
             # Backward ops run in the same dtype autocast chose for corresponding forward ops.
             scaler.scale(losses["loss"]).backward()
+
+            if self.cfg.GRAD_CLIP:
+                self.clip_grad(model)
+
             # scaler.step() first unscales the gradients of the optimizer's assigned params.
             # If these gradients do not contain infs or NaNs, optimizer.step() is then called,
             # otherwise, optimizer.step() is skipped.
