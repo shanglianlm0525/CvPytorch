@@ -457,24 +457,19 @@ class YOLOV5(nn.Module):
         [training] list  batch_imgs,batch_boxes,batch_classes
         [inference] img
         '''
-        imgs0 = torch.load('/home/lmin/pythonCode/yolov5/img.pt')
-        targets0 = torch.load('/home/lmin/pythonCode/yolov5/targets.pt')
-        inf_out0 = torch.load('/home/lmin/pythonCode/yolov5/inf_out.pt')
-        train_out0 = torch.load('/home/lmin/pythonCode/yolov5/train_out.pt')
-        output0 = torch.load('/home/lmin/pythonCode/yolov5/output.pt')
-
         nb, _, img_height, img_width = imgs.shape  # batch size, channels, height, width
         if mode == 'infer':
 
             return
         else:
+            # trans standard gt to specific formats for compute loss
             bboxes = targets['gt_bboxes']
+            gts = None
             for bbox, img in zip(bboxes, imgs):
                 bbox[:, :] = xyxy2xywh(bbox[:, :])  # convert xyxy to xywh
                 bbox[:, [0, 2]] /= img.shape[2]  # normalized width 0-1
                 bbox[:, [1, 3]] /= img.shape[1]  # normalized height 0-1
 
-            gts = None
             for i, (lbl, bbox) in enumerate(zip(targets['gt_labels'], bboxes)):
                 gt = torch.cat([torch.as_tensor(i).to(lbl.device).repeat(lbl.shape[0]).unsqueeze(1),
                                 lbl.unsqueeze(1), bbox], dim=1)
@@ -509,9 +504,8 @@ class YOLOV5(nn.Module):
             if mode == 'val':
                 conf_thres = 0.001
                 iou_thres = 0.6  # for NMS
-                merge = False
                 # output (x1, y1, x2, y2, conf, cls)
-                output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres, merge=merge)
+                output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
 
                 dets_list = []
                 for si,(pred, warp_matrix,height,width) in enumerate(zip(output, targets['warp_matrix'], targets['img_info']['height'],targets['img_info']['width'])):
