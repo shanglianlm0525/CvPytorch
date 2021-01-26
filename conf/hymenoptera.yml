@@ -70,7 +70,10 @@ GPU_IDS: [0]
 N_MAX_EPOCHS: 25
 
 INIT_LR: 0.001
-SCALE_LR: False # Scale learning rate based on global batch size
+SCALE_LR:
+  ENABLED: False
+  VAL: 256 # Scale learning rate based on global batch size
+
 OPTIMIZER:
   TYPE: 'SGD' # Adam, RMSprop
   BIAS_PARAMS:
@@ -96,8 +99,8 @@ WARMUP:
 # GRAD_CLIP Configurations
 #########################################
 GRAD_CLIP:
-  TYPE: 'norm'
-  VALUE: 5
+  TYPE: 'value'
+  VALUE: 100
 
 #########################################
 # Logging / Visualization Configurations
