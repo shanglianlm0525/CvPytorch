@@ -19,6 +19,7 @@ class SegmentationEvaluator(object):
         self.num_class = dataset.num_classes
         self.dictionary = dataset.dictionary
         self.confusion_matrix = np.zeros((self.num_class,)*2)
+        self.count = 0
 
     def Pixel_Accuracy(self):
         Acc = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
@@ -53,6 +54,8 @@ class SegmentationEvaluator(object):
         return confusion_matrix
 
     def evaluate(self):
+        if self.count < 1:
+            return None
         performances = {}
         performances['Acc'] = self.Pixel_Accuracy()
         performances['mAcc'] = self.Mean_Pixel_Accuracy()
@@ -66,6 +69,7 @@ class SegmentationEvaluator(object):
         gt_image = gt_image.data.cpu().numpy()
         pre_image = pre_image.data.cpu().numpy()
         self.confusion_matrix += self._generate_matrix(gt_image, pre_image)
+        self.count = self.count + 1
 
     def reset(self):
         self.confusion_matrix = np.zeros((self.num_class,) * 2)

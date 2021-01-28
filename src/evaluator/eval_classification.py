@@ -15,6 +15,7 @@ class ClassificationEvaluator(object):
         self.dictionary = dataset.dictionary
         self.gt_labels = []
         self.pred_labels = []
+        self.count = 0
 
     def Accuracy(self):
         all_acc = {}
@@ -30,7 +31,7 @@ class ClassificationEvaluator(object):
         return accuracy
 
     def evaluate(self):
-        if len(self.gt_labels)<1:
+        if self.count < 1:
             return None
         performances = self.Accuracy()
         performances['mAcc'] = self.Mean_Accuracy()
@@ -43,6 +44,7 @@ class ClassificationEvaluator(object):
         pred_label = pred_label.data.cpu().tolist()
         self.gt_labels.extend(gt_label)
         self.pred_labels.extend(pred_label)
+        self.count = self.count + 1
 
     def reset(self):
         self.gt_labels = []

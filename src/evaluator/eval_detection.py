@@ -200,6 +200,7 @@ class COCOEvaluator(object):
         self.dictionary = dataset.dictionary
         self.iou_thread = iou_thread
         self.rsts = {}
+        self.count = 0
         assert hasattr(dataset, 'coco_api')
         self.coco_api = dataset.coco_api
         self.cat_ids = dataset.cat_ids
@@ -211,8 +212,10 @@ class COCOEvaluator(object):
         if isinstance(preds, list):
             for i, pred in enumerate(preds):
                 self.rsts[gt['img_info']['id'].cpu().numpy()[i]] = pred
+                self.count = self.count + 1
         else:
             self.rsts[gt['img_info']['id'].cpu().numpy()[0]] = preds
+            self.count = self.count + 1
 
     def rsts2json(self):
         """
@@ -255,7 +258,7 @@ class COCOEvaluator(object):
         return eval_results
 
     def evaluate(self):
-        if len(self.rsts)<1:
+        if self.count < 1:
             return None
         performances = self.CocoEvaluate()
         performances['performance'] = performances['mAP']
