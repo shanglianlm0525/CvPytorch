@@ -22,9 +22,11 @@ class MobileNetV2(nn.Module):
 
         if subtype == 'mobilenet_v2':
             features = mobilenet_v2(pretrained=not self.backbone_path).features
-            self.out_channels = [16, 24, 32, 64, 96, 160, 320]
+            self.out_channels = [32, 16, 24, 32, 64, 96, 160, 320]
         else:
             raise NotImplementedError
+
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         self.conv1 = nn.Sequential(list(features.children())[0])
         self.stage1 = nn.Sequential(list(features.children())[1])

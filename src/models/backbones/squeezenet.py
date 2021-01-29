@@ -26,9 +26,11 @@ class SqueezeNet(nn.Module):
 
         if subtype == 'squeezenet1_1':
             features = squeezenet1_1(pretrained=not self.backbone_path).features
-            self.out_channels = [128, 256, 512]
+            self.out_channels = [96, 128, 256, 512]
         else:
             raise NotImplementedError
+
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         self.conv1 = nn.Sequential(*list(features.children())[0:2])
         self.layer1 = nn.Sequential(*list(features.children())[2:5])

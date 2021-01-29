@@ -39,6 +39,7 @@ class Darknet(nn.Module):
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
+        self.out_channels = [64, 128, 256, 512, 1024]
         self.conv1 = ConvModule(3, 32, kernel_size=3, stride=1, padding=1, bias=False,
                    norm='BatchNorm2d', activation='ReLU')
 
@@ -57,7 +58,7 @@ class Darknet(nn.Module):
         else:
             raise NotImplementedError
 
-        self.out_channels = [64, 128, 256, 512, 1024]
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))

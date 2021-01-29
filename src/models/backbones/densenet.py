@@ -21,7 +21,7 @@ class Densenet(nn.Module):
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
-        self.out_channels = [128, 256, 512, 1024]
+        self.out_channels = [64, 128, 256, 512, 1024]
         if subtype == 'densenet121':
             features = densenet121(pretrained=not backbone_path).features
         elif subtype == 'densenet161':
@@ -30,6 +30,8 @@ class Densenet(nn.Module):
             features = densenet169(pretrained=not backbone_path).features
         elif subtype == 'densenet201':
             features = densenet201(pretrained=not backbone_path).features
+
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         self.conv1 = nn.Sequential(
             features.conv0,

@@ -28,12 +28,14 @@ class WideResNet(nn.Module):
 
         if subtype == 'wide_resnet50_2':
             backbone = resnext50_32x4d(pretrained=not self.backbone_path)
-            self.out_channels = [256, 512, 1024, 2048]
+            self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'wide_resnet101_2':
             backbone = resnext101_32x8d(pretrained=not self.backbone_path)
-            self.out_channels = [256, 512, 1024, 2048]
+            self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
+
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         self.conv1 = nn.Sequential(*list(backbone.children())[0:3])
         self.maxpool = nn.Sequential(list(backbone.children())[3])

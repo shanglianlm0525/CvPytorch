@@ -33,18 +33,20 @@ class VGG(nn.Module):
 
         if subtype == 'vgg11':
             features = vgg11_bn(pretrained=not self.backbone_path).features
-            self.out_channels = [128, 256, 512, 512]
+            self.out_channels = [64, 128, 256, 512, 512]
         elif subtype == 'vgg13':
             features = vgg13_bn(pretrained=not self.backbone_path).features
-            self.out_channels = [128, 256, 512, 512]
+            self.out_channels = [64, 128, 256, 512, 512]
         elif subtype == 'vgg16':
             features = vgg16_bn(pretrained=not self.backbone_path).features
-            self.out_channels = [128, 256, 512, 512]
+            self.out_channels = [64, 128, 256, 512, 512]
         elif subtype == 'vgg19':
             features = vgg19_bn(pretrained=not self.backbone_path).features
-            self.out_channels = [128, 256, 512, 512]
+            self.out_channels = [64, 128, 256, 512, 512]
         else:
             raise NotImplementedError
+
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         self.conv1 = nn.Sequential(*list(features.children())[:7])
         self.layer1 = nn.Sequential(*list(features.children())[7:14])

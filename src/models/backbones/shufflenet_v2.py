@@ -40,6 +40,8 @@ class ShuffleNetV2(nn.Module):
         else:
             raise NotImplementedError
 
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
+
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
         else:

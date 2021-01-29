@@ -31,21 +31,23 @@ class ResNet(nn.Module):
 
         if subtype == 'resnet18':
             backbone = resnet18(pretrained=not self.backbone_path)
-            self.out_channels = [64, 128, 256, 512]
+            self.out_channels = [64, 64, 128, 256, 512]
         elif subtype == 'resnet34':
             backbone = resnet34(pretrained=not self.backbone_path)
-            self.out_channels = [64, 128, 256, 512]
+            self.out_channels = [64, 64, 128, 256, 512]
         elif subtype == 'resnet50':
             backbone = resnet50(pretrained=not self.backbone_path)
-            self.out_channels = [256, 512, 1024, 2048]
+            self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'resnet101':
             backbone = resnet101(pretrained=not self.backbone_path)
-            self.out_channels = [256, 512, 1024, 2048]
+            self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'resnet152':
             backbone = resnet152(pretrained=not self.backbone_path)
-            self.out_channels = [256, 512, 1024, 2048]
+            self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
+
+        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1]+1]
 
         self.conv1 = nn.Sequential(list(backbone.children())[0])
         self.bn1 = nn.Sequential(list(backbone.children())[1])
