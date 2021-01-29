@@ -24,9 +24,10 @@ model_urls = {
 
 class ResNet(nn.Module):
 
-    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], backbone_path=None):
+    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None):
         super(ResNet, self).__init__()
         self.out_stages = out_stages
+        self.output_stride = output_stride # 8, 16, 32
         self.backbone_path = backbone_path
 
         if subtype == 'resnet18':
@@ -49,14 +50,33 @@ class ResNet(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1]+1]
 
-        self.conv1 = nn.Sequential(list(backbone.children())[0])
-        self.bn1 = nn.Sequential(list(backbone.children())[1])
-        self.act1 = nn.Sequential(list(backbone.children())[2])
-        self.maxpool = nn.Sequential(list(backbone.children())[3])
-        self.layer1 = nn.Sequential(list(backbone.children())[4])
-        self.layer2 = nn.Sequential(list(backbone.children())[5])
-        self.layer3 = nn.Sequential(list(backbone.children())[6])
-        self.layer4 = nn.Sequential(list(backbone.children())[7])
+        self.conv1 = nn.Sequential(*list(backbone.children())[:4])
+        self.layer1 = backbone.layer1
+        self.layer2 = backbone.layer2
+        self.layer3 = backbone.layer3
+        self.layer4 = backbone.layer4
+
+        if self.output_stride == 16:
+            s3, s4, d3, d4 = (2, 1, 1, 2)
+        elif self.output_stride == 8:
+            s3, s4, d3, d4 = (1, 1, 2, 4)
+
+            for n, m in self.layer3.named_modules():
+                if 'conv1' in n and (subtype == 'resnet34' or subtype == 'resnet18'):
+                    m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
+                elif 'conv2' in n:
+                    m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
+                elif 'downsample.0' in n:
+                    m.stride = (s3, s3)
+
+        if self.output_stride == 8 or self.output_stride == 16:
+            for n, m in self.layer4.named_modules():
+                if 'conv1' in n and (subtype == 'resnet34' or subtype == 'resnet18'):
+                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
+                elif 'conv2' in n:
+                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
+                elif 'downsample.0' in n:
+                    m.stride = (s4, s4)
 
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
@@ -75,7 +95,6 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = self.maxpool(x)
         output = []
         for i in range(1, 5):
             res_layer = getattr(self, 'layer{}'.format(i))

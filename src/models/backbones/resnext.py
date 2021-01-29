@@ -37,12 +37,11 @@ class ResNeXt(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        self.conv1 = nn.Sequential(*list(backbone.children())[0:3])
-        self.maxpool = nn.Sequential(list(backbone.children())[3])
-        self.layer1 = nn.Sequential(list(backbone.children())[4])
-        self.layer2 = nn.Sequential(list(backbone.children())[5])
-        self.layer3 = nn.Sequential(list(backbone.children())[6])
-        self.layer4 = nn.Sequential(list(backbone.children())[7])
+        self.conv1 = nn.Sequential(*list(backbone.children())[:4])
+        self.layer1 = backbone.layer1
+        self.layer2 = backbone.layer2
+        self.layer3 = backbone.layer3
+        self.layer4 = backbone.layer4
 
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
@@ -61,7 +60,6 @@ class ResNeXt(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = self.maxpool(x)
         output = []
         for i in range(1, 5):
             res_layer = getattr(self, 'layer{}'.format(i))
