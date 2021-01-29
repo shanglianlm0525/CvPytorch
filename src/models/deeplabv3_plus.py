@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
 from src.models.modules.aspp import ASPP
-from src.evaluation.eval_segmentation import SegmentationEvaluator
+from src.models.backbones import build_backbone
 
 
 class ResNet(nn.Module):
@@ -112,14 +112,16 @@ class Deeplabv3Plus(nn.Module):
         self._category = [v for d in self.dictionary for v in d.keys()]
         self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
-        self.backbone = ResNet('resnet50', None)
-        self.aspp = ASPP(inplanes=self.backbone.final_out_channels)
-        self.decoder = Decoder(self._num_classes, self.backbone.low_level_inplanes)
+        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4]}
+        self.backbone = build_backbone(backbone_cfg)
+        self.aspp = ASPP(inplanes=self.backbone.out_channels[-1])
+        self.decoder = Decoder(self._num_classes, self.backbone.out_channels[0])
 
         self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
-        x, low_level_feat = self.backbone(imgs)
+        batch_size, ch, _, _ = imgs.shape
+        low_level_feat, x  = self.backbone(imgs)
         x = self.aspp(x)
         x = self.decoder(x, low_level_feat)
         outputs = F.interpolate(x, size=imgs.size()[2:], mode='bilinear', align_corners=True)
@@ -136,6 +138,7 @@ class Deeplabv3Plus(nn.Module):
                     targets_onehot = torch.zeros_like(targets)
                     targets_onehot[targets == idx] = 1
                     losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(dim=1), targets_onehot.float()) * _weight
+            losses['bce_loss'] = losses['bce_loss'] / batch_size
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':
