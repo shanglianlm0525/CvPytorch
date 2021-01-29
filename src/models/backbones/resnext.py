@@ -21,9 +21,10 @@ model_urls = {
 
 class ResNeXt(nn.Module):
 
-    def __init__(self, subtype='resnext50_32x4d', out_stages=[2, 3, 4], backbone_path=None):
+    def __init__(self, subtype='resnext50_32x4d', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None):
         super(ResNeXt, self).__init__()
         self.out_stages = out_stages
+        self.output_stride = output_stride  # 8, 16, 32
         self.backbone_path = backbone_path
 
         if subtype == 'resnext50_32x4d':
@@ -42,6 +43,28 @@ class ResNeXt(nn.Module):
         self.layer2 = backbone.layer2
         self.layer3 = backbone.layer3
         self.layer4 = backbone.layer4
+
+        if self.output_stride == 16:
+            s3, s4, d3, d4 = (2, 1, 1, 2)
+        elif self.output_stride == 8:
+            s3, s4, d3, d4 = (1, 1, 2, 4)
+
+            for n, m in self.layer3.named_modules():
+                if 'conv1' in n and (subtype == 'resnet34' or subtype == 'resnet18'):
+                    m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
+                elif 'conv2' in n:
+                    m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
+                elif 'downsample.0' in n:
+                    m.stride = (s3, s3)
+
+        if self.output_stride == 8 or self.output_stride == 16:
+            for n, m in self.layer4.named_modules():
+                if 'conv1' in n and (subtype == 'resnet34' or subtype == 'resnet18'):
+                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
+                elif 'conv2' in n:
+                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
+                elif 'downsample.0' in n:
+                    m.stride = (s4, s4)
 
         if self.backbone_path:
             self.backbone.load_state_dict(torch.load(self.backbone_path))
