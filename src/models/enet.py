@@ -12,8 +12,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from ..losses.dice_loss import dice_coeff
-from src.evaluation.eval_segmentation import SegmentationEvaluator
 
 __all__ = ["ENet"]
 
@@ -231,7 +229,8 @@ class ENet(nn.Module):
             pass
         else:
             losses = {}
-            losses['loss'] = self.ce_criterion(outputs, targets.squeeze(1).long())
+            losses['ce_loss'] = self.ce_criterion(outputs, targets.squeeze(1).long())
+            losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
                 return losses, torch.argmax(outputs, dim=1).unsqueeze(1)

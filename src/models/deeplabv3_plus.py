@@ -8,6 +8,8 @@
     Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation
     https://arxiv.org/pdf/1802.02611.pdf
 """
+from itertools import chain
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -112,12 +114,25 @@ class Deeplabv3Plus(nn.Module):
         self._category = [v for d in self.dictionary for v in d.keys()]
         self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4]}
+        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
         self.backbone = build_backbone(backbone_cfg)
         self.aspp = ASPP(inplanes=self.backbone.out_channels[-1])
         self.decoder = Decoder(self._num_classes, self.backbone.out_channels[0])
 
+        self._init_weight(self.aspp, self.decoder)
+
         self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
+
+
+    def _init_weight(self, *stages):
+        for m in chain(*stages):
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
         batch_size, ch, _, _ = imgs.shape

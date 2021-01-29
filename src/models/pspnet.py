@@ -48,7 +48,7 @@ class PSPNet(nn.Module):
         self._category = [v for d in self.dictionary for v in d.keys()]
         self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4]}
+        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
         self.backbone = build_backbone(backbone_cfg)
         aux_b_channels, b_channels = self.backbone.out_channels[0], self.backbone.out_channels[-1]
         self.ppm = PPM(b_channels)
@@ -68,11 +68,11 @@ class PSPNet(nn.Module):
             nn.Conv2d(256, self._num_classes, kernel_size=1)
         )
 
-        self._init_weight()
+        self._init_weight(self.cls, self.aux)
         self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
 
-    def _init_weight(self):
-        for m in chain(self.cls.parameters(), self.aux.parameters()):
+    def _init_weight(self, *stages):
+        for m in chain(*stages):
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight)
                 if m.bias is not None:
