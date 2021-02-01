@@ -1,6 +1,6 @@
 SEG_CLASSES:
   # - background: 1
- - wall
+ - wall: 1
  - building: 1
  - sky: 1
  - floor: 1
