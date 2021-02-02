@@ -237,10 +237,10 @@ class Trainer:
                 losses = self.run_step(scaler, model, sample, optimizer, None, None, prefix)
 
                 if self.cfg.local_rank == 0:
-                    template = "[iter {}, lr {}] Total train loss: {:.4f} \n" "{}"
+                    template = "[iter {}/{}, lr {}] Total train loss: {:.4f} \n" "{}"
                     logger.info(
                         template.format(
-                            cur_iter, round(get_current_lr(optimizer), 6),
+                            cur_iter, cfg.WARMUP.ITERS, round(get_current_lr(optimizer), 6),
                             losses["loss"].item(),
                             "\n".join(
                                 ["{}: {:.4f}".format(n, l.item()) for n, l in losses.items() if n != "loss"]),

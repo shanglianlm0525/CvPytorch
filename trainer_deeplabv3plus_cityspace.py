@@ -12,14 +12,21 @@ from collections import defaultdict
 import math
 import random
 import torch
+import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
+import torchvision
+from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
 import attr
+from tqdm import tqdm
+from copy import deepcopy
 from importlib import import_module
+from time import time
 from datetime import datetime
+from math import ceil
 import torch.backends.cudnn as cudnn
 import numpy as np
 from pathlib import Path as P
@@ -98,9 +105,12 @@ class Trainer:
             data_samplers['train'] = RandomSampler(datasets['train'])
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
-        dataloaders = {x: PrefetchDataLoader(datasets[x], batch_size=cfg.DATASET[x.upper()].BATCH_SIZE, sampler=data_samplers[x],
-                                     num_workers=cfg.DATASET[x.upper()].NUM_WORKER, collate_fn=dataset_class.collate_fn if hasattr(dataset_class,'collate_fn') else default_collate,
-                          pin_memory=True, drop_last=True) for x in ['train', 'val']}  # collate_fn=detection_collate,
+        dataloaders = {
+            x: PrefetchDataLoader(datasets[x], batch_size=cfg.DATASET[x.upper()].BATCH_SIZE, sampler=data_samplers[x],
+                          num_workers=cfg.DATASET[x.upper()].NUM_WORKER,
+                          collate_fn=dataset_class.collate_fn if hasattr(dataset_class,
+                                                                         'collate_fn') else default_collate,
+                          pin_memory=True, drop_last=True) for x in ['train', 'val']}
 
         dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         return datasets, dataloaders, data_samplers, dataset_sizes
@@ -300,7 +310,7 @@ class Trainer:
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL and (not epoch % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1):
-                acc, perf_rst = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'])
+                acc, perf_rst = self.val_epoch(epoch, model_ft,datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
@@ -343,10 +353,10 @@ class Trainer:
                     template = "[epoch {}/{}, iter {}/{}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
                     logger.info(
                         template.format(
-                            epoch, self.cfg.N_MAX_EPOCHS-1, i, num_iters-1,
+                            epoch, self.cfg.N_MAX_EPOCHS - 1, i, num_iters - 1,
                             round(get_current_lr(optimizer), 6),
                             lossLogger.meters["loss"].value,
-                            self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / _timer.diff,
+                                   self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / _timer.diff,
                             "\n".join(
                                 ["{}: {:.4f}".format(n, l.value) for n, l in lossLogger.meters.items() if n != "loss"]),
                         )
@@ -407,7 +417,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/coco_yolov5.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)

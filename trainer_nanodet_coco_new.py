@@ -1,25 +1,31 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2021/1/4 18:51
+# @Time : 2020/6/10 16:24
 # @Author : liumin
-# @File : trainer_fcos_coco_new.py
-
+# @File : trainer.py
 
 import argparse
 import os
 from collections import defaultdict
+import random
 
 import math
-import random
 import torch
+import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
+import torchvision
+from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
 import attr
+from tqdm import tqdm
+from copy import deepcopy
 from importlib import import_module
+from time import time
 from datetime import datetime
+from math import ceil
 import torch.backends.cudnn as cudnn
 import numpy as np
 from pathlib import Path as P
@@ -41,7 +47,6 @@ from src.optimizers import build_optimizer, get_current_lr
 from src.lr_schedulers import build_lr_scheduler
 from src.utils.freeze import freeze_models
 from src.lr_schedulers.warmup import get_warmup_lr
-from src.datasets.prefetch_dataLoader import PrefetchDataLoader
 
 torch.backends.cudnn.enabled = True
 torch.set_default_tensor_type(torch.FloatTensor)
@@ -60,6 +65,17 @@ def get_class_name(full_class_name):
     return full_class_name.split(".")[-1]
 
 
+def clip_grad(cfg, model):
+    if cfg.GRAD_CLIP.TYPE == "norm":
+        clip_method = clip_grad_norm_
+    elif cfg.GRAD_CLIP.TYPE == "value":
+        clip_method = clip_grad_value_
+    else:
+        raise NotImplementedError
+
+    clip_method(model.parameters(), cfg.GRAD_CLIP.VALUE)
+
+torch.autograd.set_detect_anomaly(True)
 # logger = logging.getLogger("pytorch")
 
 class Trainer:
@@ -98,7 +114,7 @@ class Trainer:
             data_samplers['train'] = RandomSampler(datasets['train'])
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
-        dataloaders = {x: PrefetchDataLoader(datasets[x], batch_size=cfg.DATASET[x.upper()].BATCH_SIZE, sampler=data_samplers[x],
+        dataloaders = {x: DataLoader(datasets[x], batch_size=cfg.DATASET[x.upper()].BATCH_SIZE, sampler=data_samplers[x],
                                      num_workers=cfg.DATASET[x.upper()].NUM_WORKER, collate_fn=dataset_class.collate_fn if hasattr(dataset_class,'collate_fn') else default_collate,
                           pin_memory=True, drop_last=True) for x in ['train', 'val']}  # collate_fn=detection_collate,
 
@@ -117,18 +133,6 @@ class Trainer:
             model = model.cuda()
 
         return model
-
-    def clip_grad(self, model):
-        if self.cfg.GRAD_CLIP.TYPE == "norm":
-            clip_method = clip_grad_norm_
-        elif self.cfg.GRAD_CLIP.TYPE == "value":
-            clip_method = clip_grad_value_
-        else:
-            raise ValueError(
-                f"Only support 'norm' and 'value' as the grad_clip type, but {self.cfg.GRAD_CLIP.TYPE} is given."
-            )
-
-        clip_method(model.parameters(), self.cfg.GRAD_CLIP.VALUE)
 
     def run_step(self, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
         '''
@@ -178,10 +182,6 @@ class Trainer:
             # Backward passes under autocast are not recommended.
             # Backward ops run in the same dtype autocast chose for corresponding forward ops.
             scaler.scale(losses["loss"]).backward()
-
-            if self.cfg.GRAD_CLIP and self.cfg.GRAD_CLIP.VALUE:
-                self.clip_grad(model)
-
             # scaler.step() first unscales the gradients of the optimizer's assigned params.
             # If these gradients do not contain infs or NaNs, optimizer.step() is then called,
             # otherwise, optimizer.step() is skipped.
@@ -230,10 +230,10 @@ class Trainer:
                 losses = self.run_step(scaler, model, sample, optimizer, None, None, prefix)
 
                 if self.cfg.local_rank == 0:
-                    template = "[iter {}/{}, lr {}] Total train loss: {:.4f} \n" "{}"
+                    template = "[iter {}, lr {}] Total train loss: {:.4f} \n" "{}"
                     logger.info(
                         template.format(
-                            cur_iter, cfg.WARMUP.ITERS, round(get_current_lr(optimizer), 6),
+                            cur_iter, round(get_current_lr(optimizer), 6),
                             losses["loss"].item(),
                             "\n".join(
                                 ["{}: {:.4f}".format(n, l.item()) for n, l in losses.items() if n != "loss"]),
@@ -258,11 +258,11 @@ class Trainer:
         model_ft = self._parser_model()
 
         # Scale learning rate based on global batch size
-        if cfg.SCALE_LR:
-            cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / cfg.SCALE_LR
+        if cfg.SCALE_LR.ENABLED:
+            cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / cfg.SCALE_LR.VAL
 
         scaler = amp.GradScaler(enabled=True)
-        if cfg.WARMUP.NAME is not None and cfg.WARMUP.ITERS:
+        if cfg.WARMUP.NAME is not None:
             logger.info('Start warm-up ... ')
             self.warm_up(scaler, model_ft, dataloaders['train'], cfg)
             logger.info('finish warm-up!')
@@ -300,7 +300,7 @@ class Trainer:
             lr_scheduler_ft.step()
 
             if self.cfg.DATASET.VAL and (not epoch % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1):
-                acc, perf_rst = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'])
+                acc, perf_rst = self.val_epoch(epoch, model_ft,datasets['val'], dataloaders['val'])
 
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
@@ -330,7 +330,6 @@ class Trainer:
         lossLogger = LossLogger()
         performanceLogger = build_evaluator(self.cfg, dataset)
 
-        num_iters = len(dataloader)
         for i, sample in enumerate(dataloader):
             self.n_iters_elapsed += 1
             _timer.tic()
@@ -340,10 +339,10 @@ class Trainer:
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
                 if self.cfg.local_rank == 0:
-                    template = "[epoch {}/{}, iter {}/{}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
+                    template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
                     logger.info(
                         template.format(
-                            epoch, self.cfg.N_MAX_EPOCHS-1, i, num_iters-1,
+                            epoch, self.cfg.N_MAX_EPOCHS-1, i,
                             round(get_current_lr(optimizer), 6),
                             lossLogger.meters["loss"].value,
                             self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / _timer.diff,
@@ -407,7 +406,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/coco_yolov5.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/coco_nanodet.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)

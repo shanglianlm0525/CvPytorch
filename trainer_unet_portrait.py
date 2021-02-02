@@ -45,7 +45,7 @@ from src.utils.logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
-from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
+from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger, LossLogger
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -258,6 +258,7 @@ class Trainer:
 
         ## parser_dict
         dictionary = self._parser_dict()
+        self.dictionary = dictionary
 
         ## parser_datasets
         datasets, dataloaders,data_samplers = self._parser_datasets(dictionary)
@@ -266,14 +267,6 @@ class Trainer:
 
         ## parser_model
         model_ft = self._parser_model(dictionary)
-
-        test_only = False
-        if test_only:
-            '''
-            confmat = evaluate(model_ft, data_loader_test, device=device, num_classes=num_classes)
-            print(confmat)
-            '''
-            return
 
         ## parser_optimizer
         # Scale learning rate based on global batch size
@@ -349,8 +342,8 @@ class Trainer:
         model.train()
 
         _timer = Timer()
-        lossLogger = MetricLogger(delimiter="  ")
-        performanceLogger = MetricLogger(delimiter="  ")
+        lossLogger = LossLogger()
+        performanceLogger = MetricLogger(self.dictionary, self.cfg)
 
         for i, sample in enumerate(dataloader):
             imgs, targets = sample['image'],sample['target']
@@ -372,9 +365,9 @@ class Trainer:
                 out = model(imgs, targets, prefix)
 
             if not isinstance(out, tuple):
-                losses, performances = out, None
+                losses, predicts = out, None
             else:
-                losses, performances = out
+                losses, predicts = out
 
             self.n_iters_elapsed += 1
 
@@ -401,15 +394,15 @@ class Trainer:
                 else:
                     lossLogger.update(**losses)
 
-                if performances is not None and all(performances):
+                if predicts is not None:
                     if self.cfg.distributed:
                         # reduce performances over all GPUs for logging purposes
-                        performance_dict_reduced = reduce_dict(performances)
-                        performanceLogger.update(**performance_dict_reduced)
-                        del performance_dict_reduced
+                        predicts_dict_reduced = reduce_dict(predicts)
+                        performanceLogger.update(targets, predicts_dict_reduced)
+                        del predicts_dict_reduced
                     else:
-                        performanceLogger.update(**performances)
-                    del performances
+                        performanceLogger.update(**predicts)
+                    del predicts
 
                 if self.cfg.local_rank == 0:
                     template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
@@ -441,8 +434,8 @@ class Trainer:
     def val_epoch(self, epoch, model, dataloader,prefix="val"):
         model.eval()
 
-        lossLogger = MetricLogger(delimiter="  ")
-        performanceLogger = MetricLogger(delimiter="  ")
+        lossLogger = LossLogger()
+        performanceLogger = MetricLogger(self.dictionary, self.cfg)
 
         with torch.no_grad():
             for sample in dataloader:
@@ -456,7 +449,7 @@ class Trainer:
                 else:
                     targets = targets.cuda()
 
-                losses, performances = model(imgs, targets, prefix)
+                losses, predicts = model(imgs, targets, prefix)
 
                 if self.cfg.distributed:
                     # reduce losses over all GPUs for logging purposes
@@ -466,15 +459,15 @@ class Trainer:
                 else:
                     lossLogger.update(**losses)
 
-                if performances is not None and all(performances):
+                if predicts is not None:
                     if self.cfg.distributed:
                         # reduce performances over all GPUs for logging purposes
-                        performance_dict_reduced = reduce_dict(performances)
-                        performanceLogger.update(**performance_dict_reduced)
-                        del performance_dict_reduced
+                        predicts_dict_reduced = reduce_dict(predicts)
+                        performanceLogger.update(targets, predicts_dict_reduced)
+                        del predicts_dict_reduced
                     else:
-                        performanceLogger.update(**performances)
-                    del performances
+                        performanceLogger.update(targets, predicts)
+                    del predicts
 
                 del imgs, targets, losses
 

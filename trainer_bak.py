@@ -47,8 +47,6 @@ from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
 from src.utils.distributed import init_distributed,is_main_process, reduce_dict, MetricLogger
 
-from CvPytorch.src.utils.distributed import LossLogger
-
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
@@ -210,17 +208,18 @@ class Trainer:
             self.tb_writer = DummyWriter(log_dir="%s/%s" % (self.cfg.TENSORBOARD_LOG_DIR, self.experiment_id))
 
     def experiment_id(self, cfg):
-        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
+        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{cfg.OPTIMIZER.TYPE}#{cfg.LR_SCHEDULER.TYPE}" \
+               f"#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
 
     def _parser_dict(self):
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
         return dictionary[cfg.DATASET.DICTIONARY_NAME]
 
-    def _parser_datasets(self):
+    def _parser_datasets(self,dictionary):
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
-        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=self.dictionary, transform=None,
+        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=dictionary, transform=None,
                                      target_transform=None, stage=x) for x in ['train', 'val']}
 
         data_samplers = defaultdict()
@@ -230,16 +229,16 @@ class Trainer:
             data_samplers['train'] = RandomSampler(datasets['train'])
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
-        dataloaders = {x: DataLoader(datasets[x], batch_size=batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=dataset_class.collate_fn if hasattr(dataset_class, 'collate_fn') else default_collate, pin_memory=True,drop_last=True) for x, batch_size in zip(['train', 'val'],[self.batch_size,1])} # collate_fn=detection_collate,
+        dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
+                                      collate_fn=dataset_class.collate_fn if dataset_class.collate_fn else default_collate, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
 
         return datasets, dataloaders, data_samplers
 
 
-    def _parser_model(self):
+    def _parser_model(self,dictionary):
         *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.split(".")
         model_class = getattr(import_module(".".join(model_mod_str_parts)), model_class_str)
-        model = model_class(dictionary=self.dictionary)
+        model = model_class(dictionary=dictionary)
 
         if self.cfg.distributed:
             model = SyncBatchNorm.convert_sync_batchnorm(model).cuda()
@@ -256,15 +255,24 @@ class Trainer:
         # cfg.print()
 
         ## parser_dict
-        self.dictionary = self._parser_dict()
+        dictionary = self._parser_dict()
+        self.dictionary = dictionary
 
         ## parser_datasets
-        datasets, dataloaders,data_samplers = self._parser_datasets()
+        datasets, dataloaders,data_samplers = self._parser_datasets(dictionary)
         # dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         # class_names = datasets['train'].classes
 
         ## parser_model
-        model_ft = self._parser_model()
+        model_ft = self._parser_model(dictionary)
+
+        test_only = False
+        if test_only:
+            '''
+            confmat = evaluate(model_ft, data_loader_test, device=device, num_classes=num_classes)
+            print(confmat)
+            '''
+            return
 
         ## parser_optimizer
         # Scale learning rate based on global batch size
@@ -292,7 +300,6 @@ class Trainer:
                     print('freezing %s' % k)
                     v.requires_grad = False
 
-
         if self.cfg.PRETRAIN_MODEL is not None:
             if self.cfg.RESUME:
                 self.start_epoch = self.ckpts.load_checkpoint(self.cfg.PRETRAIN_MODEL,model_ft, optimizer_ft, lr_scheduler_ft)
@@ -313,7 +320,7 @@ class Trainer:
             self.train_epoch(scaler, epoch, model_ft, dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
-            if self.cfg.DATASET.VAL and False:
+            if self.cfg.DATASET.VAL:
                 acc = self.val_epoch(epoch, model_ft, dataloaders['val'])
 
                 if cfg.local_rank == 0:
@@ -321,11 +328,11 @@ class Trainer:
                     if best_acc < acc:
                         self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft, lr_scheduler_ft)
                         best_acc = acc
-                        # continue
+                        continue
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -337,18 +344,20 @@ class Trainer:
         model.train()
 
         _timer = Timer()
-        lossLogger = LossLogger()
-        performanceLogger = MetricLogger(self.dictionary, self.cfg)
+        lossLogger = MetricLogger(delimiter="  ")
+        performanceLogger = MetricLogger(delimiter="  ")
 
-        for i, sample in enumerate(dataloader):
-            imgs, targets = sample['image'], sample['target']
+        for i, (imgs, targets) in enumerate(dataloader):
             _timer.tic()
             # zero the parameter gradients
             optimizer.zero_grad()
 
-            imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
-            if isinstance(targets, list):
-                if isinstance(targets[0], torch.Tensor):
+            # imgs = imgs.cuda()
+            imgs = list(img.cuda() for img in imgs) if isinstance(imgs,list) else imgs.cuda()
+            # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
+            # labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
+            if isinstance(targets,list):
+                if isinstance(targets[0],torch.Tensor):
                     targets = [t.cuda() for t in targets]
                 else:
                     targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
@@ -360,9 +369,9 @@ class Trainer:
                 out = model(imgs, targets, prefix)
 
             if not isinstance(out, tuple):
-                losses, predicts = out, None
+                losses, performances = out, None
             else:
-                losses, predicts = out
+                losses, performances = out
 
             self.n_iters_elapsed += 1
 
@@ -389,15 +398,15 @@ class Trainer:
                 else:
                     lossLogger.update(**losses)
 
-                if predicts is not None:
+                if performances is not None and all(performances):
                     if self.cfg.distributed:
                         # reduce performances over all GPUs for logging purposes
-                        predicts_dict_reduced = reduce_dict(predicts)
-                        performanceLogger.update(targets, predicts_dict_reduced)
-                        del predicts_dict_reduced
+                        performance_dict_reduced = reduce_dict(performances)
+                        performanceLogger.update(**performance_dict_reduced)
+                        del performance_dict_reduced
                     else:
-                        performanceLogger.update(targets, predicts)
-                    del predicts
+                        performanceLogger.update(**performances)
+                    del performances
 
                 if self.cfg.local_rank == 0:
                     template = "[epoch {}/{}, iter {}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
@@ -406,9 +415,8 @@ class Trainer:
                             epoch, self.cfg.N_MAX_EPOCHS, i,
                             round(get_current_lr(optimizer), 6),
                             lossLogger.meters["loss"].value,
-                            self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / _timer.diff,
-                            "\n".join(
-                                ["{}: {:.4f}".format(n, l.value) for n, l in lossLogger.meters.items() if n != "loss"]),
+                            self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS /  _timer.diff,
+                            "\n".join(["{}: {:.4f}".format(n, l.value) for n, l in lossLogger.meters.items() if n != "loss"]),
                         )
                     )
 
@@ -417,9 +425,8 @@ class Trainer:
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging train losses
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            performances = performanceLogger.compute()
-            if len(performances):
-                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
+            if len(performanceLogger.meters):
+                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v.global_avg, epoch) for k, v in performanceLogger.meters.items()]
 
         if self.cfg.TENSORBOARD_WEIGHT and False:
             for name, param in model.named_parameters():
@@ -428,16 +435,19 @@ class Trainer:
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataloader, prefix="val"):
+    def val_epoch(self, epoch, model, dataloader,prefix="val"):
         model.eval()
 
-        lossLogger = LossLogger()
-        performanceLogger = MetricLogger(self.dictionary, self.cfg)
+        lossLogger = MetricLogger(delimiter="  ")
+        performanceLogger = MetricLogger(delimiter="  ")
 
         with torch.no_grad():
-            for sample in dataloader:
-                imgs, targets = sample['image'], sample['target']
+            for (imgs, targets) in dataloader:
+
+                # imgs = imgs.cuda()
                 imgs = list(img.cuda() for img in imgs) if isinstance(imgs, list) else imgs.cuda()
+                # labels = [label.cuda() for label in labels] if isinstance(labels,list) else labels.cuda()
+                # labels = [{k: v.cuda() for k, v in t.items()} for t in labels] if isinstance(labels,list) else labels.cuda()
                 if isinstance(targets, list):
                     if isinstance(targets[0], torch.Tensor):
                         targets = [t.cuda() for t in targets]
@@ -446,7 +456,7 @@ class Trainer:
                 else:
                     targets = targets.cuda()
 
-                losses, predicts = model(imgs, targets, prefix)
+                losses, performances = model(imgs, targets, prefix)
 
                 if self.cfg.distributed:
                     # reduce losses over all GPUs for logging purposes
@@ -456,50 +466,48 @@ class Trainer:
                 else:
                     lossLogger.update(**losses)
 
-                if predicts is not None:
+                if performances is not None and all(performances):
                     if self.cfg.distributed:
                         # reduce performances over all GPUs for logging purposes
-                        predicts_dict_reduced = reduce_dict(predicts)
-                        performanceLogger.update(targets, predicts_dict_reduced)
-                        del predicts_dict_reduced
+                        performance_dict_reduced = reduce_dict(performances)
+                        performanceLogger.update(**performance_dict_reduced)
+                        del performance_dict_reduced
                     else:
-                        performanceLogger.update(targets, predicts)
-                    del predicts
+                        performanceLogger.update(**performances)
+                    del performances
 
                 del imgs, targets, losses
 
-        performances = performanceLogger.compute()
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
             # Logging val Loss
             [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
-            if len(performances):
+            if len(performanceLogger.meters):
                 # Logging val performances
-                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
+                [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v.global_avg, epoch) for k, v in performanceLogger.meters.items()]
 
         if self.cfg.local_rank == 0:
             template = "[epoch {}] Total {} loss : {:.4f} " "\n" "{}"
             logger.info(
                 template.format(
-                    epoch, prefix, lossLogger.meters["loss"].global_avg,
-                    "\n".join(
-                        ["{}: {:.4f}".format(n, l.global_avg) for n, l in lossLogger.meters.items() if n != "loss"]),
+                    epoch,prefix,lossLogger.meters["loss"].global_avg,
+                    "\n".join(["{}: {:.4f}".format(n, l.global_avg) for n, l in lossLogger.meters.items() if n != "loss"]),
                 )
             )
 
             perf_log_str = f"\n------------ Performances ({prefix}) ----------\n"
-            for k, v in performances.items():
-                perf_log_str += "{:}: {:.4f}\n".format(k, v)
+            for k,v in performanceLogger.meters.items():
+                perf_log_str += "{:}: {:.4f}\n".format(k, v.global_avg)
             perf_log_str += "------------------------------------\n"
             logger.info(perf_log_str)
 
-        acc = performances['performance']
+        acc = performanceLogger.meters['performance'].global_avg
 
         return acc
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/voc_fcos.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/hymenoptera.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)

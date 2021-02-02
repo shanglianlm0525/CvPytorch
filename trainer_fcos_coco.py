@@ -313,7 +313,7 @@ class Trainer:
             self.train_epoch(scaler, epoch, model_ft, dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
 
-            if self.cfg.DATASET.VAL and False:
+            if self.cfg.DATASET.VAL:
                 acc = self.val_epoch(epoch, model_ft, dataloaders['val'])
 
                 if cfg.local_rank == 0:
@@ -325,7 +325,7 @@ class Trainer:
 
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft, lr_scheduler_ft)
+                    self.ckpts.autosave_checkpoint(model_ft, epoch,'autosave', optimizer_ft, lr_scheduler_ft)
 
         if cfg.local_rank == 0:
             self.tb_writer.close()
@@ -396,7 +396,7 @@ class Trainer:
                         performanceLogger.update(targets, predicts_dict_reduced)
                         del predicts_dict_reduced
                     else:
-                        performanceLogger.update(targets, predicts)
+                        performanceLogger.update(**predicts)
                     del predicts
 
                 if self.cfg.local_rank == 0:
@@ -499,7 +499,7 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/voc_fcos.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/coco_fcos.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)
