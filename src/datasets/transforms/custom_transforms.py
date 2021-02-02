@@ -68,18 +68,8 @@ class ToTensor(object):
         if len(target.shape) == 2:
             target = np.expand_dims(target, axis=0)
 
-        img = torch.from_numpy(img).float()
+        img = torch.from_numpy(img).float() / 255.0
         target = torch.from_numpy(target).float()
-
-
-        '''
-        img = TF.to_tensor(img)
-        if target is not None:
-            target = np.array(target, dtype=np.uint8)
-            if len(target.shape) == 2:
-                target = np.expand_dims(target, axis=2)
-            target = torch.from_numpy(target)
-        '''
         return {'image': img, 'target': target}
 
 
