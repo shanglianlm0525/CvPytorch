@@ -8,6 +8,30 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder
+import torchvision.transforms as T
+
+data_transforms = {
+    'train': T.Compose([
+        T.RandomResizedCrop(224),
+        T.RandomHorizontalFlip(),
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    ]),
+
+    'val': T.Compose([
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    ]),
+
+    'test': T.Compose([
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+    ])
+}
 
 class FlowerDataset(Dataset):
     """
@@ -20,8 +44,8 @@ class FlowerDataset(Dataset):
         super(FlowerDataset, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = transform
-        self.target_transform = target_transform
+        self.transform = data_transforms[stage]
+        self.target_transform = None
         self.stage = stage
 
         # self.imgs = ImageFolder(os.path.join(root_path,self.stage))
