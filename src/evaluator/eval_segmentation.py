@@ -7,6 +7,8 @@
 import torch
 import numpy as np
 
+np.seterr(divide='ignore', invalid='ignore')
+
 def torch_nanmean(x):
     num = torch.where(torch.isnan(x), torch.full_like(x, 0), torch.full_like(x, 1)).sum()
     value = torch.where(torch.isnan(x), torch.full_like(x, 0), x).sum()
@@ -18,7 +20,7 @@ class SegmentationEvaluator(object):
         self.dataset = dataset
         self.num_class = dataset.num_classes
         self.dictionary = dataset.dictionary
-        self.confusion_matrix = np.zeros((self.num_class,)*2)
+        self.confusion_matrix = np.ones((self.num_class,)*2)
         self.count = 0
 
     def Pixel_Accuracy(self):
