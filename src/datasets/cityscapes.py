@@ -3,49 +3,50 @@
 # @Time : 2020/8/6 10:24
 # @Author : liumin
 # @File : cityscapes.py
-import os
 
-import cv2
-import torch
-from PIL import Image
+import os
 from glob2 import glob
 import numpy as np
-import random
-
 from PIL import Image, ImageOps, ImageFilter
 from torch.utils.data import Dataset
-from torchvision import transforms as transformsT
 from ..utils import palette
-from torchvision import transforms as tf
 from .transforms import custom_transforms as ctf
 
-data_transforms = {
-    'train': tf.Compose([
-        ctf.Resize((512,512)),
-        ctf.RandomHorizontalFlip(p=0.5),
-        ctf.RandomTranslation(2),
-        ctf.ToTensor(),
-        # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ]),
+"""
+    ADE20K dataset
+    http://groups.csail.mit.edu/vision/datasets/ADE20K/
+"""
 
-    'val': tf.Compose([
-        ctf.Resize((512, 512)),
-        ctf.ToTensor(),
-        # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ]),
+def get_data_transforms(input_size):
+    data_transforms = {
+        'train': ctf.Compose([
+            ctf.Resize(input_size),
+            ctf.RandomHorizontalFlip(p=0.5),
+            ctf.RandomTranslation(2),
+            ctf.ToTensor(),
+            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ]),
 
-    'infer': tf.Compose([
-        ctf.Resize((512, 512)),
-        ctf.ToTensor(),
-        # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ])
-}
+        'val': ctf.Compose([
+            ctf.Resize(input_size),
+            ctf.ToTensor(),
+            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ]),
+
+        'infer': ctf.Compose([
+            ctf.Resize(input_size),
+            ctf.ToTensor(),
+            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
+    }
+    return data_transforms
 
 class CityscapesSegmentation(Dataset):
+    ignore_index = 255
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = data_transforms[stage]
+        self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
         self.target_transform = target_transform
         self.stage = stage
 
@@ -55,13 +56,12 @@ class CityscapesSegmentation(Dataset):
         self.id2name = {v: k for k, v in self.name2id.items()}
         self.palette = palette.CityScpates_palette
 
-        self.ignore_index = 255
         self.invalid_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
         self.valid_classes = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
         self.class_map = dict(zip(self.valid_classes, range(self.num_classes)))
 
-        self._imgs = list()
-        self._targets = list()
+        self._imgs = []
+        self._targets = []
         if self.stage == 'infer':
             if data_cfg.INDICES is not None:
                 with open(data_cfg.INDICES, 'r') as fd:
@@ -100,6 +100,7 @@ class CityscapesSegmentation(Dataset):
             return self.transform(sample)
 
     def encode_segmap(self, mask):
+        # This is used to convert tags
         mask = np.array(mask, dtype=np.uint8)
         # Put all void classes to zero
         for _voidc in self.invalid_classes:
