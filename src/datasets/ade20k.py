@@ -3,46 +3,106 @@
 # @Time : 2020/7/6 16:00
 # @Author : liumin
 # @File : ade20k.py
+
 from glob2 import glob
 import os
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
+from CvPytorch.src.utils import palette
+from CvPytorch.src.transforms import custom_transforms as ctf
 
-class ADE20KDataset(Dataset):
-    """
-        ADE20K dataset
-        http://groups.csail.mit.edu/vision/datasets/ADE20K/
-    """
+"""
+    Cityscapes dataset
+    https://www.cityscapes-dataset.com/
+"""
+
+def get_data_transforms(input_size):
+    data_transforms = {
+        'train': ctf.Compose([
+            ctf.Resize(input_size),
+            ctf.RandomHorizontalFlip(p=0.5),
+            ctf.RandomTranslation(2),
+            ctf.ToTensor(),
+            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ]),
+
+        'val': ctf.Compose([
+            ctf.Resize(input_size),
+            ctf.ToTensor(),
+            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ]),
+
+        'infer': ctf.Compose([
+            ctf.Resize(input_size),
+            ctf.ToTensor(),
+            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
+    }
+    return data_transforms
+
+class ADE20KSegmentation(Dataset):
+    ignore_index = 255
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
-        super(ADE20KDataset, self).__init__()
+        super(ADE20KSegmentation, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = transform
+        self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
         self.target_transform = target_transform
         self.stage = stage
 
-        self.num_classes = 150
-        # self.palette = palette.ADE20K_palette
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.name2id = dict(zip(self.category, range(self.num_classes)))
+        self.id2name = {v: k for k, v in self.name2id.items()}
+        self.palette = palette.ADE20K_palette
 
         self._imgs = []
-        self._labels = []
+        self._targets = []
         if self.stage == 'infer':
-            self._imgs = glob.glob(os.path.join(data_cfg.IMG_DIR, data_cfg.IMG_SUFFIX))
+            if data_cfg.INDICES is not None:
+                with open(data_cfg.INDICES, 'r') as fd:
+                    self._imgs.extend([os.path.join(data_cfg.IMG_DIR, line.strip()) for line in fd])
+            else:
+                for root, fnames, _ in sorted(os.walk(data_cfg.IMG_DIR)):
+                    for fname in sorted(fnames):
+                        self._imgs.extend(glob(os.path.join(root, fname, data_cfg.IMG_SUFFIX)))
+
+            if len(self._imgs) == 0:
+                raise RuntimeError(
+                    "Found 0 images in subfolders of: " + data_cfg.IMG_DIR if data_cfg.INDICES is not None else data_cfg.INDICES + "\n")
         else:
-            self._imgs = glob.glob(os.path.join(data_cfg.IMG_DIR, data_cfg.IMG_SUFFIX))
-            self._labels = glob.glob(os.path.join(data_cfg.LABELS.SEG_DIR, data_cfg.LABELS.SEG_SUFFIX))
+            if data_cfg.INDICES is not None:
+                for line in open(data_cfg.INDICES):
+                    imgpath, labelpath = line.strip().split(' ')
+                    self._imgs.append(os.path.join(data_cfg.IMG_DIR, imgpath))
+                    self._targets.append(os.path.join(data_cfg.LABELS.SEG_DIR, labelpath))
+            else:
+                self._imgs = glob(os.path.join(data_cfg.IMG_DIR,data_cfg.IMG_SUFFIX))
+                self._targets = glob(os.path.join(data_cfg.LABELS.SEG_DIR, data_cfg.LABELS.SEG_SUFFIX))
+
+            assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._targets)'
+            assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
 
     def __getitem__(self, idx):
-        img, label = Image.open(self._imgs[idx]).convert('RGB'), np.asarray(Image.open(self._labels[idx]), dtype=np.int32) - 1 # -1:149
-        if self.transform is not None:
-            img = self.transform(img)
         if self.stage == 'infer':
-            return img
+            _img = Image.open(self._imgs[idx]).convert('RGB')
+            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
+            sample = {'image': _img, 'mask': None}
+            return self.transform(sample), img_id
         else:
-            if self.target_transform is not None:
-                label = self.target_transform(label)
-            return img, label
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+            _target = self.encode_segmap(_target)
+            sample = {'image': _img, 'target': _target}
+            return self.transform(sample)
+
+    def encode_segmap(self, mask):
+        # This is used to convert tags
+        # index from zero 0:149
+        mask = np.array(mask, dtype=np.uint8)
+        mask = mask -1 # uint8 will change -1 to 255
+        mask = Image.fromarray(mask)
+        return mask
 
     def __len__(self):
         return len(self._imgs)
@@ -50,7 +110,7 @@ class ADE20KDataset(Dataset):
 
 if __name__ == '__main__':
     root_path = '/home/lmin/data/ADE20K/images/training'
-    dataset = ADE20KDataset(root_path)
+    dataset = ADE20KSegmentation(root_path)
 
     print(dataset.__len__())
     print(dataset.__getitem__(20))

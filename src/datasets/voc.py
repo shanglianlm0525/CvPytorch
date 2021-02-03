@@ -3,14 +3,13 @@
 # @Time : 2021/2/1 15:10
 # @Author : liumin
 # @File : voc.py
-import torch
 from glob2 import glob
 import os
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
 from CvPytorch.src.utils import palette
-from .transforms import custom_transforms as ctf
+from ..transforms import custom_transforms as ctf
 
 """
     Pascal Voc dataset
