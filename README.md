@@ -41,11 +41,11 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 - [x] (**PSPNet**) Pyramid Scene Parsing Network
 
-- [ ] (**ENet**) A Deep Neural Network Architecture for Real-Time Semantic Segmentation
+- [x] (**ENet**) A Deep Neural Network Architecture for Real-Time Semantic Segmentation
 
 - [x] (**U-Net**) Convolutional Networks for Biomedical Image Segmentation
 
-- [ ] (**SegNet**) A Deep ConvolutionalEncoder-Decoder Architecture for ImageSegmentation
+- [x] (**SegNet**) A Deep ConvolutionalEncoder-Decoder Architecture for ImageSegmentation
 
 ## Instance Segmentation
 - [x] (**Mask-RCNN**) Mask-RCNN
