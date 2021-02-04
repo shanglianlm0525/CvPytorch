@@ -166,7 +166,7 @@ class Classify(nn.Module):
 
 
 
-def parse_yolov5_model(cfg, depth_mul=1, width_mul=1, num_outs=1):
+def parse_yolov5_model(cfg, depth_mul=1, width_mul=1):
     layers = []
     ch_list = [3]
     ch_out = ch_list[-1]

@@ -12,6 +12,12 @@ from .init_weights import kaiming_init, constant_init
 from .norms import build_norm_layer
 
 
+def autopad(k, p=None):  # kernel, padding
+    # Pad to 'same'
+    if p is None:
+        p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
+    return p
+
 class ConvModule(nn.Module):
     '''A conv block that bundles conv/norm/activation layers.'''
     def __init__(self,in_channels,out_channels,kernel_size=3,stride=1,
@@ -21,7 +27,7 @@ class ConvModule(nn.Module):
         self.activation = activation
 
         self.conv_layer = nn.Conv2d(in_channels,out_channels,kernel_size,stride=stride,
-                              padding=padding,dilation=dilation,groups=groups,bias=bias)
+                              padding=autopad(kernel_size, padding),dilation=dilation,groups=groups,bias=bias)
         if self.norm is not None:
             self.norm_layer = build_norm_layer(self.norm, out_channels)
         if self.activation is not None:
