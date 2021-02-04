@@ -9,9 +9,9 @@ DATASET:
   DICTIONARY_NAME: 'SEG_CLASSES'
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/ADE20K'
+    IMG_DIR: '/home/lmin/data/ADEChallengeData2016'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/ADE20K/training.txt'
+    INDICES: '/home/lmin/data/ADEChallengeData2016/training.txt'
     SHUFFLE: True
     BATCH_SIZE: 4
     NUM_WORKER: 4
@@ -19,13 +19,13 @@ DATASET:
     LABELS:
       DET_DIR: ''
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/ADE20K'
+      SEG_DIR: '/home/lmin/data/ADEChallengeData2016'
       SEG_SUFFIX: '*.png'
 
   VAL:
-    IMG_DIR: '/home/lmin/data/ADE20K'
+    IMG_DIR: '/home/lmin/data/ADEChallengeData2016'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/ADE20K/validation.txt'
+    INDICES: '/home/lmin/data/ADEChallengeData2016/validation.txt'
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 4
