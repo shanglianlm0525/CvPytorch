@@ -66,5 +66,26 @@ def produceDict():
     for seg in seg_name:
         print(' - '+seg+': 1')
 
-produceDict()
+def produceImgAndLabel():
+    root_path = '/home/lmin/data/ADEChallengeData2016/'
+
+    stages = ['training', 'validation']
+    for stage in stages:
+        seg_txt = open(root_path + stage + '.txt', 'a')
+
+        imgpath = glob(os.path.join(root_path, 'images', stage,'*.jpg'))
+        txtpath = glob(os.path.join(root_path, 'annotations', stage,'*.png'))
+
+        for imgline,txtline in zip(imgpath,txtpath):
+            print(imgline.replace(root_path, '') +' '+ txtline.replace(root_path, ''))
+
+            seg_txt.write(imgline.replace(root_path, '') + ' ' + txtline.replace(root_path, '') + '\n')
+
+        seg_txt.close()
+
+produceImgAndLabel()
+
+
+# produceDict()
+
 print('finished!')
