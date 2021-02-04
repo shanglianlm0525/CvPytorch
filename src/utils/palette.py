@@ -1,4 +1,8 @@
 
+'''
+    copy from https://github.com/yassouali/pytorch_segmentation/blob/master/utils/palette.py
+'''
+
 def get_voc_palette(num_classes):
     n = num_classes
     palette = [0]*(n*3)
