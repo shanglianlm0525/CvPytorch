@@ -13,6 +13,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from itertools import chain
+import numpy as np
+from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
 from CvPytorch.src.models.backbones import build_backbone
 
 class PPM(nn.Module):
@@ -69,7 +71,7 @@ class PSPNet(nn.Module):
         )
 
         self._init_weight(self.cls, self.aux)
-        self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 
     def _init_weight(self, *stages):
         for m in chain(*stages):
@@ -94,15 +96,8 @@ class PSPNet(nn.Module):
             return outputs
         else:
             losses = {}
-            losses['bce_loss'] = 0
-
-            for idx, d in enumerate(self.dictionary):
-                for _label, _weight in d.items():
-                    targets_onehot = torch.zeros_like(targets)
-                    targets_onehot[targets == idx] = 1
-                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(dim=1), targets_onehot.float()) * _weight
-
-            losses['bce_loss'] = losses['bce_loss'] / batch_size
+            losses['loss'] = 0
+            losses['bce_loss'] = self.bce_criterion(outputs, targets)
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':
@@ -112,13 +107,6 @@ class PSPNet(nn.Module):
                 aux = F.interpolate(aux, size=imgs.size()[2:], mode='bilinear', align_corners=True)
 
                 aux_weight = 0.4
-                losses['aux_loss'] = 0
-                for idx, d in enumerate(self.dictionary):
-                    for _label, _weight in d.items():
-                        targets_onehot = torch.zeros_like(targets)
-                        targets_onehot[targets == idx] = 1
-                        losses['aux_loss'] += self.bce_criterion(aux[:, idx, :, :].unsqueeze(dim=1),
-                                                                 targets_onehot.float()) * _weight
-                losses['aux_loss'] = losses['aux_loss'] / batch_size
+                losses['aux_loss'] = self.bce_criterion(outputs, targets)
                 losses['loss'] = losses['bce_loss'] + losses['aux_loss'] * aux_weight
                 return losses

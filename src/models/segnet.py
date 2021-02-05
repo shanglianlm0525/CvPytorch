@@ -14,9 +14,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchsummary import summary
-
+import numpy as np
 
 __all__ = ["SegNet"]
+
+from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
 
 
 def Conv3x3BNReLU(in_channels,out_channels,stride,groups=1):
@@ -91,7 +93,7 @@ class SegNet(nn.Module):
 
         self.outconv = nn.Conv2d(64, self._num_classes, kernel_size=3, padding=1)
 
-        self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 
     def _init_weight(self):
         for m in self.modules():
@@ -147,15 +149,8 @@ class SegNet(nn.Module):
             return outputs
         else:
             losses = {}
-            losses['bce_loss'] = 0
-
-            for idx, d in enumerate(self.dictionary):
-                for _label, _weight in d.items():
-                    targets_onehot = torch.zeros_like(targets)
-                    targets_onehot[targets == idx] = 1
-                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(dim=1),
-                                                             targets_onehot.float()) * _weight
-            losses['bce_loss'] = losses['bce_loss'] / batch_size
+            losses['loss'] = 0
+            losses['bce_loss'] = self.bce_criterion(outputs, targets)
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':

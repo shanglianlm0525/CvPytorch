@@ -13,53 +13,13 @@ from itertools import chain
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
 from src.models.modules.aspp import ASPP
 from src.models.backbones import build_backbone
 
-
-class ResNet(nn.Module):
-    def __init__(self, backbone='resnet50', pretrained_path=None):
-        super().__init__()
-        if backbone == 'resnet18':
-            backbone = resnet18(pretrained=not pretrained_path)
-            self.final_out_channels = 256
-            self.low_level_inplanes = 64
-        elif backbone == 'resnet34':
-            backbone = resnet34(pretrained=not pretrained_path)
-            self.final_out_channels = 256
-            self.low_level_inplanes = 64
-        elif backbone == 'resnet50':
-            backbone = resnet50(pretrained=not pretrained_path)
-            self.final_out_channels = 1024
-            self.low_level_inplanes = 256
-        elif backbone == 'resnet101':
-            backbone = resnet101(pretrained=not pretrained_path)
-            self.final_out_channels = 1024
-            self.low_level_inplanes = 256
-        else:  # backbone == 'resnet152':
-            backbone = resnet152(pretrained=not pretrained_path)
-            self.final_out_channels = 1024
-            self.low_level_inplanes = 256
-        if pretrained_path:
-            backbone.load_state_dict(torch.load(pretrained_path))
-
-
-        self.early_extractor = nn.Sequential(*list(backbone.children())[:5])
-        self.later_extractor = nn.Sequential(*list(backbone.children())[5:7])
-
-        conv4_block1 = self.later_extractor[-1][0]
-
-        conv4_block1.conv1.stride = (1, 1)
-        conv4_block1.conv2.stride = (1, 1)
-        conv4_block1.downsample[0].stride = (1, 1)
-
-    def forward(self, x):
-        x = self.early_extractor(x)
-        out = self.later_extractor(x)
-        return out,x
-
+from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
 
 class Decoder(nn.Module):
     def __init__(self, num_classes, low_level_inplanes=256):
@@ -121,7 +81,7 @@ class Deeplabv3Plus(nn.Module):
 
         self._init_weight(self.aspp, self.decoder)
 
-        self.bce_criterion = nn.BCEWithLogitsLoss().cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 
 
     def _init_weight(self, *stages):
@@ -146,14 +106,7 @@ class Deeplabv3Plus(nn.Module):
             return outputs
         else:
             losses = {}
-            losses['bce_loss'] = 0
-
-            for idx, d in enumerate(self.dictionary):
-                for _label, _weight in d.items():
-                    targets_onehot = torch.zeros_like(targets)
-                    targets_onehot[targets == idx] = 1
-                    losses['bce_loss'] += self.bce_criterion(outputs[:, idx, :, :].unsqueeze(dim=1), targets_onehot.float()) * _weight
-            losses['bce_loss'] = losses['bce_loss'] / batch_size
+            losses['bce_loss'] = self.bce_criterion(outputs, targets)
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':

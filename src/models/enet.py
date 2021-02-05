@@ -206,7 +206,6 @@ class ENet(nn.Module):
         self.bce_criterion = BCEWithLogitsLoss2d(pos_weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
         self.dice_criterion = DiceLoss().cuda()
         self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
-        self.ce_criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 
         self.init_params()
 
@@ -244,9 +243,7 @@ class ENet(nn.Module):
             losses['bce_loss'] = self.bce_criterion(outputs, targets)
             losses['dice_loss'] = self.dice_criterion(outputs, targets)
             losses['ce_dice_loss'] = self.ce_dice_criterion(outputs, targets)
-            losses['ce1_loss'] = self.ce_criterion1(outputs, targets)
             losses['loss'] = losses['ce_loss']
-            print(losses)
 
             if mode == 'val':
                 return losses, torch.argmax(outputs, dim=1).unsqueeze(1)
