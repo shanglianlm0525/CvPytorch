@@ -46,13 +46,15 @@ class BCEWithLogitsLoss2d(nn.Module):
         self.weight = weight
         self.pos_weight = pos_weight
         self.reduction = reduction
-        # self.BCE = nn.BCEWithLogitsLoss(weight=weight, pos_weight=pos_weight, reduction=reduction)
 
     def forward(self, output, target):
         assert output.shape[0] == target.shape[0] and output.shape[2:] == target.shape[2:]
         target = make_one_hot(target.long(), output.size()[1], self.ignore_index)
-        pos_weight = self.pos_weight.view(1, -1, 1, 1).expand(target.shape).cuda()
-        loss = F.binary_cross_entropy_with_logits(output, target.float(), weight=self.weight, pos_weight=pos_weight,
+        if self.weight is not None and self.weight.shape != target.shape:
+            self.weight = self.weight.view(1, -1, 1, 1).expand(target.shape).cuda()
+        if self.pos_weight is not None and self.pos_weight.shape != target.shape:
+            self.pos_weight = self.weight.view(1, -1, 1, 1).expand(target.shape).cuda()
+        loss = F.binary_cross_entropy_with_logits(output, target.float(), weight=self.weight, pos_weight=self.pos_weight,
                                                  reduction=self.reduction)
         return loss
 
@@ -118,11 +120,17 @@ class CE_DiceLoss(nn.Module):
         return ce_loss + dice_loss
 
 if __name__ == '__main__':
-    ce_loss = CrossEntropyLoss2d()
-    input = torch.randn(3, 5)
-    target = torch.empty(3, dtype=torch.long).random_(5)
+    input = torch.randn(4, 5, 6, 7)
+    target = torch.randn(4, 5, 6, 7)
+
+    ce_loss = CrossEntropyLoss2d(reduction='mean')
     output = ce_loss(input, target)
     print('ce_loss', output.item())
+
+    ce_loss = CrossEntropyLoss2d(reduction='sum')
+    output = ce_loss(input, target)
+    print('ce_loss', output.item())
+
 
     target = torch.ones([5, 6], dtype=torch.float32)  # 64 classes, batch size = 10
     output = torch.full([5, 6], 1.5)  # A prediction (logit)
