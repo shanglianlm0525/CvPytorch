@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/12/16 15:38
+# @Time : 2021/2/5 14:16
 # @Author : liumin
 # @File : __init__.py
 
@@ -39,5 +39,3 @@ def build_optimizer(cfg, model):
         raise ValueError("Unsupported optimizer type: {}".format(cfg.OPTIMIZER.TYPE))
 
     return optimizer
-
-
