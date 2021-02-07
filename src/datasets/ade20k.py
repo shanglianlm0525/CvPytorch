@@ -10,7 +10,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
 from CvPytorch.src.utils import palette
-from CvPytorch.src.transforms import custom_transforms as ctf
+from CvPytorch.src.datasets.transforms import custom_transforms as ctf
 
 """
     Cityscapes dataset

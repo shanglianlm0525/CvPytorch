@@ -10,7 +10,7 @@ import numpy as np
 
 from PIL import Image
 from torch.utils.data import Dataset
-from ..transforms import custom_transforms as ctf
+from .transforms import custom_transforms as ctf, build_transforms
 
 
 def get_data_transforms(input_size):
@@ -42,7 +42,8 @@ class CamvidSegmentation(Dataset):
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
+        # self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
+        self.transform = build_transforms(data_cfg.TRANSFORMS)
         self.target_transform = target_transform
         self.stage = stage
 

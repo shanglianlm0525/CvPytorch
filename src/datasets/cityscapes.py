@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from ..utils import palette
-from ..transforms import custom_transforms as ctf
+from .transforms import custom_transforms as ctf
 
 """
     ADE20K dataset
