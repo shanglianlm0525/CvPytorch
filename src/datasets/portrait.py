@@ -3,41 +3,14 @@
 # @Time : 2020/7/9 8:56
 # @Author : liumin
 # @File : portrait.py
-import cv2
+
 from glob2 import glob
 import os
 
-import torch
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from torchvision import transforms as tf
-from .transforms import custom_transforms as ctf
-
-
-data_transforms = {
-    'train': tf.Compose([
-        ctf.Resize((600,800)),
-        ctf.RandomHorizontalFlip(p=0.5),
-        ctf.ColorJitter(brightness=0.01, contrast=0.01, saturation=0.01, hue=0.01),
-        ctf.RandomRotate(5),
-        # ctf.RandomTranslation(2),
-        ctf.ToTensor(),
-        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ]),
-
-    'val': tf.Compose([
-        ctf.Resize((600, 800)),
-        ctf.ToTensor(),
-        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ]),
-
-    'infer': tf.Compose([
-        ctf.Resize((600, 800)),
-        ctf.ToTensor(),
-        ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ])
-}
+from .transforms import build_transforms
 
 
 class PortraitSegmentation(Dataset):
@@ -49,7 +22,7 @@ class PortraitSegmentation(Dataset):
         super(PortraitSegmentation, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = data_transforms[stage]
+        self.transform = build_transforms(data_cfg.TRANSFORMS)
         self.target_transform = None
         self.stage = stage
 

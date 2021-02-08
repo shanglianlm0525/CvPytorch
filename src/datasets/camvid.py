@@ -10,39 +10,13 @@ import numpy as np
 
 from PIL import Image
 from torch.utils.data import Dataset
-from .transforms import custom_transforms as ctf, build_transforms
-
-
-def get_data_transforms(input_size):
-    data_transforms = {
-        'train': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.RandomHorizontalFlip(p=0.5),
-            ctf.RandomTranslation(2),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ]),
-
-        'val': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ]),
-
-        'infer': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-    }
-    return data_transforms
+from .transforms import build_transforms
 
 class CamvidSegmentation(Dataset):
     ignore_index = 255
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        # self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
         self.transform = build_transforms(data_cfg.TRANSFORMS)
         self.target_transform = target_transform
         self.stage = stage
@@ -86,18 +60,18 @@ class CamvidSegmentation(Dataset):
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+            _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(Image.open(self._targets[idx]), dtype=np.uint8)
             _target = self.encode_segmap(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
     def encode_segmap(self, mask):
         # This is used to convert tags
-        mask = np.array(mask, dtype=np.uint8)
+        mask_cp = mask.copy()
         # no background, index form zero
-        mask[mask==11] = self.ignore_index
-        mask = Image.fromarray(mask)
-        return mask
+        mask_cp[mask_cp==11] = self.ignore_index
+        # mask = Image.fromarray(mask)
+        return mask_cp
 
     def __len__(self):
         return len(self._imgs)

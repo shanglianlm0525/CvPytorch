@@ -10,43 +10,19 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from ..utils import palette
-from .transforms import custom_transforms as ctf
+from .transforms import build_transforms
 
 """
     ADE20K dataset
     http://groups.csail.mit.edu/vision/datasets/ADE20K/
 """
 
-def get_data_transforms(input_size):
-    data_transforms = {
-        'train': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.RandomHorizontalFlip(p=0.5),
-            ctf.RandomTranslation(2),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ]),
-
-        'val': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ]),
-
-        'infer': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-    }
-    return data_transforms
-
 class CityscapesSegmentation(Dataset):
     ignore_index = 255
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
+        self.transform = build_transforms(data_cfg.TRANSFORMS)
         self.target_transform = target_transform
         self.stage = stage
 
