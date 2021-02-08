@@ -5,15 +5,12 @@
 # @File : __init__.py
 
 import copy
+from CvPytorch.src.datasets.transforms import custom_transforms as ctf
 
-['KeepRatio',
-'RandomHorizontalFlip',
-'RandomTranslation',
-'ToTensor',
-'Normalize']
-
-def build_transforms(cfg, mode=None):
+def build_transforms(cfg, mode='train'):
     _params = []
     transform_cfg = copy.deepcopy(cfg)
     for t, v in transform_cfg.items():
-        print("'" + t + "', ")
+        t = getattr(ctf, t)(**v) if v is not None else getattr(ctf, t)()
+        _params.append(t)
+    return ctf.Compose(_params)

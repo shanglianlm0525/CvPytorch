@@ -70,6 +70,7 @@ class ToTensor(object):
         # torch image: C X H X W
         img, target = sample['image'], sample['target']
         img = TF.to_tensor(img.astype(np.uint8))
+
         if len(target.shape) == 2:
             target = np.expand_dims(target, axis=0)
         target = torch.from_numpy(target).float()
