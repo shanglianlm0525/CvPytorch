@@ -9,69 +9,21 @@ from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
 from CvPytorch.src.utils import palette
-from ..transforms import custom_transforms as ctf
+from .transforms import build_transforms
 
 """
     Pascal Voc dataset
     http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
 """
 
-def get_data_transforms(input_size):
-    data_transforms = {
-        'train': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.RandomHorizontalFlip(p=0.5),
-            ctf.RandomTranslation(2),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ]),
-
-        'val': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ]),
-
-        'infer': ctf.Compose([
-            ctf.Resize(input_size),
-            ctf.ToTensor(),
-            # ctf.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-    }
-    return data_transforms
-
-
-def colormap(n):
-    cmap=np.zeros([n, 3]).astype(np.uint8)
-
-    for i in np.arange(n):
-        r, g, b = np.zeros(3)
-
-        for j in np.arange(8):
-            r = r + (1<<(7-j))*((i&(1<<(3*j))) >> (3*j))
-            g = g + (1<<(7-j))*((i&(1<<(3*j+1))) >> (3*j+1))
-            b = b + (1<<(7-j))*((i&(1<<(3*j+2))) >> (3*j+2))
-
-        cmap[i,:] = np.array([r, g, b])
-    return cmap
 
 class VOCSegmentation(Dataset):
-    """
-    Pascal Voc dataset
-    http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
-    """
     ignore_index = 255
-    VOC_COLORMAP = [[0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0],
-                    [0, 0, 128], [128, 0, 128], [0, 128, 128], [128, 128, 128],
-                    [64, 0, 0], [192, 0, 0], [64, 128, 0], [192, 128, 0],
-                    [64, 0, 128], [192, 0, 128], [64, 128, 128], [192, 128, 128],
-                    [0, 64, 0], [128, 64, 0], [0, 192, 0], [128, 192, 0],
-                    [0, 64, 128]]
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         super(VOCSegmentation, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = get_data_transforms(data_cfg.INPUT_SIZE)[stage]
+        self.transform = build_transforms(data_cfg.TRANSFORMS)
         self.target_transform = None
         self.stage = stage
 
