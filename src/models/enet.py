@@ -203,7 +203,7 @@ class ENet(nn.Module):
         self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self._weight)).float()).cuda()
         self.focal_criterion = FocalLoss(alpha=torch.from_numpy(np.array(self._weight)).float()).cuda()
         self.lovasz_criterion = LovaszSoftmax().cuda()
-        self.bce_criterion = BCEWithLogitsLoss2d(pos_weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
         self.dice_criterion = DiceLoss().cuda()
         self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 

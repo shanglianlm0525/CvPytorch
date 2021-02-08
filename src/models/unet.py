@@ -13,7 +13,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
+from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d, CrossEntropyLoss2d, FocalLoss, LovaszSoftmax, DiceLoss, \
+    CE_DiceLoss
 
 
 def Conv3x3BNReLU(in_channels,out_channels,stride,groups=1):
@@ -109,7 +110,12 @@ class UNet(nn.Module):
         self.up4 = UpConv(128, 64)
         self.outconv = nn.Conv2d(64, self._num_classes, kernel_size=1)
 
+        self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.focal_criterion = FocalLoss(alpha=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.lovasz_criterion = LovaszSoftmax().cuda()
         self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.dice_criterion = DiceLoss().cuda()
+        self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 
         self.init_params()
 
@@ -144,9 +150,14 @@ class UNet(nn.Module):
             return probs * 255
         else:
             losses = {}
-            losses['loss'] = 0
+            losses['ce_loss'] = self.ce_criterion(outputs, targets)
+            losses['focal_loss'] = self.focal_criterion(outputs, targets)
+            losses['lovasz_loss'] = self.lovasz_criterion(outputs, targets)
+
             losses['bce_loss'] = self.bce_criterion(outputs, targets)
-            losses['loss'] = losses['bce_loss']
+            losses['dice_loss'] = self.dice_criterion(outputs, targets)
+            losses['ce_dice_loss'] = self.ce_dice_criterion(outputs, targets)
+            losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
                 return losses, torch.argmax(outputs, dim=1).unsqueeze(1)

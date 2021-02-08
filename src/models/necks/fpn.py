@@ -19,7 +19,7 @@ class FPN(nn.Module):
     '''modified from MMDetection'''
 
     def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2):
-        super().__init__()
+        super(FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
         self.out_channels = out_channels

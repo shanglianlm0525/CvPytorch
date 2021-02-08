@@ -7,11 +7,11 @@
 from copy import deepcopy
 from .fpn import FPN
 from .pan import PAN
-from .yolo_neck import YOLOV3Neck, YOLOV4Neck, YOLOV5Neck
+from .yolov3_neck import YOLOV3Neck
 
 __all__ = [
     'FPN', 'PAN',
-    'YOLOV3Neck', 'YOLOV4Neck', 'YOLOV5Neck'
+    'YOLOV3Neck'
 ]
 
 def build_neck(cfg):
