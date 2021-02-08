@@ -8,15 +8,17 @@ import random
 import cv2
 import torch
 from PIL import Image
-from torchvision import transforms as T
+from torchvision.transforms import functional as TF
 import numpy as np
 from numbers import Number
 
-__all__ = ['KeepRatio',
-'RandomHorizontalFlip',
-'RandomTranslation',
-'ToTensor',
-'Normalize']
+__all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
+        'Resize', 'Scale', 'RandomCrop', 'CenterCrop',
+        'RandomRotate', 'RandomTranslation',
+        'ColorJitter', 'RandomGaussianBlur',
+        'Normalize', 'DeNormalize', 'ToTensor',
+        'RGB2BGR', 'BGR2RGB', 'Encrypt']
+
 
 class Compose(object):
     def __init__(self, transforms):
@@ -28,16 +30,6 @@ class Compose(object):
         for t in self.transforms:
             sample = t(sample)
         return sample
-
-
-class KeepRatio(object):
-    def __init__(self, keep_ratio=True, padding=0, ignore_label=255):
-        self.keep_ratio = keep_ratio
-        self.padding = padding
-        self.ignore_label = ignore_label
-
-    def __call__(self, sample):
-        pass
 
 
 class Normalize(object):
@@ -77,13 +69,9 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         img, target = sample['image'], sample['target']
-
-        img = np.array(img).astype(np.float32).transpose((2, 0, 1))
-        target = np.array(target).astype(np.float32)
+        img = TF.to_tensor(img.astype(np.uint8))
         if len(target.shape) == 2:
             target = np.expand_dims(target, axis=0)
-
-        img = torch.from_numpy(img).float() / 255.0
         target = torch.from_numpy(target).float()
         return {'image': img, 'target': target}
 
@@ -94,19 +82,20 @@ class Encrypt(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        target = cv2.resize(target, [int(img.size(0) / self.down_size[0]), (int(img.size(1) / self.down_size[1]))], interpolation=cv2.INTER_NEAREST)
+        h, w, _ = img.shape
+        target = cv2.resize(target, (w // self.down_size[1], h // self.down_size[0]), interpolation=cv2.INTER_NEAREST)
         return {'image': img,'target': target}
 
 
 class Resize(object):
     def __init__(self, size): # size: (h, w)
-        self.size = (size, size) if isinstance(size, int) else size
+        self.size = (size, size) if isinstance(size, int) else (size)
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         assert img.shape[:2] == target.shape
-        img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
-        target = cv2.resize(target, self.size[::-1], interpolation=cv2.INTER_NEAREST)
+        img = cv2.resize(img, tuple(self.size[::-1]), interpolation=cv2.INTER_LINEAR)
+        target = cv2.resize(target, tuple(self.size[::-1]), interpolation=cv2.INTER_NEAREST)
         return {'image': img,'target': target}
 
 
@@ -166,22 +155,25 @@ class RandomGaussianBlur(object):
 
 
 class RandomTranslation(object):
-    def __init__(self, pixel, padding=255):
+    def __init__(self, p=0.5, pixel=(2,2), ignore_label=255): # (h, w)
+        self.p = p
         if isinstance(pixel, Number):
-            self.transX = random.randint(-pixel, pixel)
-            self.transY = random.randint(-pixel, pixel)
+            self.transX = random.randint(pixel, pixel)
+            self.transY = random.randint(pixel, pixel)
         else:
-            self.transX = random.randint(-pixel[0], pixel[0])
-            self.transY = random.randint(-pixel[1], pixel[1])
-        self.padding = padding
+            self.transX = random.randint(pixel[1], pixel[1])
+            self.transY = random.randint(pixel[0], pixel[0])
+        self.ignore_label = ignore_label
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         # Random translation 0-2 pixels (fill rest with padding
-        img = ImageOps.expand(img, border=(self.transX, self.transY, 0, 0), fill=0)
-        target = ImageOps.expand(target, border=(self.transX, self.transY, 0, 0), fill=self.padding)  # pad label filling with 255
-        img = img.crop((0, 0, img.size[0] - self.transX, img.size[1] - self.transY))
-        target = target.crop((0, 0, target.size[0] - self.transX, target.size[1] - self.transY))
+        if random.random() < self.p:
+            img = cv2.copyMakeBorder(img, self.transX, 0, self.transY, 0, cv2.BORDER_CONSTANT, (0, 0, 0)) # top, bottom, left, right
+            target = cv2.copyMakeBorder(target, self.transX, 0, self.transY, 0, cv2.BORDER_CONSTANT, self.ignore_label)
+            h, w, _ = img.shape
+            img = img[:h - self.transY, :w - self.transX]
+            target = target[:h - self.transY, :w - self.transX]
         return {'image': img,'target': target}
 
 
@@ -348,19 +340,7 @@ if __name__ == '__main__':
     print('img', img.shape)
     print('target', target.shape)
 
-    '''
-        ['', 'RandomHorizontalFlip', 'RandomVerticalFlip', 
-        'Resize', '', '',
-        'RandomRotate', '', '', # RandomTranslation
-        'ColorJitter', 'RandomGaussianBlur',
-        'RandomCrop', 'CenterCrop',
-        '', '', '',  # Scale FreeScale FixScaleCrop
-        'Encrypt', 
-        'Normalize', 'DeNormalize', 'ToTensor',  
-        'RGB2BGR', 'BGR2RGB', '']
-    '''
-
-    test_transform = Scale(size=300)
+    test_transform = ToTensor()
     sample = test_transform(sample)
     img, target = sample['image'], sample['target']
     print('-'*20)
