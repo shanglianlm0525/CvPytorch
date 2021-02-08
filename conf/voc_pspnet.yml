@@ -15,12 +15,17 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 16
     NUM_WORKER: 4
-    INPUT_SIZE: [512, 512]
     LABELS:
       DET_DIR: '/home/lmin/data/VOCdevkit'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/VOCdevkit'
       SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      Resize: { size: [512, 512] } # [h,w]
+      RandomHorizontalFlip: { p: 0.5 }
+      RandomTranslation: { p: 0.5, pixel: [2,2] }
+      ToTensor:
+      Normalize: { mean: [0.5, 0.5, 0.5], std:[1.0, 1.0, 1.0] }
 
   VAL:
     IMG_DIR: '/home/lmin/data/VOCdevkit'
@@ -29,19 +34,15 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 4
-    INPUT_SIZE: [512, 512]
     LABELS:
       DET_DIR: '/home/lmin/data/VOCdevkit'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/VOCdevkit'
       SEG_SUFFIX: '*.png'
-
-  TRANSFORMS:
-    CenterCrop:
-      crop_size: [512, 512]
-    ToTensor:
-    ToBGR:
-    ImageSubtract128:
+    TRANSFORMS:
+      Resize: { size: [512, 512] }
+      ToTensor:
+      Normalize: { mean: [0.5, 0.5, 0.5], std:[1.0, 1.0, 1.0] }
 
 
 #########################################

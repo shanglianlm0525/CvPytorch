@@ -15,12 +15,17 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 16
     NUM_WORKER: 4
-    INPUT_SIZE: [712, 712]
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelTrainIds.png'
+    TRANSFORMS:
+      Resize: { size: [712, 712] } # [h,w]
+      RandomHorizontalFlip: { p: 0.5 }
+      RandomTranslation: { p: 0.5, pixel: [2,2] }
+      ToTensor:
+      Normalize: { mean: [0.5, 0.5, 0.5], std:[1.0, 1.0, 1.0] }
 
   VAL:
     IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
@@ -29,19 +34,15 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 4
-    INPUT_SIZE: [712, 712]
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelTrainIds.png'
-
-  TRANSFORMS:
-    CenterCrop:
-      crop_size: [712, 712]
-    ToTensor:
-    ToBGR:
-    ImageSubtract128:
+    TRANSFORMS:
+      Resize: { size: [712, 712] }
+      ToTensor:
+      Normalize: { mean: [0.5, 0.5, 0.5], std:[1.0, 1.0, 1.0] }
 
 
 #########################################
