@@ -7,9 +7,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-
-from CvPytorch.src.losses.lovasz_losses import lovasz_softmax
+from .lovasz_losses import lovasz_softmax
 
 
 def make_one_hot(labels, classes, ignore_index=None):
@@ -53,7 +51,7 @@ class BCEWithLogitsLoss2d(nn.Module):
         if self.weight is not None and self.weight.shape != target.shape:
             self.weight = self.weight.view(1, -1, 1, 1).expand(target.shape).cuda()
         if self.pos_weight is not None and self.pos_weight.shape != target.shape:
-            self.pos_weight = self.weight.view(1, -1, 1, 1).expand(target.shape).cuda()
+            self.pos_weight = self.pos_weight.view(1, -1, 1, 1).expand(target.shape).cuda()
         loss = F.binary_cross_entropy_with_logits(output, target.float(), weight=self.weight, pos_weight=self.pos_weight,
                                                  reduction=self.reduction)
         return loss
@@ -123,11 +121,7 @@ if __name__ == '__main__':
     input = torch.randn(4, 5, 6, 7)
     target = torch.randn(4, 5, 6, 7)
 
-    ce_loss = CrossEntropyLoss2d(reduction='mean')
-    output = ce_loss(input, target)
-    print('ce_loss', output.item())
-
-    ce_loss = CrossEntropyLoss2d(reduction='sum')
+    ce_loss = CrossEntropyLoss2d()
     output = ce_loss(input, target)
     print('ce_loss', output.item())
 
