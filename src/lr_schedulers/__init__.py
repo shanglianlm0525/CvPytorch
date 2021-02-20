@@ -5,10 +5,10 @@
 # @File : __init__.py
 
 import math
-from torch.optim.lr_scheduler import StepLR, MultiStepLR, ExponentialLR, ReduceLROnPlateau, CosineAnnealingLR, LambdaLR
+from torch.optim.lr_scheduler import StepLR, MultiStepLR, ExponentialLR, ReduceLROnPlateau, CosineAnnealingLR, CosineAnnealingWarmRestarts, LambdaLR
 
 
-__all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR','ExponentialLR']
+__all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts','ExponentialLR']
 
 '''
         schedule_cfg = copy.deepcopy(self.cfg.schedule.lr_schedule)
@@ -46,6 +46,10 @@ def build_lr_scheduler(cfg, optimizer):
         lr_scheduler_ft = LambdaLR(optimizer, lr_lambda=lf)
 
         # lr_scheduler_ft = CosineAnnealingLR(optimizer, T_max=cfg.N_MAX_EPOCHS, eta_min=0.02)
+
+    elif cfg.LR_SCHEDULER.TYPE == "CosineAnnealingWarmRestarts":
+        lr_scheduler_ft = CosineAnnealingWarmRestarts(optimizer, T_0=cfg.N_MAX_EPOCHS, T_mult=1, eta_min=0.02)
+        # torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0, T_mult=1, eta_min=0.02, last_epoch=-1)
     else:
         raise ValueError("Unsupported lr_scheduler type: {}".format(cfg.LR_SCHEDULER.TYPE))
 
