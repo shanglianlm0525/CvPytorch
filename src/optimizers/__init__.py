@@ -28,16 +28,16 @@ def build_optimizer(cfg, model):
 
     opt_type = cfg.OPTIMIZER.TYPE.lower()
 
-    if opt_type == "SGD":
+    if opt_type == "sgd":
         '''torch.optim.SGD(params, lr=0.001, momentum=0, dampening=0, weight_decay=0, nesterov=False)'''
         optimizer = SGD(_params)
-    elif opt_type == "Adam":
+    elif opt_type == "adam":
         '''torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)'''
         optimizer = Adam(_params)
-    elif opt_type == "Adadelta":
+    elif opt_type == "adadelta":
         '''torch.optim.Adadelta(params, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0)'''
         optimizer = Adadelta(_params)
-    elif opt_type == 'RMSprop':
+    elif opt_type == 'rmsprop':
         '''torch.optim.RMSprop(params, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)'''
         optimizer = RMSprop(_params)
     else:
