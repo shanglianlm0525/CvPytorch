@@ -5,9 +5,9 @@
 # @File : __init__.py
 
 from copy import deepcopy
-from torch.optim import SGD, Adam, RMSprop, Adadelta
+from torch.optim import SGD, Adam, AdamW, RMSprop, Adadelta
 
-__all__ = ['SGD','Adam', 'Adadelta','RMSprop']
+__all__ = ['SGD','Adam', 'AdamW','Adadelta','RMSprop']
 
 
 def get_current_lr(optimizer):
@@ -34,6 +34,9 @@ def build_optimizer(cfg, model):
     elif opt_type == "adam":
         '''torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)'''
         optimizer = Adam(_params)
+    elif opt_type == "adamw":
+        '''torch.optim.AdamW(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False)'''
+        optimizer = AdamW(_params)
     elif opt_type == "adadelta":
         '''torch.optim.Adadelta(params, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0)'''
         optimizer = Adadelta(_params)
