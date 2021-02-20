@@ -26,16 +26,18 @@ def build_optimizer(cfg, model):
             if "bias" in n:
                 _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
 
-    if cfg.OPTIMIZER.TYPE == "SGD":
+    opt_type = cfg.OPTIMIZER.TYPE.lower()
+
+    if opt_type == "SGD":
         '''torch.optim.SGD(params, lr=0.001, momentum=0, dampening=0, weight_decay=0, nesterov=False)'''
         optimizer = SGD(_params)
-    elif cfg.OPTIMIZER.TYPE == "Adam":
+    elif opt_type == "Adam":
         '''torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)'''
         optimizer = Adam(_params)
-    elif cfg.OPTIMIZER.TYPE == "Adadelta":
+    elif opt_type == "Adadelta":
         '''torch.optim.Adadelta(params, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0)'''
         optimizer = Adadelta(_params)
-    elif cfg.OPTIMIZER.TYPE == 'RMSprop':
+    elif opt_type == 'RMSprop':
         '''torch.optim.RMSprop(params, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)'''
         optimizer = RMSprop(_params)
     else:
