@@ -5,9 +5,9 @@
 # @File : __init__.py
 
 from copy import deepcopy
-from torch.optim import SGD, Adam, RMSprop
+from torch.optim import SGD, Adam, RMSprop, Adadelta
 
-__all__ = ['SGD','Adam','RMSprop']
+__all__ = ['SGD','Adam', 'Adadelta','RMSprop']
 
 
 def get_current_lr(optimizer):
@@ -32,10 +32,13 @@ def build_optimizer(cfg, model):
     elif cfg.OPTIMIZER.TYPE == "Adam":
         '''torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)'''
         optimizer = Adam(_params)
+    elif cfg.OPTIMIZER.TYPE == "Adadelta":
+        '''torch.optim.Adadelta(params, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0)'''
+        optimizer = Adadelta(_params)
     elif cfg.OPTIMIZER.TYPE == 'RMSprop':
         '''torch.optim.RMSprop(params, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)'''
         optimizer = RMSprop(_params)
     else:
-        raise ValueError("Unsupported optimizer type: {}".format(cfg.OPTIMIZER.TYPE))
+        raise ValueError("Unsupported optimizer type: {}, Expected optimizer method in [SGD, Adam, Adadelta, RMSprop]".format(cfg.OPTIMIZER.TYPE))
 
     return optimizer
