@@ -7,9 +7,9 @@ DATASET:
   DICTIONARY_NAME: 'DET_CLASSES'
 
   TRAIN:
-    IMG_DIR: '//home/lmin/data/VOCdevkit'
+    IMG_DIR: '/home/lmin/data/VOCdevkit'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/VOCdevkit/train_det1.txt'
+    INDICES: '/home/lmin/data/VOCdevkit/train_det.txt'
     SHUFFLE: True
     LABELS:
       DET_DIR: '/home/lmin/data/VOCdevkit'
@@ -20,7 +20,7 @@ DATASET:
   VAL:
     IMG_DIR: '/home/lmin/data/VOCdevkit'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/VOCdevkit/val_det1.txt'
+    INDICES: '/home/lmin/data/VOCdevkit/val_det.txt'
     SHUFFLE: False
     LABELS:
       DET_DIR: '/home/lmin/data/VOCdevkit'
@@ -71,7 +71,7 @@ OPTIMIZER:
 ## LR_SCHEDULER
 LR_SCHEDULER:
   TYPE: 'MultiStepLR'
-  MILESTONES: [20, 40, 80, 120, 160]
+  MILESTONES: [3, 6]
   GAMMA: 0.1
   PATIENCE: 10
   WARMUP:
@@ -93,7 +93,7 @@ BATCH_SIZE: 4
 NUM_WORKERS: 4
 N_MAX_EPOCHS: 30
 
-N_ITERS_TO_DISPLAY_STATUS: 50
+N_ITERS_TO_DISPLAY_STATUS: 100
 
 ## TENSORBOARD
 TENSORBOARD: False

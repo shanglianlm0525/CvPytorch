@@ -21,11 +21,12 @@ DATASET:
       SEG_DIR: '/home/lmin/data/VOCdevkit'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      Resize: { size: [512, 512] } # [h,w]
+      # Resize: { size: [512, 512] } # [h,w]
       RandomHorizontalFlip: { p: 0.5 }
-      RandomTranslation: { p: 0.5, pixel: [2,2] }
+      RandomScale: { size: 520 }
+      RandomCrop: { size: 480 }
       ToTensor:
-      Normalize: { mean: [0.5, 0.5, 0.5], std:[1.0, 1.0, 1.0] }
+      Normalize: { mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] }
 
   VAL:
     IMG_DIR: '/home/lmin/data/VOCdevkit'
@@ -40,9 +41,9 @@ DATASET:
       SEG_DIR: '/home/lmin/data/VOCdevkit'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      Resize: { size: [512, 512] }
+      FixScaleCrop: { size: [480, 480] }
       ToTensor:
-      Normalize: { mean: [0.5, 0.5, 0.5], std:[1.0, 1.0, 1.0] }
+      Normalize: { mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] }
 
 
 #########################################

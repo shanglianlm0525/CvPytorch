@@ -1,21 +1,21 @@
 SEG_CLASSES:
   # - background: 1
-  - road: 1
-  - sidewalk: 1
-  - building: 1
-  - wall: 1
-  - fence: 1
-  - pole: 1
-  - traffic light: 1
-  - traffic sign: 1
-  - vegetation : 1
-  - terrain: 1
-  - sky: 1
-  - person: 1
-  - rider: 1
-  - car: 1
-  - truck: 1
-  - bus: 1
-  - train: 1
-  - motorcycle: 1
-  - bicycle: 1
+  - road: 0.8373
+  - sidewalk: 0.918
+  - building: 0.866
+  - wall: 1.0345
+  - fence: 1.0166
+  - pole: 0.9969
+  - traffic light: 0.9754
+  - traffic sign: 1.0489
+  - vegetation : 0.8786
+  - terrain: 1.0023
+  - sky: 0.9539
+  - person: 0.9843
+  - rider: 1.1116
+  - car: 0.9037
+  - truck: 1.0865
+  - bus: 1.0955
+  - train: 1.0865
+  - motorcycle: 1.1529
+  - bicycle: 1.0507

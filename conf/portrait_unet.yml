@@ -48,7 +48,7 @@ DATASET:
 
 ## MODEL
 USE_MODEL: 'src.models.unet.UNet'
-# USE_MODEL: 'src.models.unet_model.UnetModel'
+EVAL_FUNC: 'segmentation'
 
 ## CHECKPOINT
 CHECKPOINT_DIR: 'checkpoints'
@@ -85,8 +85,8 @@ GRAD_CLIP:
 
 ## CONFIGURATIONS
 GPU_IDS: [1]
-BATCH_SIZE: 4
-NUM_WORKERS: 8
+BATCH_SIZE: 2
+NUM_WORKERS: 2
 N_MAX_EPOCHS: 100
 
 N_ITERS_TO_DISPLAY_STATUS: 100
