@@ -66,7 +66,7 @@ class CityscapesSegmentation(Dataset):
     def __getitem__(self, idx):
         if self.stage == 'infer':
             _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
-            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
+            img_id = os.path.basename(os.path.basename(self._imgs[idx]))
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
