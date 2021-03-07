@@ -37,6 +37,49 @@ class CrossEntropyLoss2d(nn.Module):
         return self.CE(output, target)
 
 
+class OhemCrossEntropyLoss2d(nn.Module):
+    def __init__(self, weight=None, thresh=0.7, min_kept=100000, ignore_index=255, reduction='mean'):
+        super(OhemCrossEntropyLoss2d, self).__init__()
+        self.thresh = float(thresh)
+        self.min_kept = int(min_kept)
+        self.ignore_index = ignore_index
+        self.CE = nn.CrossEntropyLoss(weight=weight, ignore_index=ignore_index, reduction=reduction)
+
+    def forward(self, output, target):
+        assert output.shape[0] == target.shape[0] and output.shape[2:] == target.shape[2:]
+        target = target.squeeze(1).long()
+
+        # ohem
+        n, c, h, w = output.size()
+        target = target.view(-1)
+        valid_mask = target.ne(self.ignore_index)
+        target = target * valid_mask.long()
+        num_valid = valid_mask.sum()
+
+        prob = F.softmax(output, dim=1)
+        prob = prob.transpose(0, 1).reshape(c, -1)
+
+        if num_valid > 0:
+            # prob = prob.masked_fill_(1 - valid_mask, 1)
+            prob = prob.masked_fill_(~valid_mask, 1)
+            mask_prob = prob[target, torch.arange(len(target), dtype=torch.long)]
+            threshold = self.thresh
+            if self.min_kept > 0:
+                index = mask_prob.argsort()
+                threshold_index = index[min(len(index), self.min_kept) - 1]
+                if mask_prob[threshold_index] > self.thresh:
+                    threshold = mask_prob[threshold_index]
+            kept_mask = mask_prob.le(threshold)
+            valid_mask = valid_mask * kept_mask
+            target = target * kept_mask.long()
+
+        # target = target.masked_fill_(1 - valid_mask, self.ignore_index)
+        target = target.masked_fill_(~valid_mask, self.ignore_index)
+        target = target.view(n, h, w)
+
+        return self.CE(output, target)
+
+
 class BCEWithLogitsLoss2d(nn.Module):
     def __init__(self, weight=None, pos_weight=None, ignore_index=255, reduction='mean'):
         super(BCEWithLogitsLoss2d, self).__init__()
@@ -48,20 +91,28 @@ class BCEWithLogitsLoss2d(nn.Module):
     def forward(self, output, target):
         assert output.shape[0] == target.shape[0] and output.shape[2:] == target.shape[2:]
         target = make_one_hot(target.long(), output.size()[1], self.ignore_index)
-        if self.weight is not None and self.weight.shape != target.shape:
-            self.weight = self.weight.view(1, -1, 1, 1).expand(target.shape).cuda()
-        if self.pos_weight is not None and self.pos_weight.shape != target.shape:
-            self.pos_weight = self.pos_weight.view(1, -1, 1, 1).expand(target.shape).cuda()
-        loss = F.binary_cross_entropy_with_logits(output, target.float(), weight=self.weight, pos_weight=self.pos_weight,
+        weight = None
+        if self.weight is not None:
+            if self.weight.shape != target.shape:
+                weight = self.weight.view(1, -1, 1, 1).expand(target.shape).cuda()
+            else:
+                weight = self.weight.cuda()
+        pos_weight = None
+        if self.pos_weight is not None:
+            if self.pos_weight.shape != target.shape:
+                pos_weight = self.pos_weight.view(1, -1, 1, 1).expand(target.shape).cuda()
+            else:
+                pos_weight = self.pos_weight.cuda()
+        loss = F.binary_cross_entropy_with_logits(output, target.float(), weight=weight, pos_weight=pos_weight,
                                                  reduction=self.reduction)
         return loss
 
-
 class DiceLoss(nn.Module):
-    def __init__(self, smooth=1., ignore_index=255):
+    def __init__(self, smooth=1., weight=None, ignore_index=255):
         super(DiceLoss, self).__init__()
         self.ignore_index = ignore_index
         self.smooth = smooth
+        self.weight = weight
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, output, target):
@@ -69,39 +120,44 @@ class DiceLoss(nn.Module):
         target = make_one_hot(target.long(), output.size()[1], self.ignore_index)
         output = self.softmax(output)
         target = target.float()
-        # have to be contiguous since they may from a torch.view op
-        output_flat = output.contiguous().view(-1)
-        target_flat = target.contiguous().view(-1)
-        intersection = (output_flat * target_flat).sum()
-        loss = 1 - ((2. * intersection + self.smooth) /
-                    (output_flat.sum() + target_flat.sum() + self.smooth))
-        return loss
+
+        loss = 0
+        for i in range(output.shape[1]):
+            output_flat = output[:, i, :, :].contiguous().view(-1)
+            target_flat = target[:, i, :, :].contiguous().view(-1)
+            intersection = (output_flat * target_flat).sum()
+            dice_loss = 1 - ((2. * intersection + self.smooth) /
+                        (output_flat.sum() + target_flat.sum() + self.smooth))
+            if self.weight is not None:
+                dice_loss *= self.weight[i]
+            loss += dice_loss
+        return loss / output.shape[1]
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, gamma=2, alpha=None, ignore_index=255, reduction='mean'):
+    def __init__(self, gamma=2, alpha=0.5, weight=None, ignore_index=255, reduction='mean'):
         super(FocalLoss, self).__init__()
         self.gamma = gamma
         self.alpha = alpha
-        self.CE = CrossEntropyLoss2d(weight=alpha,ignore_index=ignore_index, reduction=reduction)
+        self.weight = weight
+        self.CE = CrossEntropyLoss2d(weight=self.weight,ignore_index=ignore_index, reduction=reduction)
 
     def forward(self, output, target):
         logpt = self.CE(output, target)
         pt = torch.exp(-logpt)
-        loss = ((1-pt)**self.gamma) * logpt
+        loss = ((1-pt) ** self.gamma) * logpt
         return loss
 
 
 class LovaszSoftmax(nn.Module):
-    def __init__(self, classes='present', per_image=False, ignore_index=255):
+    def __init__(self, classes='present', ignore_index=255):
         super(LovaszSoftmax, self).__init__()
-        self.smooth = classes
-        self.per_image = per_image
+        self.classes = classes
         self.ignore_index = ignore_index
 
     def forward(self, output, target):
         logits = F.softmax(output, dim=1)
-        loss = lovasz_softmax(logits, target, ignore=self.ignore_index)
+        loss = lovasz_softmax(logits, target, classes=self.classes, ignore=self.ignore_index)
         return loss
 
 
@@ -116,6 +172,7 @@ class CE_DiceLoss(nn.Module):
         ce_loss = self.ce(output, target)
         dice_loss = self.dice(output, target)
         return ce_loss + dice_loss
+
 
 if __name__ == '__main__':
     input = torch.randn(4, 5, 6, 7)
