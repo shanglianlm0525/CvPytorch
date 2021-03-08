@@ -3,6 +3,7 @@ CvPytorch
 CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 
+
 ## Dependencies
 - Python 3.8
 - PyTorch 1.6.0
