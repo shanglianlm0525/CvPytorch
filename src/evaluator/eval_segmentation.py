@@ -29,8 +29,8 @@ class SegmentationEvaluator(object):
 
     def Mean_Pixel_Accuracy(self):
         Acc = np.diag(self.confusion_matrix) / self.confusion_matrix.sum(axis=1)
-        Acc = np.nanmean(Acc)
-        return Acc
+        mAcc = np.nanmean(Acc)
+        return mAcc
 
     def Mean_Intersection_over_Union(self):
         MIoU = np.diag(self.confusion_matrix) / (
