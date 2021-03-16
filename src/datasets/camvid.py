@@ -5,19 +5,25 @@
 # @File : camvid.py
 
 import os
+
+import cv2
+import random
 from glob2 import glob
 import numpy as np
-
 from PIL import Image
 from torch.utils.data import Dataset
-from .transforms import build_transforms
+
+"""
+    CamVid dataset
+    http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/
+"""
 
 class CamvidSegmentation(Dataset):
     ignore_index = 255
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = build_transforms(data_cfg.TRANSFORMS)
+        self.transform = transform
         self.target_transform = target_transform
         self.stage = stage
 
@@ -61,6 +67,7 @@ class CamvidSegmentation(Dataset):
             return self.transform(sample), img_id
         else:
             _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(Image.open(self._targets[idx]), dtype=np.uint8)
+
             _target = self.encode_segmap(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
