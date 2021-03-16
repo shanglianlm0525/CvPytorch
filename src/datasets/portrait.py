@@ -10,7 +10,6 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from .transforms import build_transforms
 
 
 class PortraitSegmentation(Dataset):
@@ -22,8 +21,8 @@ class PortraitSegmentation(Dataset):
         super(PortraitSegmentation, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = build_transforms(data_cfg.TRANSFORMS)
-        self.target_transform = None
+        self.transform = transform
+        self.target_transform = target_transform
         self.stage = stage
 
         self.num_classes = len(self.dictionary)
@@ -60,11 +59,11 @@ class PortraitSegmentation(Dataset):
         else:
             _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
                 Image.open(self._targets[idx]), dtype=np.uint8)
-            _target = self.encode_segmap(_target)
+            _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_segmap(self, mask):
+    def encode_map(self, mask):
         mask_cp = mask.copy()
         # contain background, index form zero, [0, 1], pls uncomment - background in conf/dicts/portrait_dict.yml
         # mask[mask > 0] = 1

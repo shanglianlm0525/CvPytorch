@@ -10,7 +10,6 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from ..utils import palette
-from .transforms import build_transforms
 
 """
     ADE20K dataset
@@ -22,7 +21,7 @@ class CityscapesSegmentation(Dataset):
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = build_transforms(data_cfg.TRANSFORMS)
+        self.transform = transform
         self.target_transform = target_transform
         self.stage = stage
 
@@ -72,11 +71,11 @@ class CityscapesSegmentation(Dataset):
         else:
             _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
                 Image.open(self._targets[idx]), dtype=np.uint8)
-            _target = self.encode_segmap(_target)
+            _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_segmap(self, mask):
+    def encode_map(self, mask):
         # This is used to convert tags
         mask_cp = mask.copy()
         # Put all void classes to zero

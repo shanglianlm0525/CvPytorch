@@ -9,8 +9,7 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from CvPytorch.src.utils import palette
-from CvPytorch.src.datasets.transforms import build_transforms
+from ..utils import palette
 
 """
     Cityscapes dataset
@@ -23,7 +22,7 @@ class ADE20KSegmentation(Dataset):
         super(ADE20KSegmentation, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = build_transforms(data_cfg.TRANSFORMS)
+        self.transform = transform
         self.target_transform = target_transform
         self.stage = stage
 
@@ -69,11 +68,11 @@ class ADE20KSegmentation(Dataset):
         else:
             _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
                 Image.open(self._targets[idx]), dtype=np.uint8)
-            _target = self.encode_segmap(_target)
+            _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_segmap(self, mask):
+    def encode_map(self, mask):
         # This is used to convert tags
         # index from zero 0:149
         mask_cp = mask.copy()
