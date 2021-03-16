@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2021/1/29 14:40
 # @Author : liumin
-# @File : seg_transform.py.py
+# @File : cp_seg_transform.py.py
 
 import random
 import math
@@ -20,11 +20,11 @@ copy from https://github.com/hszhao/semseg/blob/master/util/transform.py
 
 class Compose(object):
     # Composes segtransforms: segtransform.Compose([segtransform.RandScale([0.5, 2.0]), segtransform.ToTensor()])
-    def __init__(self, segtransform):
-        self.segtransform = segtransform
+    def __init__(self, transform):
+        self.transform = transform
 
     def __call__(self, image, label):
-        for t in self.segtransform:
+        for t in self.transform:
             image, label = t(image, label)
         return image, label
 

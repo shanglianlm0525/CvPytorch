@@ -2,18 +2,19 @@
 # -- coding: utf-8 --
 # @Time : 2020/9/25 14:30
 # @Author : liumin
-# @File : custom_transforms.py
-import random
+# @File : seg_transforms.py
 
+import random
 import cv2
 import torch
 from PIL import Image
-from torchvision.transforms import functional as TF
+from torchvision import transforms as T
+from torchvision.transforms import functional as F
 import numpy as np
 from numbers import Number
 
 __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
-        'Resize', 'Scale', 'RandomCrop', 'CenterCrop',
+        'Resize', 'RandomScale', 'RandomCrop', 'CenterCrop',
         'RandomRotate', 'RandomTranslation',
         'ColorJitter', 'RandomGaussianBlur',
         'Normalize', 'DeNormalize', 'ToTensor',
@@ -26,7 +27,6 @@ class Compose(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        assert img.shape[:2] == target.shape
         for t in self.transforms:
             sample = t(sample)
         return sample
@@ -69,10 +69,12 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         img, target = sample['image'], sample['target']
-        img = TF.to_tensor(img.astype(np.uint8))
+        img = F.to_tensor(img.astype(np.uint8))
 
+        '''
         if len(target.shape) == 2:
             target = np.expand_dims(target, axis=0)
+        '''
         target = torch.from_numpy(target).float()
         return {'image': img, 'target': target}
 
@@ -254,6 +256,26 @@ class ColorJitter(object):
         return {'image': img, 'target': target}
 
 
+class RandomScale(object):
+    def __init__(self, size): # (short edge)
+        self.size = size
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        assert img.shape[:2] == target.shape
+        short_size = random.randint(int(self.size * 0.5), int(self.size * 2.0))
+        h, w, _ = img.shape
+        if w > h:
+            oh = short_size
+            ow = int(1.0 * w * oh / h)
+            return {'image': cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR),
+                    'target': cv2.resize(target, (ow, oh), interpolation=cv2.INTER_NEAREST)}
+        else:
+            ow = short_size
+            oh = int(1.0 * h * ow / w)
+            return {'image': cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR),
+                    'target': cv2.resize(target, (ow, oh), interpolation=cv2.INTER_NEAREST)}
+
 class Scale(object):
     def __init__(self, size): # (h, w)
         if isinstance(size, Number):
@@ -280,26 +302,28 @@ class Scale(object):
 
 
 class FixScaleCrop(object):
-    def __init__(self, crop_size):
-        self.crop_size = crop_size
+    def __init__(self, size):
+        self.size = size
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         h, w, _ = img.shape
+        short_size = min(self.size)
         if w > h:
-            oh = self.crop_size
+            oh = short_size
             ow = int(1.0 * w * oh / h)
         else:
-            ow = self.crop_size
+            ow = short_size
             oh = int(1.0 * h * ow / w)
-        img = img.resize((ow, oh), Image.BILINEAR)
-        target = target.resize((ow, oh), Image.NEAREST)
+
+        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+        target = cv2.resize(target, (ow, oh), interpolation=cv2.INTER_NEAREST)
         # center crop
-        h, w, _ = img.shape
-        x1 = int(round((w - self.crop_size) / 2.))
-        y1 = int(round((h - self.crop_size) / 2.))
-        img = img.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
-        target = target.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
+        h, w = target.shape
+        h_off = int((h - self.size[0]) / 2)
+        w_off = int((w - self.size[1]) / 2)
+        img = img[h_off:h_off + self.size[0], w_off:w_off + self.size[1]]
+        target = target[h_off:h_off + self.size[0], w_off:w_off + self.size[1]]
         return {'image': img,'target': target}
 
 
