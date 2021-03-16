@@ -27,6 +27,7 @@ class Compose(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
+        assert img.shape[:2] == target.shape
         for t in self.transforms:
             sample = t(sample)
         return sample

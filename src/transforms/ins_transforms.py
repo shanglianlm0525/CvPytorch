@@ -39,7 +39,7 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         img, target = sample['image'], sample['target']
-        img = F.to_tensor(img / 255.0)
+        img = F.to_tensor(img.astype(np.uint8))
         return {'image': img, 'target': target}
 
 
