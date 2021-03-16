@@ -23,8 +23,7 @@ import torch.distributed as dist
 
 class CocoEvaluator(object):
     def __init__(self, dataset, iou_types):
-        coco_gt = convert_to_coco_api(dataset)
-        # coco_gt = dataset.coco if dataset.coco is not None else convert_to_coco_api(dataset)
+        coco_gt = dataset.coco
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
@@ -36,9 +35,14 @@ class CocoEvaluator(object):
 
         self.img_ids = []
         self.eval_imgs = {k: [] for k in iou_types}
+        self.metric_names = ['mAP', 'AP_50', 'AP_75', 'AP_small', 'AP_medium', 'AP_large'
+            , 'Recall_1', 'Recall_10', 'Recall_100', 'Recall_small', 'Recall_medium', 'Recall_large']
         self.count = 0
 
-    def update(self, predictions):
+    def update(self, targets, outputs):
+        outputs = [{k: v.to(torch.device("cpu")) for k, v in t.items()} for t in outputs]
+        predictions = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+
         img_ids = list(np.unique(list(predictions.keys())))
         self.img_ids.extend(img_ids)
 
@@ -166,10 +170,18 @@ class CocoEvaluator(object):
     def evaluate(self):
         if self.count < 1:
             return None
-        performances = {}
+
+        self.synchronize_between_processes()
         self.accumulate()
         self.summarize()
-        performances['performance'] = performances['mIoU']
+
+        performances = {}
+        performances['performance'] = 0
+        for iou_type in self.iou_types:
+            for k, v in zip(self.metric_names, self.coco_eval[iou_type].stats):
+                performances[iou_type+'_'+k] = v
+                if k=='mAP':
+                    performances['performance'] += v
         return performances
 
 
