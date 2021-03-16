@@ -14,12 +14,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-
 from src.models.modules.aspp import ASPP
 from src.models.backbones import build_backbone
-
-from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
+from src.losses.seg_loss import BCEWithLogitsLoss2d
 
 class Decoder(nn.Module):
     def __init__(self, num_classes, low_level_inplanes=256):
@@ -79,7 +76,7 @@ class Deeplabv3Plus(nn.Module):
         self.aspp = ASPP(inplanes=self.backbone.out_channels[-1])
         self.decoder = Decoder(self._num_classes, self.backbone.out_channels[0])
 
-        self._init_weight(self.aspp, self.decoder)
+        # self._init_weight(self.aspp, self.decoder)
 
         self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
 

@@ -6,8 +6,10 @@
 
 from copy import deepcopy
 from torch.optim import SGD, Adam, AdamW, RMSprop, Adadelta
+from .RAdam import RAdam
+from .Ranger import Ranger
 
-__all__ = ['SGD','Adam', 'AdamW','Adadelta','RMSprop']
+__all__ = ['SGD','Adam', 'AdamW','Adadelta','RMSprop', 'RAdam', 'Ranger']
 
 
 def get_current_lr(optimizer):
@@ -43,7 +45,12 @@ def build_optimizer(cfg, model):
     elif opt_type == 'rmsprop':
         '''torch.optim.RMSprop(params, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)'''
         optimizer = RMSprop(_params)
+    elif opt_type == 'radam':
+        '''optimizer = RAdam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01, betas=(0.90, 0.999), eps=1e-08, weight_decay=1e-4)'''
+        optimizer = RAdam(_params)
+    elif opt_type == 'ranger':
+        '''optimizer = Ranger(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01, betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)'''
+        optimizer = Ranger(_params)
     else:
-        raise ValueError("Unsupported optimizer type: {}, Expected optimizer method in [SGD, Adam, Adadelta, RMSprop]".format(cfg.OPTIMIZER.TYPE))
-
+        raise ValueError("Unsupported optimizer type: {}, Expected optimizer method in {} ".format(cfg.OPTIMIZER.TYPE, __all__))
     return optimizer
