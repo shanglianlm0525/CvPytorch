@@ -34,8 +34,7 @@ class ClassificationEvaluator(object):
         if self.count < 1:
             return None
         performances = self.Accuracy()
-        performances['mAcc'] = self.Mean_Accuracy()
-        performances['performance'] = self.Mean_Accuracy()
+        performances['performance'] = performances['mAcc'] = self.Mean_Accuracy()
         return performances
 
     def update(self, gt_label, pred_label):
