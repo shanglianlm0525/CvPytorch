@@ -4,7 +4,7 @@ EXPERIMENT_NAME: 'Coco_Maskrcnn'
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.coco_maskrcnn.CocoDetection'
+  CLASS: 'src.datasets.coco.CocoDetection'
   DICTIONARY: 'conf/dicts/coco_dict.yml'
   DICTIONARY_NAME: 'INS_CLASSES'
 
@@ -13,6 +13,25 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: True
+    BATCH_SIZE: 4
+    NUM_WORKER: 2
+    LABELS:
+      DET_DIR: '/home/lmin/data/coco/annotations'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/coco/annotations'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90] }
+      ConvertCocoPolysToMask:
+      RandomHorizontalFlip: { p: 0.5 }
+      ToTensor:
+      # Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/coco/images/val2017'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: ''
+    SHUFFLE: False
     BATCH_SIZE: 2
     NUM_WORKER: 2
     LABELS:
@@ -21,28 +40,10 @@ DATASET:
       SEG_DIR: '/home/lmin/data/coco/annotations'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      RandomHorizontalFlip: { p: 0.5 }
-      RandomScale: { size: 400 }
-      RandomCrop: { size: 360 }
+      FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90] }
+      ConvertCocoPolysToMask:
       ToTensor:
-      Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
-
-  VAL:
-    IMG_DIR: '/home/lmin/data/coco/images/val2017'
-    IMG_SUFFIX: '*.jpg'
-    INDICES: ''
-    SHUFFLE: False
-    BATCH_SIZE: 2
-    NUM_WORKER: 8
-    LABELS:
-      DET_DIR: '/home/lmin/data/coco/annotations'
-      DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/coco/annotations'
-      SEG_SUFFIX: '*.png'
-    TRANSFORMS:
-      FixScaleCrop: { size: [360, 480] }
-      ToTensor:
-      Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
+      # Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
 
 
 #########################################
@@ -50,7 +51,7 @@ DATASET:
 #########################################
 USE_MODEL: 'src.models.maskrcnn.MaskRCNN'
 EVALUATOR:
-  NAME: 'segmentation'
+  NAME: 'coco_instance'
   EVAL_TYPE: 'mIoU'
   EVAL_INTERVALS: 2
 
@@ -67,7 +68,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 26
 
 INIT_LR: 0.02
@@ -106,7 +107,7 @@ GRAD_CLIP:
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 10
+N_ITERS_TO_DISPLAY_STATUS: 200
 
 ## TENSORBOARD
 TENSORBOARD: True
