@@ -40,7 +40,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/CamVid'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      FixScaleCrop: { size: [360, 480] }
+      FixScaleCrop: { size: [480, 480] }
       ToTensor:
       Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
 
