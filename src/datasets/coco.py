@@ -1,212 +1,90 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/7/17 13:30
+# @Time : 2021/3/11 15:06
 # @Author : liumin
 # @File : coco.py
-import cv2
-import torch
-import random
+
 import os
 from PIL import Image
 from torch.utils.data import Dataset
-
-from src.utils import palette
 from pycocotools.coco import COCO
-from pycocotools import mask as coco_mask
 import numpy as np
-from torchvision import transforms as tf
-from .transforms import custom_transforms as ctf
 
+"""
+    MS Coco Detection
+    http://mscoco.org/dataset/#detections-challenge2016
+"""
 
-def flip(img, boxes):
-    img = img.transpose(Image.FLIP_LEFT_RIGHT)
-    w = img.width
-    if boxes.shape[0] != 0:
-        xmin = w - boxes[:,2]
-        xmax = w - boxes[:,0]
-        boxes[:, 2] = xmax
-        boxes[:, 0] = xmin
-    return img, boxes
-
-CLASSES_NAME = (
-    '__back_ground__', 'person', 'bicycle', 'car', 'motorcycle',
-    'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-    'fire hydrant', 'stop sign', 'parking meter', 'bench',
-    'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant',
-    'bear', 'zebra', 'giraffe', 'backpack', 'umbrella',
-    'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard',
-    'sports ball', 'kite', 'baseball bat', 'baseball glove',
-    'skateboard', 'surfboard', 'tennis racket', 'bottle',
-    'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-    'banana', 'apple', 'sandwich', 'orange', 'broccoli',
-    'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
-    'couch', 'potted plant', 'bed', 'dining table', 'toilet',
-    'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-    'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
-    'book', 'clock', 'vase', 'scissors', 'teddy bear',
-    'hair drier', 'toothbrush')
-
-'''
-def __init__(self,imgs_path,anno_path,resize_size=[800,1333],is_train = True, nanodet_transform=None):
-    super().__init__(imgs_path,anno_path)
-'''
 
 class CocoDetection(Dataset):
-    """
-            MS Coco Detection
-            http://mscoco.org/dataset/#detections-challenge2016
-    """
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         super(CocoDetection, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
         self.stage = stage
-
         self.transform = transform
+        self.target_transform = target_transform
         self.resize_size = [800, 1333]
 
         self.num_classes = len(self.dictionary)
         self.coco = COCO(os.path.join(data_cfg.LABELS.DET_DIR, 'instances_{}.json'.format(os.path.basename(data_cfg.IMG_DIR))))
         self.ids = list(sorted(self.coco.imgs.keys()))
 
-        # check annos, filtering invalid data
-        valid_ids=[]
-        for id in self.ids:
-            ann_id=self.coco.getAnnIds(imgIds=id,iscrowd=None)
-            ann=self.coco.loadAnns(ann_id)
-            if self._has_valid_annotation(ann):
-                valid_ids.append(id)
-        self.ids = valid_ids
+        self._filter_invalid_annotation()
 
         self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
 
-    def __getitem__(self,idx):
-        img_id = self.ids[idx]
-        ann_ids = self.coco.getAnnIds(imgIds=img_id)
-        ann = self.coco.loadAnns(ann_ids)
-
-        path = self.coco.loadImgs(img_id)[0]['file_name']
-        assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(os.path.join(self.data_cfg.IMG_DIR, path))
-        img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
-
-        ann = [o for o in ann if o['iscrowd'] == 0]
-        boxes = [o['bbox'] for o in ann]
-        boxes=np.array(boxes,dtype=np.float32)
-        #xywh-->xyxy
-        boxes[...,2:]=boxes[...,2:]+boxes[...,:2]
-        if self.stage=='train':
-            if random.random() < 0.5 :
-                img, boxes = flip(img, boxes)
-            if self.transform is not None:
-                img, boxes = self.transform(img, boxes)
-        img=np.array(img)
-
-        img,boxes=self.preprocess_img_boxes(img,boxes,self.resize_size)
-
-        classes = [o['category_id'] for o in ann]
-        classes = [self.category2id[c] for c in classes]
-
-        img = tf.ToTensor()(img)
-        boxes = torch.from_numpy(boxes)
-        classes = torch.LongTensor(classes)
-        return img,boxes,classes
-
-    def __len__(self):
-        return len(self.ids)
-
-    def preprocess_img_boxes(self,image,boxes,input_ksize):
-        '''
-        resize image and bboxes
-        Returns
-        image_paded: input_ksize
-        bboxes: [None,4]
-        '''
-        min_side, max_side    = input_ksize
-        h,  w, _  = image.shape
-
-        smallest_side = min(w,h)
-        largest_side=max(w,h)
-        scale=min_side/smallest_side
-        if largest_side*scale>max_side:
-            scale=max_side/largest_side
-        nw, nh  = int(scale * w), int(scale * h)
-        image_resized = cv2.resize(image, (nw, nh))
-
-        pad_w=32-nw%32
-        pad_h=32-nh%32
-
-        image_paded = np.zeros(shape=[nh+pad_h, nw+pad_w, 3],dtype=np.uint8)
-        image_paded[:nh, :nw, :] = image_resized
-
-        if boxes is None:
-            return image_paded
-        else:
-            boxes[:, [0, 2]] = boxes[:, [0, 2]] * scale
-            boxes[:, [1, 3]] = boxes[:, [1, 3]] * scale
-            return image_paded, boxes
-
-
-
-    def _has_only_empty_bbox(self,annot):
-        return all(any(o <= 1 for o in obj['bbox'][2:]) for obj in annot)
-
+    def _filter_invalid_annotation(self):
+        # check annos, filtering invalid data
+        valid_ids = []
+        for id in self.ids:
+            ann_id = self.coco.getAnnIds(imgIds=id, iscrowd=None)
+            ann = self.coco.loadAnns(ann_id)
+            if self._has_valid_annotation(ann):
+                valid_ids.append(id)
+        self.ids = valid_ids
 
     def _has_valid_annotation(self,annot):
         if len(annot) == 0:
             return False
 
-        if self._has_only_empty_bbox(annot):
+        if all(any(o <= 1 for o in obj['bbox'][2:]) for obj in annot):
             return False
-
         return True
 
-    def collate_fn(self,data):
-        imgs_list,boxes_list,classes_list=zip(*data)
-        assert len(imgs_list)==len(boxes_list)==len(classes_list)
-        batch_size=len(boxes_list)
-        pad_imgs_list=[]
-        pad_boxes_list=[]
-        pad_classes_list=[]
+    def __getitem__(self, idx):
+        img_id = self.ids[idx]
+        ann_ids = self.coco.getAnnIds(imgIds=img_id)
+        ann = self.coco.loadAnns(ann_ids)
 
-        h_list = [int(s.shape[1]) for s in imgs_list]
-        w_list = [int(s.shape[2]) for s in imgs_list]
-        max_h = np.array(h_list).max()
-        max_w = np.array(w_list).max()
-        for i in range(batch_size):
-            img=imgs_list[i]
-            pad_imgs_list.append(tf.Normalize([0.40789654, 0.44719302, 0.47026115], [0.28863828, 0.27408164, 0.27809835],inplace=True)(torch.nn.functional.pad(img,(0,int(max_w-img.shape[2]),0,int(max_h-img.shape[1])),value=0.)))
+        path = self.coco.loadImgs(img_id)[0]['file_name']
+        assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
+            os.path.join(self.data_cfg.IMG_DIR, path))
 
+        _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
+        _img = np.asarray(Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB'), dtype=np.float32)
+        # _target = dict(image_id=img_id, annotations=ann)
+        _target = self.encode_map(ann, idx)
+        sample = {'image': _img, 'target': _target}
+        return self.transform(sample)
 
-        max_num=0
-        for i in range(batch_size):
-            n=boxes_list[i].shape[0]
-            if n>max_num:max_num=n
-        for i in range(batch_size):
-            pad_boxes_list.append(torch.nn.functional.pad(boxes_list[i],(0,0,0,max_num-boxes_list[i].shape[0]),value=-1))
-            pad_classes_list.append(torch.nn.functional.pad(classes_list[i],(0,max_num-classes_list[i].shape[0]),value=-1))
+    def encode_map(self, ann, idx):
+        img_id = self.ids[idx]
+        target = dict(image_id=img_id, annotations=ann)
+        return target
 
+    def __len__(self):
+        return len(self.ids)
 
-        batch_boxes=torch.stack(pad_boxes_list)
-        batch_classes=torch.stack(pad_classes_list)
-        batch_imgs=torch.stack(pad_imgs_list)
-
-        target = torch.cat([batch_boxes, batch_classes.unsqueeze(2)], 2)
-        sample = {'image': batch_imgs, 'target': target}
+    @staticmethod
+    def collate_fn(batch):
+        '''list[tuple(Tensor, dict]'''
+        _img_list = []
+        _target_list = []
+        for bch in batch:
+            _img_list.append(bch['image'])
+            _target_list.append(bch['target'])
+        sample = {'image': _img_list, 'target': _target_list}
         return sample
-        # return batch_imgs,batch_boxes,batch_classes
-
-
-
-
-
-
-
-if __name__=="__main__":
-
-    dataset=CocoDataset("/home/data/coco2017/train2017","/home/data/coco2017/instances_train2017.json")
-    # img,boxes,classes=dataset[0]
-    # print(boxes,classes,"\n",img.shape,boxes.shape,classes.shape,boxes.dtype,classes.dtype,img.dtype)
-    # cv2.imwrite("./123.jpg",img)
-    img,boxes,classes=dataset.collate_fn([dataset[0],dataset[1],dataset[2]])
-    print(boxes,classes,"\n",img.shape,boxes.shape,classes.shape,boxes.dtype,classes.dtype,img.dtype)
+        # return tuple(zip(*batch))

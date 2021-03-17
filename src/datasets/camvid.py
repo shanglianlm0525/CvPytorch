@@ -68,11 +68,11 @@ class CamvidSegmentation(Dataset):
         else:
             _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(Image.open(self._targets[idx]), dtype=np.uint8)
 
-            _target = self.encode_segmap(_target)
+            _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_segmap(self, mask):
+    def encode_map(self, mask):
         # This is used to convert tags
         mask_cp = mask.copy()
         # no background, index form zero

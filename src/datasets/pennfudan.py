@@ -73,7 +73,6 @@ class PennFudanDetection(Dataset):
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-
     def encode_map(self, mask, idx):
         # instances are encoded as different colors
         obj_ids = np.unique(mask)
