@@ -3,7 +3,7 @@
 # @Time : 2021/3/11 14:36
 # @Author : liumin
 # @File : ins_transforms.py
-
+import copy
 import random
 
 import cv2
@@ -18,6 +18,7 @@ from PIL import Image
 
 
 __all__ = ['RandomHorizontalFlip',
+        'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask',
         'ColorJitter', 'RandomGaussianBlur',
         'Normalize', 'DeNormalize', 'ToTensor']
 
@@ -88,9 +89,30 @@ def convert_coco_poly_to_mask(segmentations, height, width):
         masks = torch.zeros((0, height, width), dtype=torch.uint8)
     return masks
 
+
+class FilterAndRemapCocoCategories(object):
+    def __init__(self, categories, remap=True):
+        self.categories = categories
+        self.remap = remap
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        anno = target["annotations"]
+        anno = [obj for obj in anno if obj["category_id"] in self.categories]
+        if not self.remap:
+            target["annotations"] = anno
+            return {'image': img, 'target': target}
+        anno = copy.deepcopy(anno)
+        for obj in anno:
+            obj["category_id"] = self.categories.index(obj["category_id"])
+        target["annotations"] = anno
+        return {'image': img, 'target': target}
+
+
 class ConvertCocoPolysToMask(object):
-    def __call__(self, image, target):
-        w, h = image.size
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        h, w, _ = img.shape
 
         image_id = target["image_id"]
         image_id = torch.tensor([image_id])
@@ -140,9 +162,7 @@ class ConvertCocoPolysToMask(object):
         iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
         target["area"] = area
         target["iscrowd"] = iscrowd
-
-        return image, target
-
+        return {'image': img, 'target': target}
 
 
 def _flip_coco_person_keypoints(kps, width):
