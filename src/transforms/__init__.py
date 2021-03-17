@@ -5,18 +5,21 @@
 # @File : __init__.py
 
 import copy
+import CvPytorch.src.transforms.cls_transforms as cls_t
 import CvPytorch.src.transforms.seg_transforms as seg_t
+import CvPytorch.src.transforms.det_transforms as det_t
 import CvPytorch.src.transforms.ins_transforms as ins_t
+
 
 def build_transforms(dict_name, cfg, mode='train'):
     _params = []
 
     if dict_name == 'CLS_CLASSES':
-        trans = seg_t
+        trans = cls_t
     elif dict_name == 'SEG_CLASSES':
         trans = seg_t
     elif dict_name == 'DET_CLASSES':
-        trans = seg_t
+        trans = det_t
     elif dict_name == 'INS_CLASSES':
         trans = ins_t
     else:
