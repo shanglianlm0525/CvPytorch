@@ -1,10 +1,8 @@
 # A Simple Guide to Deep Learning Semantic Segmentation
 
-
+**Semantic  Segmentation：** Given an input image, assign a label to every pixel (e.g., background, bottle, hand, sky, etc.).
 
 ## Datasets  
-
-
 
 - **CamVid**: is a road/driving scene understanding database with 367 training images and 233 testing images of day and dusk scenes. The challenge is to segment 11 classes such as building, tree, sky, car, sign, road, pedestrian, fence, pole, sidewalk, and bicyclist etc. We usually resize images to 360x480 pixels for training and testing.
 
