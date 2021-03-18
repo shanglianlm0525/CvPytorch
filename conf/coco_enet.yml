@@ -1,0 +1,120 @@
+EXPERIMENT_NAME: 'Coco_Enet'
+
+#########################################
+# Dataset / Transforms Configurations
+#########################################
+DATASET:
+  CLASS: 'src.datasets.coco.CocoSegmentation'
+  DICTIONARY: 'conf/dicts/coco_dict.yml'
+  DICTIONARY_NAME: 'SEG_CLASSES'
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/coco/images/train2017'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: ''
+    SHUFFLE: True
+    BATCH_SIZE: 2
+    NUM_WORKER: 2
+    LABELS:
+      DET_DIR: '/home/lmin/data/coco/annotations'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/coco/annotations'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      FilterAndRemapCocoCategories: { categories: [0, 5, 2, 16, 9, 44, 6, 3, 17, 62, 21, 67, 18, 19, 4, 1, 64, 20, 63, 7, 72], remap: True }
+      ConvertCocoPolysToMask:
+      RandomHorizontalFlip: { p: 0.5 }
+      RandomResize: { size: 520 }
+      RandomCrop: { size: 480 }
+      ToTensor:
+      Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/coco/images/val2017'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: ''
+    SHUFFLE: False
+    BATCH_SIZE: 2
+    NUM_WORKER: 2
+    LABELS:
+      DET_DIR: '/home/lmin/data/coco/annotations'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/coco/annotations'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      FilterAndRemapCocoCategories: { categories: [0, 5, 2, 16, 9, 44, 6, 3, 17, 62, 21, 67, 18, 19, 4, 1, 64, 20, 63, 7, 72], remap: True }
+      ConvertCocoPolysToMask:
+      FixScaleCrop: { size: 480 }
+      ToTensor:
+      Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
+
+
+#########################################
+# Model / Evaluator Configurations
+#########################################
+USE_MODEL: 'src.models.enet.ENet'
+EVALUATOR:
+  NAME: 'coco_segmentation'
+  EVAL_TYPE: 'mIoU'
+  EVAL_INTERVALS: 2
+
+
+#########################################
+# Checkpoints / Resume Configurations
+#########################################
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 10
+# PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+RESUME: False
+
+
+#########################################
+# Devices / Optimizer / Lr_scheduler / Warmup Configurations
+#########################################
+GPU_IDS: [1]
+N_MAX_EPOCHS: 26
+
+INIT_LR: 0.02
+SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
+
+OPTIMIZER:
+  TYPE: 'SGD' # Adam, RMSprop
+  BIAS_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0001
+  WEIGHT_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0001
+  BIAS_LR_MULTIPLIER: 1
+
+LR_SCHEDULER:
+  TYPE: 'MultiStepLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [16, 22]
+  GAMMA: 0.1
+  STEP: 300
+
+WARMUP:
+  NAME: 'linear'
+  ITERS: 0
+  FACTOR: 0.1
+
+
+#########################################
+# GRAD_CLIP Configurations
+#########################################
+GRAD_CLIP:
+  TYPE: 'norm'
+  VALUE: 0
+
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 200
+
+## TENSORBOARD
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: False
+TENSORBOARD_WEIGHT: False
+TENSORBOARD_IMAGE: False
