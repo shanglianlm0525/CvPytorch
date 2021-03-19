@@ -160,7 +160,7 @@ class RandomHorizontalFlip(object):
         """
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            return F.hflip(img), F.hflip(target)
+            return {'image': F.hflip(img),'target': F.hflip(target)}
         return {'image': img,'target': target}
 
     def __repr__(self):
@@ -187,7 +187,7 @@ class RandomVerticalFlip(object):
         """
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            return F.vflip(img), F.vflip(target)
+            return {'image': F.vflip(img), 'target': F.vflip(target)}
         return {'image': img, 'target': target}
 
     def __repr__(self):
