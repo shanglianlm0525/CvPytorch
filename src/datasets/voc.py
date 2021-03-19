@@ -54,13 +54,12 @@ class VOCSegmentation(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
+            _img = Image.open(self._imgs[idx]).convert('RGB')
             img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
-                Image.open(self._targets[idx]), dtype=np.uint8)
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
             _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)

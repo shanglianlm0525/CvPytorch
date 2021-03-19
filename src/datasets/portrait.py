@@ -52,27 +52,27 @@ class PortraitSegmentation(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
+            _img = Image.open(self._imgs[idx]).convert('RGB')
             image_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), image_id
         else:
-            _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
-                Image.open(self._targets[idx]), dtype=np.uint8)
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
             _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
     def encode_map(self, mask):
-        mask_cp = mask.copy()
+        mask = np.asarray(mask, dtype=np.uint8).copy()
         # contain background, index form zero, [0, 1], pls uncomment - background in conf/dicts/portrait_dict.yml
         # mask[mask > 0] = 1
 
         # non background index, form zero, [0], pls uncomment - background in conf/dicts/portrait_dict.yml
-        mask_nonzero = mask_cp > 0
-        mask_cp[:,:] = 255
-        mask_cp[mask_nonzero] = 0
-        return mask_cp
+        mask_nonzero = mask > 0
+        mask[:,:] = 255
+        mask[mask_nonzero] = 0
+        mask = Image.fromarray(mask.astype(np.uint8))
+        return mask
 
     def __len__(self):
         return len(self._imgs)

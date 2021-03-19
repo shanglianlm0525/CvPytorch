@@ -64,27 +64,27 @@ class CityscapesSegmentation(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
+            _img = Image.open(self._imgs[idx]).convert('RGB')
             img_id = os.path.basename(os.path.basename(self._imgs[idx]))
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
-                Image.open(self._targets[idx]), dtype=np.uint8)
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
             _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
     def encode_map(self, mask):
         # This is used to convert tags
-        mask_cp = mask.copy()
+        mask = np.asarray(mask, dtype=np.uint8).copy()
         # Put all void classes to zero
         for _voidc in self.invalid_classes:
-            mask_cp[mask_cp == _voidc] = self.ignore_index
+            mask[mask == _voidc] = self.ignore_index
         # index from zero 0:18
         for _validc in self.valid_classes:
-            mask_cp[mask_cp == _validc] = self.class_map[_validc]
-        return mask_cp
+            mask[mask == _validc] = self.class_map[_validc]
+        mask = Image.fromarray(mask.astype(np.uint8))
+        return mask
 
     def __len__(self):
         return len(self._imgs)

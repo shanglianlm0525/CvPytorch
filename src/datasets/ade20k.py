@@ -61,13 +61,12 @@ class ADE20KSegmentation(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
+            _img = Image.open(self._imgs[idx]).convert('RGB')
             img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(
-                Image.open(self._targets[idx]), dtype=np.uint8)
+            _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
             _target = self.encode_map(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
@@ -75,9 +74,10 @@ class ADE20KSegmentation(Dataset):
     def encode_map(self, mask):
         # This is used to convert tags
         # index from zero 0:149
-        mask_cp = mask.copy()
-        mask_cp = mask_cp -1 # uint8 will change -1 to 255
-        return mask_cp
+        mask = np.asarray(mask, dtype=np.uint8).copy()
+        mask = mask -1 # uint8 will change -1 to 255
+        mask = Image.fromarray(mask.astype(np.uint8))
+        return mask
 
     def __len__(self):
         return len(self._imgs)
