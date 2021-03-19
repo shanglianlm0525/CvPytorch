@@ -21,10 +21,9 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelTrainIds.png'
     TRANSFORMS:
-      # Resize: { size: [512, 512] } # [h,w]
+      RandomCrop: { size: [768, 768] }
+      ColorJitter: { brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.1 }
       RandomHorizontalFlip: { p: 0.5 }
-      RandomScale: { size: 1024 }
-      RandomCrop: { size: 712 }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -41,7 +40,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelTrainIds.png'
     TRANSFORMS:
-      FixScaleCrop: { size: [1024, 2048] }
+      Resize: { size: [1024, 2048] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
