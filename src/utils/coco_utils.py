@@ -3,6 +3,8 @@
 # @Time : 2021/3/16 9:25
 # @Author : liumin
 # @File : coco_utils.py
+import copy
+
 import torch
 import torchvision
 from pycocotools.cocoeval import COCOeval
