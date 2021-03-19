@@ -24,9 +24,9 @@ class MaskRCNN(nn.Module):
         self.input_size = [512, 512]
         self.dummy_input = torch.zeros(1, 3, self.input_size[0], self.input_size[1])
 
-        self._num_classes = len(self.dictionary)
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         # load an instance segmentation model pre-trained pre-trained on COCO
         self.model = maskrcnn_resnet50_fpn(pretrained=True)
@@ -34,13 +34,13 @@ class MaskRCNN(nn.Module):
         # get number of input features for the classifier
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
         # replace the pre-trained head with a new one
-        self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self._num_classes)
+        self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.num_classes)
 
         # now get the number of input features for the mask classifier
         in_features_mask = self.model.roi_heads.mask_predictor.conv5_mask.in_channels
         hidden_layer = 256
         # and replace the mask predictor with a new one
-        self.model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer, self._num_classes)
+        self.model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer, self.num_classes)
 
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):

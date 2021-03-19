@@ -28,7 +28,7 @@ class RetinaNet(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        self.model = retinanet_resnet50_fpn(pretrained=False, progress=True,
+        self.model = retinanet_resnet50_fpn(pretrained=False, progress=False,
                                             num_classes=self.num_classes, pretrained_backbone=True, trainable_backbone_layers=None)
 
 

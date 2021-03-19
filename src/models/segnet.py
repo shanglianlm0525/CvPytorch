@@ -75,9 +75,9 @@ class SegNet(nn.Module):
         self.input_size = [512, 512]
         self.dummy_input = torch.zeros(1, 3, self.input_size[0], self.input_size[1])
 
-        self._num_classes = len(self.dictionary)
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         self.encoder1 = DoubleConv(3, 64)
         self.encoder2 = DoubleConv(64, 128)
@@ -91,9 +91,9 @@ class SegNet(nn.Module):
         self.decoder2 = DoubleConv(128, 64, reverse=True)
         self.decoder1 = Conv3x3BNReLU(64, 64, stride=1)
 
-        self.outconv = nn.Conv2d(64, self._num_classes, kernel_size=3, padding=1)
+        self.outconv = nn.Conv2d(64, self.num_classes, kernel_size=3, padding=1)
 
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
     def _init_weight(self):
         for m in self.modules():

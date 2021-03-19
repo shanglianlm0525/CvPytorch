@@ -46,9 +46,9 @@ class PSPNet(nn.Module):
         self.dictionary = dictionary
         self.dummy_input = torch.zeros(1, 3, 800, 600)
 
-        self._num_classes = len(self.dictionary)
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
         self.backbone = build_backbone(backbone_cfg)
@@ -59,7 +59,7 @@ class PSPNet(nn.Module):
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.1),
-            nn.Conv2d(512, self._num_classes, kernel_size=1)
+            nn.Conv2d(512, self.num_classes, kernel_size=1)
         )
 
         self.aux = nn.Sequential(
@@ -67,11 +67,11 @@ class PSPNet(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.1),
-            nn.Conv2d(256, self._num_classes, kernel_size=1)
+            nn.Conv2d(256, self.num_classes, kernel_size=1)
         )
 
         self._init_weight(self.cls, self.aux)
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
     def _init_weight(self, *stages):
         for m in chain(*stages):

@@ -155,9 +155,9 @@ class ENet(nn.Module):
         self.dictionary = dictionary
         self.dummy_input = torch.zeros(1, 3, 480, 360)
 
-        self._num_classes = len(self.dictionary)
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         self.initialBlock = InitialBlock(3,16)
         self.stage1_1 = DownBottleneck(16, 64, 2, p=0.01)
@@ -197,16 +197,16 @@ class ENet(nn.Module):
         self.stage5_1 = UpBottleneck(64, 16, 2, is_relu=True, p=0.1)
         self.stage5_2 = RegularBottleneck(16, 16, 1, is_relu=True, p=0.1)
 
-        self.final_conv = nn.ConvTranspose2d(in_channels=16, out_channels=self._num_classes, kernel_size=3, stride=2, padding=1,
+        self.final_conv = nn.ConvTranspose2d(in_channels=16, out_channels=self.num_classes, kernel_size=3, stride=2, padding=1,
                            output_padding=1, bias=False)
 
-        self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self._weight)).float()).cuda()
-        self.ohem_ce_criterion = OhemCrossEntropyLoss2d(torch.from_numpy(np.array(self._weight)).float()).cuda()
-        self.focal_criterion = FocalLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self.weight)).float()).cuda()
+        self.ohem_ce_criterion = OhemCrossEntropyLoss2d(torch.from_numpy(np.array(self.weight)).float()).cuda()
+        self.focal_criterion = FocalLoss(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
         self.lovasz_criterion = LovaszSoftmax().cuda()
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
         self.dice_criterion = DiceLoss().cuda()
-        self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
         self.init_params()
 

@@ -67,18 +67,18 @@ class Deeplabv3Plus(nn.Module):
         self.input_size = [512, 512]
         self.dummy_input = torch.zeros(1, 3, self.input_size[0], self.input_size[1])
 
-        self._num_classes = len(self.dictionary)
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
         self.backbone = build_backbone(backbone_cfg)
         self.aspp = ASPP(inplanes=self.backbone.out_channels[-1])
-        self.decoder = Decoder(self._num_classes, self.backbone.out_channels[0])
+        self.decoder = Decoder(self.num_classes, self.backbone.out_channels[0])
 
         # self._init_weight(self.aspp, self.decoder)
 
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
 
     def _init_weight(self, *stages):

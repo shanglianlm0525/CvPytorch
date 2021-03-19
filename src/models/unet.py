@@ -95,9 +95,9 @@ class UNet(nn.Module):
         self.dictionary = dictionary
         self.dummy_input = torch.zeros(1, 3, 800, 600)
 
-        self._num_classes = len(self.dictionary)
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         self.conv = DoubleConv(3, 64)
         self.down1 = DownConv(64, 128)
@@ -108,14 +108,14 @@ class UNet(nn.Module):
         self.up2 = UpConv(512, 256)
         self.up3 = UpConv(256, 128)
         self.up4 = UpConv(128, 64)
-        self.outconv = nn.Conv2d(64, self._num_classes, kernel_size=1)
+        self.outconv = nn.Conv2d(64, self.num_classes, kernel_size=1)
 
-        self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self._weight)).float()).cuda()
-        self.focal_criterion = FocalLoss(alpha=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self.weight)).float()).cuda()
+        self.focal_criterion = FocalLoss(alpha=torch.from_numpy(np.array(self.weight)).float()).cuda()
         self.lovasz_criterion = LovaszSoftmax().cuda()
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
         self.dice_criterion = DiceLoss().cuda()
-        self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self._weight)).float()).cuda()
+        self.ce_dice_criterion = CE_DiceLoss(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
         self.init_params()
 
