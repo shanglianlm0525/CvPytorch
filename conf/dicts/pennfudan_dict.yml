@@ -1,6 +1,6 @@
-INS_CLASSES:
+DET_CLASSES:
   - 'background': 1
   - 'pedestrian': 1
-DET_CLASSES:
-  # - 'background': 1
+INS_CLASSES:
+  - 'background': 1
   - 'pedestrian': 1
