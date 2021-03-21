@@ -25,6 +25,8 @@ def build_evaluator(cfg, dataset):
     elif cfg.EVALUATOR.NAME.startswith('coco'):
         if cfg.EVALUATOR.NAME == 'coco_segmentation':
             iou_types = ["segm"]
+        elif cfg.EVALUATOR.NAME == 'coco_detection':
+            iou_types = ["bbox"]
         elif cfg.EVALUATOR.NAME == 'coco_keypoints':
             iou_types = ["bbox", "keypoints"]
         else: # 'coco_instance'
