@@ -24,26 +24,32 @@ model_urls = {
 
 class ResNet(nn.Module):
 
-    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None):
+    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None, pretrained = False):
         super(ResNet, self).__init__()
         self.out_stages = out_stages
         self.output_stride = output_stride # 8, 16, 32
         self.backbone_path = backbone_path
+        self.pretrained = pretrained
 
         if subtype == 'resnet18':
-            backbone = resnet18(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnet18(pretrained=self.pretrained)
             self.out_channels = [64, 64, 128, 256, 512]
         elif subtype == 'resnet34':
-            backbone = resnet34(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnet34(pretrained=self.pretrained)
             self.out_channels = [64, 64, 128, 256, 512]
         elif subtype == 'resnet50':
-            backbone = resnet50(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnet50(pretrained=self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'resnet101':
-            backbone = resnet101(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnet101(pretrained=self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'resnet152':
-            backbone = resnet152(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnet152(pretrained=self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -78,10 +84,11 @@ class ResNet(nn.Module):
                 elif 'downsample.0' in n:
                     m.stride = (s4, s4)
 
-        if self.backbone_path:
-            self.backbone.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not self.pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

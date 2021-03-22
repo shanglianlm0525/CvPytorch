@@ -21,16 +21,19 @@ model_urls = {
 
 class WideResNet(nn.Module):
 
-    def __init__(self, subtype='wide_resnet50_2', out_stages=[2, 3, 4], backbone_path=None):
+    def __init__(self, subtype='wide_resnet50_2', out_stages=[2, 3, 4], backbone_path=None, pretrained = False):
         super(WideResNet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
+        self.pretrained = pretrained
 
         if subtype == 'wide_resnet50_2':
-            backbone = resnext50_32x4d(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnext50_32x4d(pretrained=self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'wide_resnet101_2':
-            backbone = resnext101_32x8d(pretrained=not self.backbone_path)
+            self.pretrained = True
+            backbone = resnext101_32x8d(pretrained=self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -44,10 +47,11 @@ class WideResNet(nn.Module):
         self.layer3 = nn.Sequential(list(backbone.children())[6])
         self.layer4 = nn.Sequential(list(backbone.children())[7])
 
-        if self.backbone_path:
-            self.backbone.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not self.pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

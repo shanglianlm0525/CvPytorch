@@ -20,32 +20,37 @@ model_urls = {
 
 class ShuffleNetV2(nn.Module):
 
-    def __init__(self, subtype='shufflenet_v2_x1_0', out_stages=[2,3,4], backbone_path=None):
+    def __init__(self, subtype='shufflenet_v2_x1_0', out_stages=[2,3,4], backbone_path=None, pretrained = False):
         super(ShuffleNetV2, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
 
         if subtype == 'shufflenet_v2_x0_5':
-            self.backbone = shufflenet_v2_x0_5(pretrained=not self.backbone_path)
+            pretrained = True
+            self.backbone = shufflenet_v2_x0_5(pretrained=pretrained)
             self.out_channels = [24, 48, 96, 192, 1024]
         elif subtype == 'shufflenet_v2_x1_0':
-            self.backbone = shufflenet_v2_x1_0(pretrained=not self.backbone_path)
+            pretrained = True
+            self.backbone = shufflenet_v2_x1_0(pretrained=pretrained)
             self.out_channels = [24, 116, 232, 464, 1024]
         elif subtype == 'shufflenet_v2_x1_5':
-            self.backbone = shufflenet_v2_x1_5(pretrained=not self.backbone_path)
+            pretrained = True
+            self.backbone = shufflenet_v2_x1_5(pretrained=pretrained)
             self.out_channels = [24, 176, 352, 704, 1024]
         elif subtype == 'shufflenet_v2_x2_0':
-            self.backbone = shufflenet_v2_x2_0(pretrained=not self.backbone_path)
+            pretrained = True
+            self.backbone = shufflenet_v2_x2_0(pretrained=pretrained)
             self.out_channels = [24, 244, 488, 976, 2048]
         else:
             raise NotImplementedError
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        if self.backbone_path:
-            self.backbone.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
 
     def forward(self, x):

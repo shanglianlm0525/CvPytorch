@@ -13,15 +13,22 @@ from torchvision.models.mobilenet import mobilenet_v2
     https://arxiv.org/abs/1801.04381
 """
 
+model_urls = {
+    'mobilenet_v2': 'https://download.pytorch.org/models/mobilenet_v2-b0353104.pth',
+}
+
 class MobileNetV2(nn.Module):
 
-    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], backbone_path=None):
+    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, backbone_path=None, pretrained = False):
         super(MobileNetV2, self).__init__()
         self.out_stages = out_stages
+        self.output_stride = output_stride  # 8, 16, 32
         self.backbone_path = backbone_path
+        self.pretrained = pretrained
 
         if subtype == 'mobilenet_v2':
-            features = mobilenet_v2(pretrained=not self.backbone_path).features
+            self.pretrained = True
+            features = mobilenet_v2(pretrained=self.pretrained).features
             self.out_channels = [32, 16, 24, 32, 64, 96, 160, 320]
         else:
             raise NotImplementedError
@@ -37,10 +44,11 @@ class MobileNetV2(nn.Module):
         self.stage6 = nn.Sequential(*list(features.children())[14:17])
         self.stage7 = nn.Sequential(list(features.children())[17])
 
-        if self.backbone_path:
-            self.backbone.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not self.pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

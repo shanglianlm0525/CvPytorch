@@ -19,13 +19,16 @@ model_urls = {
 
 class SqueezeNet(nn.Module):
 
-    def __init__(self, subtype='squeezenet1_1', out_stages=[1, 2, 3], backbone_path=None):
+    def __init__(self, subtype='squeezenet1_1', out_stages=[1, 2, 3], backbone_path=None, pretrained = False):
         super(SqueezeNet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
+        self.pretrained = pretrained
 
+        self.pretrained = False
         if subtype == 'squeezenet1_1':
-            features = squeezenet1_1(pretrained=not self.backbone_path).features
+            self.pretrained = True
+            features = squeezenet1_1(pretrained=self.pretrained).features
             self.out_channels = [96, 128, 256, 512]
         else:
             raise NotImplementedError
@@ -37,10 +40,11 @@ class SqueezeNet(nn.Module):
         self.layer2 = nn.Sequential(*list(features.children())[5:8])
         self.layer3 = nn.Sequential(*list(features.children())[8:13])
 
-        if self.backbone_path:
-            self.features.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not self.pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

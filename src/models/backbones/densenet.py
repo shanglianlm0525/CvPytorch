@@ -16,20 +16,26 @@ from torchvision.models.densenet import densenet121, densenet161, densenet169, d
 
 class Densenet(nn.Module):
 
-    def __init__(self, subtype='densenet121', out_stages=[2, 3, 4], backbone_path=None):
+    def __init__(self, subtype='densenet121', out_stages=[2, 3, 4], backbone_path=None, pretrained = False):
         super(Densenet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
+        self.pretrained = pretrained
 
         self.out_channels = [64, 128, 256, 512, 1024]
+
         if subtype == 'densenet121':
-            features = densenet121(pretrained=not backbone_path).features
+            self.pretrained = True
+            features = densenet121(pretrained=self.pretrained).features
         elif subtype == 'densenet161':
-            features = densenet161(pretrained=not backbone_path).features
+            self.pretrained = True
+            features = densenet161(pretrained=self.pretrained).features
         elif subtype == 'densenet169':
-            features = densenet169(pretrained=not backbone_path).features
+            self.pretrained = True
+            features = densenet169(pretrained=self.pretrained).features
         elif subtype == 'densenet201':
-            features = densenet201(pretrained=not backbone_path).features
+            self.pretrained = True
+            features = densenet201(pretrained=self.pretrained).features
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
@@ -53,10 +59,11 @@ class Densenet(nn.Module):
         )
         self.layer4 = features.denseblock4
 
-        if self.backbone_path:
-            self.features.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not self.pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

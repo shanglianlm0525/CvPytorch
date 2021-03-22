@@ -34,10 +34,11 @@ class ResBlock(nn.Module):
 
 
 class Darknet(nn.Module):
-    def __init__(self, subtype='darknet53', out_stages=[2, 3, 4], backbone_path=None):
+    def __init__(self, subtype='darknet53', out_stages=[2, 3, 4], backbone_path=None, pretrained = False):
         super(Darknet, self).__init__()
         self.out_stages = out_stages
         self.backbone_path = backbone_path
+        self.pretrained = pretrained
 
         self.out_channels = [64, 128, 256, 512, 1024]
         self.conv1 = ConvModule(3, 32, kernel_size=3, stride=1, padding=1, bias=False,
@@ -60,10 +61,11 @@ class Darknet(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        if self.backbone_path:
-            self.backbone.load_state_dict(torch.load(self.backbone_path))
-        else:
-            self.init_weights()
+        if not self.pretrained:
+            if self.backbone_path:
+                self.backbone.load_state_dict(torch.load(self.backbone_path))
+            else:
+                self.init_weights()
 
     def _make_layer_v2(self, in_places, places, block, stride):
         layers = []
