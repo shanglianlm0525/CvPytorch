@@ -111,6 +111,9 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, merge=False, 
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
+        print('boxes', boxes.shape)
+        print('scores', scores.shape)
+        print('iou_thres', iou_thres)
         i = torchvision.ops.boxes.nms(boxes, scores, iou_thres)
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
@@ -413,9 +416,9 @@ class YOLOV5(nn.Module):
         self.dictionary = dictionary
         self.dummy_input = torch.zeros(1, 3, 800, 600)
 
-        self._num_classes = len(self.dictionary)
+        self.num_classes = len(self.dictionary)
         self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
         cfg = 'src/models/yolov5s.yaml'
         ch = 3
@@ -491,10 +494,10 @@ class YOLOV5(nn.Module):
             # gts = targets0
             if mode == 'val':
                 inf_out, train_out = outs
-                loss, loss_items = compute_loss([t.float() for t in train_out], gts, self.model, self._num_classes)  # scaled by batch_size
+                loss, loss_items = compute_loss([t.float() for t in train_out], gts, self.model, self.num_classes)  # scaled by batch_size
             else:
                 inf_out, train_out = None, outs
-                loss, loss_items = compute_loss(train_out, gts, self.model,self._num_classes)  # scaled by batch_size
+                loss, loss_items = compute_loss(train_out, gts, self.model,self.num_classes)  # scaled by batch_size
 
             losses['bbox_loss'] = loss_items[0]
             losses['obj_loss'] = loss_items[1]
@@ -518,7 +521,7 @@ class YOLOV5(nn.Module):
                         height = height.cpu().numpy() if isinstance(height, torch.Tensor) else height
                         width = width.cpu().numpy() if isinstance(width, torch.Tensor) else width
 
-                        dets = post_process(pred,warp_matrix,height,width,self._num_classes)
+                        dets = post_process(pred,warp_matrix,height,width,self.num_classes)
                     dets_list.append(dets)
                 return losses, dets_list
             else:
