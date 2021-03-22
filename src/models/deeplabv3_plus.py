@@ -107,7 +107,7 @@ class Deeplabv3Plus(nn.Module):
             losses['loss'] = losses['bce_loss']
 
             if mode == 'val':
-                return losses, torch.argmax(outputs, dim=1).unsqueeze(1)
+                return losses, torch.argmax(outputs, dim=1)
             else:
                 return losses
 
