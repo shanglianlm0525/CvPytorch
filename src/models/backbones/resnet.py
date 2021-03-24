@@ -86,6 +86,7 @@ class ResNet(nn.Module):
 
         if not self.pretrained:
             if self.backbone_path:
+                self.pretrained = True
                 self.backbone.load_state_dict(torch.load(self.backbone_path))
             else:
                 self.init_weights()
