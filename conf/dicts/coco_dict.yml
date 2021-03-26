@@ -1,4 +1,5 @@
 DET_CLASSES:
+ # - background: 1
  - person: 1
  - bicycle: 1
  - car: 1

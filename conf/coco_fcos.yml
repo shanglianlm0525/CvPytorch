@@ -13,7 +13,7 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: False
-    BATCH_SIZE: 2
+    BATCH_SIZE: 4
     NUM_WORKER: 2
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
@@ -26,8 +26,7 @@ DATASET:
       RandomHorizontalFlip: { p: 0.5 }
       ColorJitter: { brightness: 0.1, contrast: 0.1, saturation: 0.1, hue: 0.1 }
       RandomRotate: { degrees: 10 }
-      # RandomResizedCrop: { size: , scale: [0.2, 1.0], ratio: [0.75., 1.33] }
-      FcosPreprocess: { size: [800,1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: True }
+      FcosPreprocess: { size: [800, 1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: True }
       ToTensor:
       Normalize: { mean: [0.40789654, 0.44719302, 0.47026115], std: [0.28863828, 0.27408164, 0.27809835] }
 
@@ -76,7 +75,7 @@ RESUME: False
 GPU_IDS: [1]
 N_MAX_EPOCHS: 26
 
-INIT_LR: 0.01
+INIT_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
