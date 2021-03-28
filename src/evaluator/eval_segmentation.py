@@ -6,6 +6,7 @@
 
 import torch
 import numpy as np
+from .base_evaluator import BaseEvaluator
 
 np.seterr(divide='ignore', invalid='ignore')
 
@@ -15,7 +16,7 @@ def torch_nanmean(x):
     return value / num
 
 
-class SegmentationEvaluator(object):
+class SegmentationEvaluator(BaseEvaluator):
     def __init__(self, dataset):
         self.dataset = dataset
         self.num_class = dataset.num_classes
@@ -36,6 +37,7 @@ class SegmentationEvaluator(object):
         MIoU = np.diag(self.confusion_matrix) / (
                     np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
                     np.diag(self.confusion_matrix))
+        # print('Class IoU', MIoU)
         MIoU = np.nanmean(MIoU)
         return MIoU
 
@@ -44,7 +46,6 @@ class SegmentationEvaluator(object):
         iu = np.diag(self.confusion_matrix) / (
                     np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
                     np.diag(self.confusion_matrix))
-
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
         return FWIoU
 

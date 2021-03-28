@@ -9,6 +9,8 @@ import json
 import numpy as np
 import torch
 from pycocotools.cocoeval import COCOeval
+from .base_evaluator import BaseEvaluator
+
 
 def iou_2d(cubes_a, cubes_b):
     """
@@ -68,7 +70,7 @@ def sort_by_score(pred_boxes, pred_labels, pred_scores):
     pred_scores = [sample_boxes[mask] for sample_boxes, mask in zip(pred_scores, score_seq)]
     return pred_boxes, pred_labels, pred_scores
 
-class VOCEvaluator(object):
+class VOCEvaluator(BaseEvaluator):
     def __init__(self, dataset, iou_thread=0.5):
         self.dataset = dataset
         self.num_class = dataset.num_classes
@@ -81,14 +83,19 @@ class VOCEvaluator(object):
         self.pred_bboxes = []
 
     def update(self, gt_targets, preds):
-        gt_targets = gt_targets.cpu().numpy()
-        gt_bbox, gt_label = np.split(gt_targets.squeeze(0), [4], 1)
-        pred_score, pred_label, pred_bbox = preds[0].cpu().numpy(), preds[1].cpu().numpy(), preds[2].cpu().numpy()
-        self.gt_labels.append(np.squeeze(gt_label, 1))
-        self.gt_bboxes.append(gt_bbox)
-        self.pred_scores.append(pred_score[0])
-        self.pred_labels.append(pred_label[0])
-        self.pred_bboxes.append(pred_bbox[0])
+        for gt_target, pred in zip(gt_targets, preds):
+            gt_bbox = gt_target['boxes'].cpu().numpy()
+            gt_label = gt_target['labels'].cpu().numpy()
+
+            pred_score = pred['scores'].cpu().numpy()
+            pred_label = pred['labels'].cpu().numpy()
+            pred_bbox = pred['boxes'].cpu().numpy()
+
+            self.gt_labels.append(gt_label)
+            self.gt_bboxes.append(gt_bbox)
+            self.pred_scores.append(pred_score)
+            self.pred_labels.append(pred_label)
+            self.pred_bboxes.append(pred_bbox)
 
     def Precision(self):
         """
@@ -193,7 +200,7 @@ def xyxy2xywh(bbox):
         bbox[3] - bbox[1],
     ]
 
-class COCOEvaluator(object):
+class COCOEvaluator(BaseEvaluator):
     def __init__(self, dataset, iou_thread=0.5):
         self.dataset = dataset
         self.num_class = dataset.num_classes

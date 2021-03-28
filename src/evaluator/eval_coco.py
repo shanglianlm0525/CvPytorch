@@ -19,9 +19,10 @@ from pycocotools.coco import COCO
 import pycocotools.mask as coco_mask
 from collections import defaultdict
 import torch.distributed as dist
+from .base_evaluator import BaseEvaluator
 
 
-class CocoEvaluator(object):
+class CocoEvaluator(BaseEvaluator):
     def __init__(self, dataset, iou_types):
         coco_gt = dataset.coco
         assert isinstance(iou_types, (list, tuple))

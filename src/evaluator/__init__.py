@@ -15,7 +15,6 @@ __all__ = [
     'SegmentationEvaluator',
     'CocoEvaluator']
 
-
 def build_evaluator(cfg, dataset):
     'Using adapter design patterns'
     if cfg.EVALUATOR.NAME == 'classification':

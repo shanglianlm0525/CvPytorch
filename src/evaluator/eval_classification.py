@@ -6,9 +6,10 @@
 
 import numpy as np
 import torch
+from .base_evaluator import BaseEvaluator
 
 
-class ClassificationEvaluator(object):
+class ClassificationEvaluator(BaseEvaluator):
     def __init__(self, dataset):
         self.dataset = dataset
         self.num_class = dataset.num_classes
