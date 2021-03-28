@@ -81,6 +81,7 @@ class VOCEvaluator(BaseEvaluator):
         self.pred_labels = []
         self.pred_scores = []
         self.pred_bboxes = []
+        self.count = 0
 
     def update(self, gt_targets, preds):
         for gt_target, pred in zip(gt_targets, preds):
@@ -96,6 +97,7 @@ class VOCEvaluator(BaseEvaluator):
             self.pred_scores.append(pred_score)
             self.pred_labels.append(pred_label)
             self.pred_bboxes.append(pred_bbox)
+            self.count += 1
 
     def Precision(self):
         """
@@ -185,7 +187,7 @@ class VOCEvaluator(BaseEvaluator):
         self.pred_labels = []
         self.pred_scores = []
         self.pred_bboxes = []
-
+        self.count = 0
 
 def xyxy2xywh(bbox):
     """
@@ -273,3 +275,4 @@ class COCOEvaluator(BaseEvaluator):
 
     def reset(self):
         self.rsts = {}
+        self.count = 0

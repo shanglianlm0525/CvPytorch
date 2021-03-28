@@ -185,6 +185,10 @@ class CocoEvaluator(BaseEvaluator):
                     performances['performance'] += v
         return performances
 
+    def reset(self):
+        self.img_ids = []
+        self.count = 0
+
 
 def convert_to_xywh(boxes):
     xmin, ymin, xmax, ymax = boxes.unbind(1)

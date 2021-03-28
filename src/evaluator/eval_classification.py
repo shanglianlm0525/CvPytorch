@@ -44,8 +44,9 @@ class ClassificationEvaluator(BaseEvaluator):
         pred_label = pred_label.data.cpu().tolist()
         self.gt_labels.extend(gt_label)
         self.pred_labels.extend(pred_label)
-        self.count = self.count + 1
+        self.count += 1
 
     def reset(self):
         self.gt_labels = []
         self.pred_labels = []
+        self.count = 0
