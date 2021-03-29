@@ -35,28 +35,29 @@ class _ASPPModule(nn.Module):
                 m.bias.data.zero_()
 
 class ASPP(nn.Module):
-    def __init__(self, inplanes=2048, output_stride=16):
+    def __init__(self, inplanes=2048, output_stride=16, drop_rate=0.1):
         super(ASPP, self).__init__()
+        mid_channels = 256
         if output_stride == 16:
-            dilations = [1, 6, 12, 18]
+            dilations = [6, 12, 18]
         elif output_stride == 8:
-            dilations = [1, 12, 24, 36]
+            dilations = [12, 24, 36]
         else:
             raise NotImplementedError
 
-        self.aspp1 = _ASPPModule(inplanes, 256, 1, padding=0, dilation=dilations[0])
-        self.aspp2 = _ASPPModule(inplanes, 256, 3, padding=dilations[1], dilation=dilations[1])
-        self.aspp3 = _ASPPModule(inplanes, 256, 3, padding=dilations[2], dilation=dilations[2])
-        self.aspp4 = _ASPPModule(inplanes, 256, 3, padding=dilations[3], dilation=dilations[3])
+
+        self.aspp1 = _ASPPModule(inplanes, mid_channels, 1, padding=0, dilation=dilations[0])
+        self.aspp2 = _ASPPModule(inplanes, mid_channels, 3, padding=dilations[0], dilation=dilations[0])
+        self.aspp3 = _ASPPModule(inplanes, mid_channels, 3, padding=dilations[1], dilation=dilations[1])
+        self.aspp4 = _ASPPModule(inplanes, mid_channels, 3, padding=dilations[2], dilation=dilations[2])
 
         self.global_avg_pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
-                                             nn.Conv2d(inplanes, 256, 1, stride=1, bias=False),
-                                             nn.BatchNorm2d(256),
+                                             nn.Conv2d(inplanes, mid_channels, 1, stride=1, bias=False),
+                                             nn.BatchNorm2d(mid_channels),
                                              nn.ReLU(inplace=True))
-        self.conv1 = nn.Conv2d(1280, 256, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(256)
-        self.relu = nn.ReLU(inplace=True)
-        self.dropout = nn.Dropout(0.5)
+        self.conv_bn_relu = nn.Sequential(nn.Conv2d(mid_channels*5, mid_channels, 1, bias=False) ,
+                                          nn.BatchNorm2d(mid_channels),nn.ReLU(inplace=True))
+        self.dropout = nn.Dropout(p=drop_rate)
         self._init_weight()
 
     def forward(self, x):
@@ -68,10 +69,7 @@ class ASPP(nn.Module):
         x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
         x = torch.cat((x1, x2, x3, x4, x5), dim=1)
 
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
+        x = self.conv_bn_relu(x)
         return self.dropout(x)
 
     def _init_weight(self):

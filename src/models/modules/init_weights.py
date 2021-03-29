@@ -1,4 +1,11 @@
+# !/usr/bin/env python
+# -- coding: utf-8 --
+# @Time : 2021/3/28 15:20
+# @Author : liumin
+# @File : init_weights.py
+
 import torch.nn as nn
+
 
 def kaiming_init(module,
                  a=0,

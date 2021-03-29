@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 
 
+__all__ = ['SEBlock', 'SKBlock']
+
 class SEBlock(nn.Module):
     """
         Squeeze-and-Excitation Networks

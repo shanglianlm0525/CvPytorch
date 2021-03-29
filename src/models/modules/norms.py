@@ -1,23 +1,61 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/12/10 15:15
+# @Time : 2021/3/28 15:22
 # @Author : liumin
 # @File : norms.py
 
-import torch
 import torch.nn as nn
 
-
-__avalible__ = {
-    'BatchNorm1d': nn.BatchNorm1d, 'BatchNorm2d': nn.BatchNorm2d,'BatchNorm3d': nn.BatchNorm3d
-    ,'InstanceNorm1d': nn.InstanceNorm1d, 'InstanceNorm2d': nn.InstanceNorm2d, 'InstanceNorm3d': nn.InstanceNorm3d
-    ,'GroupNorm': nn.GroupNorm, 'SyncBatchNorm': nn.SyncBatchNorm
+norm_cfg = {
+    # format: layer_type: (abbreviation, module)
+    'BN': ('bn', nn.BatchNorm2d),
+    'SyncBN': ('bn', nn.SyncBatchNorm),
+    'GN': ('gn', nn.GroupNorm),
+    # and potentially 'SN'
 }
 
 
-def build_norm_layer(name, num_features):
-    assert name in __avalible__.keys()
-    if name == 'GroupNorm':
-        return __avalible__[name](num_groups=1,num_features=num_features)
+def norm_layer(cfg, num_features, postfix=''):
+    """ Build normalization layer
+
+    Args:
+        cfg (dict): cfg should contain:
+            type (str): identify norm layer type.
+            layer args: args needed to instantiate a norm layer.
+            requires_grad (bool): [optional] whether stop gradient updates
+        num_features (int): number of channels from input.
+        postfix (int, str): appended into norm abbreviation to
+            create named layer.
+
+    Returns:
+        name (str): abbreviation + postfix
+        layer (nn.Module): created norm layer
+    """
+    assert isinstance(cfg, dict) and 'type' in cfg
+    cfg_ = cfg.copy()
+
+    layer_type = cfg_.pop('type')
+    if layer_type not in norm_cfg:
+        raise KeyError('Unrecognized norm type {}'.format(layer_type))
     else:
-        return __avalible__[name](num_features=num_features)
+        abbr, norm_layer = norm_cfg[layer_type]
+        if norm_layer is None:
+            raise NotImplementedError
+
+    assert isinstance(postfix, (int, str))
+    name = abbr + str(postfix)
+
+    requires_grad = cfg_.pop('requires_grad', True)
+    cfg_.setdefault('eps', 1e-5)
+    if layer_type != 'GN':
+        layer = norm_layer(num_features, **cfg_)
+        if layer_type == 'SyncBN':
+            layer._specify_ddp_gpu_num(1)
+    else:
+        assert 'num_groups' in cfg_
+        layer = norm_layer(num_channels=num_features, **cfg_)
+
+    for param in layer.parameters():
+        param.requires_grad = requires_grad
+
+    return name, layer
