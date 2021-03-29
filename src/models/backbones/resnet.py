@@ -56,7 +56,10 @@ class ResNet(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1]+1]
 
-        self.conv1 = nn.Sequential(*list(backbone.children())[:4])
+        self.conv1 = backbone.conv1
+        self.bn1 = backbone.bn1
+        self.relu = backbone.relu
+        self.maxpool = backbone.maxpool
         self.layer1 = backbone.layer1
         self.layer2 = backbone.layer2
         self.layer3 = backbone.layer3
@@ -102,7 +105,7 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.bias, 0.0001)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.maxpool(self.relu(self.bn1(self.conv1(x))))
         output = []
         for i in range(1, 5):
             res_layer = getattr(self, 'layer{}'.format(i))

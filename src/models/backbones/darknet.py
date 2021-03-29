@@ -6,7 +6,7 @@
 
 import torch
 import torch.nn as nn
-from CvPytorch.src.models.modules.convs import ConvModule
+from CvPytorch.src.models.modules.convs_org import ConvModule
 
 """
     YOLOv3: An Incremental Improvement
