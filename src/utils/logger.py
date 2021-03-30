@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import datetime
+from termcolor import colored
 
 LOG_DIR = 'logs'
 LOG_LEVEL = os.environ.get('LOG_LEVEL') or 'INFO'
@@ -13,17 +14,23 @@ logger.propagate = 0
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
-fh = logging.FileHandler(os.path.sep.join([
+fileHandeler = logging.FileHandler(os.path.sep.join([
     LOG_DIR if os.path.isdir(LOG_DIR) and os.access(LOG_DIR, os.W_OK) else '/logs',
     datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d')
 ]))
-fh.setLevel(LOG_LEVEL)
+fileHandeler.setLevel(LOG_LEVEL)
 
-ch = logging.StreamHandler()
-ch.setLevel(LOG_LEVEL)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
+consoleHandeler = logging.StreamHandler()
+consoleHandeler.setLevel(LOG_LEVEL)
+fileFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fmt = colored('%(asctime)s', 'blue') +' - '+ colored('%(name)s', 'magenta', attrs=['bold']) + ' - '+ \
+              colored('%(levelname)s:', 'green') +' - '+ colored('%(message)s', 'grey')
+consoleFormatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S")
+fileHandeler.setFormatter(fileFormatter)
+consoleHandeler.setFormatter(consoleFormatter)
 
-logger.addHandler(fh)
-logger.addHandler(ch)
+logger.addHandler(fileHandeler)
+logger.addHandler(consoleHandeler)
+
+
+
