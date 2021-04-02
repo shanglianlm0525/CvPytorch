@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+from torch.utils import model_zoo
 from torchvision.models.mobilenet import mobilenet_v2
 
 """
@@ -21,14 +22,14 @@ class MobileNetV2(nn.Module):
 
     def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, backbone_path=None, pretrained = False):
         super(MobileNetV2, self).__init__()
+        self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        if subtype == 'mobilenet_v2':
-            self.pretrained = True
-            features = mobilenet_v2(pretrained=self.pretrained).features
+        if self.subtype == 'mobilenet_v2':
+            features = mobilenet_v2().features
             self.out_channels = [32, 16, 24, 32, 64, 96, 160, 320]
         else:
             raise NotImplementedError
@@ -44,12 +45,9 @@ class MobileNetV2(nn.Module):
         self.stage6 = nn.Sequential(*list(features.children())[14:17])
         self.stage7 = nn.Sequential(list(features.children())[17])
 
-        if not self.pretrained:
-            if self.backbone_path:
-                self.pretrained = True
-                self.backbone.load_state_dict(torch.load(self.backbone_path))
-            else:
-                self.init_weights()
+        self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
 
     def init_weights(self):
         for m in self.modules():
@@ -81,6 +79,16 @@ class MobileNetV2(nn.Module):
         for layer in self.modules():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.eval()
+
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
 
 if __name__=="__main__":

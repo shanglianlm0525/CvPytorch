@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+from torch.utils import model_zoo
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
 """
@@ -26,30 +27,26 @@ class ResNet(nn.Module):
 
     def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None, pretrained = False):
         super(ResNet, self).__init__()
+        self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride # 8, 16, 32
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        if subtype == 'resnet18':
-            self.pretrained = True
-            backbone = resnet18(pretrained=self.pretrained)
+        if self.subtype == 'resnet18':
+            backbone = resnet18()
             self.out_channels = [64, 64, 128, 256, 512]
-        elif subtype == 'resnet34':
-            self.pretrained = True
-            backbone = resnet34(pretrained=self.pretrained)
+        elif self.subtype == 'resnet34':
+            backbone = resnet34()
             self.out_channels = [64, 64, 128, 256, 512]
-        elif subtype == 'resnet50':
-            self.pretrained = True
-            backbone = resnet50(pretrained=self.pretrained)
+        elif self.subtype == 'resnet50':
+            backbone = resnet50()
             self.out_channels = [64, 256, 512, 1024, 2048]
-        elif subtype == 'resnet101':
-            self.pretrained = True
-            backbone = resnet101(pretrained=self.pretrained)
+        elif self.subtype == 'resnet101':
+            backbone = resnet101()
             self.out_channels = [64, 256, 512, 1024, 2048]
-        elif subtype == 'resnet152':
-            self.pretrained = True
-            backbone = resnet152(pretrained=self.pretrained)
+        elif self.subtype == 'resnet152':
+            backbone = resnet152()
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -87,22 +84,10 @@ class ResNet(nn.Module):
                 elif 'downsample.0' in n:
                     m.stride = (s4, s4)
 
-        if not self.pretrained:
-            if self.backbone_path:
-                self.pretrained = True
-                self.backbone.load_state_dict(torch.load(self.backbone_path))
-            else:
-                self.init_weights()
+        self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
 
-    def init_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.normal_(m.weight, std=0.001)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0.0001)
 
     def forward(self, x):
         x = self.maxpool(self.relu(self.bn1(self.conv1(x))))
@@ -131,6 +116,26 @@ class ResNet(nn.Module):
             layer.eval()
             for param in layer.parameters():
                 param.requires_grad = False
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.normal_(m.weight, std=0.001)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0.0001)
+
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
 
 if __name__ == "__main__":

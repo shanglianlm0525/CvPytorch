@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+from torch.utils import model_zoo
 from torchvision.models.resnet import resnext50_32x4d, resnext101_32x8d
 
 """
@@ -23,18 +24,17 @@ class ResNeXt(nn.Module):
 
     def __init__(self, subtype='resnext50_32x4d', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None, pretrained = False):
         super(ResNeXt, self).__init__()
+        self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        if subtype == 'resnext50_32x4d':
-            self.pretrained = True
-            backbone = resnext50_32x4d(pretrained=self.pretrained)
+        if self.subtype == 'resnext50_32x4d':
+            backbone = resnext50_32x4d()
             self.out_channels = [64, 256, 512, 1024, 2048]
-        elif subtype == 'resnext101_32x8d':
-            self.pretrained = True
-            backbone = resnext101_32x8d(pretrained=self.pretrained)
+        elif self.subtype == 'resnext101_32x8d':
+            backbone = resnext101_32x8d()
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -69,12 +69,9 @@ class ResNeXt(nn.Module):
                 elif 'downsample.0' in n:
                     m.stride = (s4, s4)
 
-        if not self.pretrained:
-            if self.backbone_path:
-                self.pretrained = True
-                self.backbone.load_state_dict(torch.load(self.backbone_path))
-            else:
-                self.init_weights()
+        self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
 
     def init_weights(self):
         for m in self.modules():
@@ -114,6 +111,15 @@ class ResNeXt(nn.Module):
             for param in layer.parameters():
                 param.requires_grad = False
 
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
 if __name__ == "__main__":
     model = ResNeXt('resnext50_32x4d')

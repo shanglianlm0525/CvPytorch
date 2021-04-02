@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+from torch.utils import model_zoo
 from torchvision.models.vgg import vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
 
 """
@@ -26,26 +27,24 @@ model_urls = {
 
 class VGG(nn.Module):
 
-    def __init__(self, subtype='vgg16', out_stages=[2,3,4], backbone_path=None, pretrained = False):
+    def __init__(self, subtype='vgg16', out_stages=[2,3,4], output_stride=32, backbone_path=None, pretrained = False):
         super(VGG, self).__init__()
+        self.subtype = subtype
         self.out_stages = out_stages
+        self.output_stride = output_stride  # 8, 16, 32
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        if subtype == 'vgg11':
-            self.pretrained = True
+        if self.subtype == 'vgg11':
             features = vgg11_bn(pretrained=self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
-        elif subtype == 'vgg13':
-            self.pretrained = True
+        elif self.subtype == 'vgg13':
             features = vgg13_bn(pretrained=self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
-        elif subtype == 'vgg16':
-            self.pretrained = True
+        elif self.subtype == 'vgg16':
             features = vgg16_bn(pretrained=self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
-        elif subtype == 'vgg19':
-            self.pretrained = True
+        elif self.subtype == 'vgg19':
             features = vgg19_bn(pretrained=self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         else:
@@ -59,12 +58,9 @@ class VGG(nn.Module):
         self.layer3 = nn.Sequential(*list(features.children())[24:34])
         self.layer4 = nn.Sequential(*list(features.children())[34:43])
 
-        if not self.pretrained:
-            if self.backbone_path:
-                self.pretrained = True
-                self.backbone.load_state_dict(torch.load(self.backbone_path))
-            else:
-                self.init_weights()
+        self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
 
     def init_weights(self):
         for m in self.modules():
@@ -92,6 +88,15 @@ class VGG(nn.Module):
             if isinstance(layer, nn.BatchNorm2d):
                 layer.eval()
 
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
 if __name__=="__main__":
     model =VGG('vgg16')
