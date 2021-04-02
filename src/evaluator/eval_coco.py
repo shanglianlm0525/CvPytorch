@@ -187,6 +187,7 @@ class CocoEvaluator(BaseEvaluator):
 
     def reset(self):
         self.img_ids = []
+        self.eval_imgs = {k: [] for k in self.iou_types}
         self.count = 0
 
 
