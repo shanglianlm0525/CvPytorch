@@ -23,7 +23,7 @@ from collections.abc import Sequence
 
 __all__ = ['Compose', 'ToTensor', 'Normalize',
         'RandomHorizontalFlip', 'RandomVerticalFlip',
-        'RandomScale', 'Scale',
+        'RandomScale',
         'Resize', 'RandomResizedCrop',
         'RandomCrop', 'CenterCrop',
         'RandomRotate', 'RandomPerspective',
@@ -39,6 +39,13 @@ _pil_interpolation_to_str = {
     Image.LANCZOS: 'PIL.Image.LANCZOS',
 }
 
+def _get_image_size(img):
+    if F._is_pil_image(img):
+        return img.size
+    elif isinstance(img, torch.Tensor) and img.dim() > 2:
+        return img.shape[-2:][::-1]
+    else:
+        raise TypeError("Unexpected type {}".format(type(img)))
 
 def _setup_size(size, error_msg):
     if isinstance(size, numbers.Number):
@@ -219,37 +226,6 @@ class RandomScale(object):
         return self.__class__.__name__ + '(scale_range={0}, interpolation={1})'.format(self.scale_range, interpolate_str)
 
 
-class Scale(object):
-    """Resize the input PIL Image to the given scale.
-    Args:
-        Scale (sequence or int): scale factors
-        interpolation (int, optional): Desired interpolation. Default is
-            ``PIL.Image.BILINEAR``
-    """
-
-    def __init__(self, scale, interpolation=Image.BILINEAR):
-        self.scale = scale
-        self.interpolation = interpolation
-
-    def __call__(self, sample):
-        """
-        Args:
-            img (PIL Image): Image to be scaled.
-            lbl (PIL Image): Label to be scaled.
-        Returns:
-            PIL Image: Rescaled image.
-            PIL Image: Rescaled label.
-        """
-        img, target = sample['image'], sample['target']
-        assert img.size == target.size
-        target_size = ( int(img.size[1]*self.scale), int(img.size[0]*self.scale) ) # (H, W)
-        return {'image': F.resize(img, target_size, self.interpolation), 'target': F.resize(target, target_size, Image.NEAREST)}
-
-    def __repr__(self):
-        interpolate_str = _pil_interpolation_to_str[self.interpolation]
-        return self.__class__.__name__ + '(scale={0}, interpolation={1})'.format(self.scale, interpolate_str)
-
-
 class CenterCrop(object):
     """Crops the given PIL Image at the center.
     Args:
@@ -278,31 +254,26 @@ class CenterCrop(object):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
-class RandomCrop(torch.nn.Module):
-    """Crop the given image at a random location.
-    If the image is torch Tensor, it is expected
-    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions,
-    but if non-constant padding is used, the input is expected to have at most 2 leading dimensions
+
+class RandomCrop(object):
+    """Crop the given PIL Image at a random location.
 
     Args:
         size (sequence or int): Desired output size of the crop. If size is an
             int instead of sequence like (h, w), a square crop (size, size) is
-            made. If provided a sequence of length 1, it will be interpreted as (size[0], size[0]).
+            made.
         padding (int or sequence, optional): Optional padding on each border
-            of the image. Default is None. If a single int is provided this
-            is used to pad all borders. If sequence of length 2 is provided this is the padding
-            on left/right and top/bottom respectively. If a sequence of length 4 is provided
-            this is the padding for the left, top, right and bottom borders respectively.
-            In torchscript mode padding as single int is not supported, use a sequence of length 1: ``[padding, ]``.
+            of the image. Default is None, i.e no padding. If a sequence of length
+            4 is provided, it is used to pad left, top, right, bottom borders
+            respectively. If a sequence of length 2 is provided, it is used to
+            pad left/right, top/bottom borders, respectively.
         pad_if_needed (boolean): It will pad the image if smaller than the
             desired size to avoid raising an exception. Since cropping is done
             after padding, the padding seems to be done at a random offset.
-        fill (number or str or tuple): Pixel fill value for constant fill. Default is 0. If a tuple of
+        fill: Pixel fill value for constant fill. Default is 0. If a tuple of
             length 3, it is used to fill R, G, B channels respectively.
-            This value is only used when the padding_mode is constant.
-            Only number is supported for torch Tensor.
-            Only int or str or tuple value is supported for PIL Image.
-        padding_mode (str): Type of padding. Should be: constant, edge, reflect or symmetric. Default is constant.
+            This value is only used when the padding_mode is constant
+        padding_mode: Type of padding. Should be: constant, edge, reflect or symmetric. Default is constant.
 
              - constant: pads with a constant value, this value is specified with fill
 
@@ -320,77 +291,64 @@ class RandomCrop(torch.nn.Module):
 
     """
 
-    @staticmethod
-    def get_params(img, output_size):
-        """Get parameters for ``crop`` for a random crop.
-
-        Args:
-            img (PIL Image or Tensor): Image to be cropped.
-            output_size (tuple): Expected output size of the crop.
-
-        Returns:
-            tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
-        """
-        w, h = F._get_image_size(img)
-        th, tw = output_size
-
-        if h + 1 < th or w + 1 < tw:
-            raise ValueError(
-                "Required crop size {} is larger then input image size {}".format((th, tw), (h, w))
-            )
-
-        if w == tw and h == th:
-            return 0, 0, h, w
-
-        i = torch.randint(0, h - th + 1, size=(1, )).item()
-        j = torch.randint(0, w - tw + 1, size=(1, )).item()
-        return i, j, th, tw
-
-
-    def __init__(self, size, padding=None, pad_if_needed=False, fill=0, ignore_label=255, padding_mode="constant"):
-        super().__init__()
-
-        self.size = tuple(_setup_size(
-            size, error_msg="Please provide only two dimensions (h, w) for size."
-        ))
-
+    def __init__(self, size, padding=None, pad_if_needed=False, fill=0, ignore_label=255, padding_mode='constant'):
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        else:
+            self.size = size
         self.padding = padding
         self.pad_if_needed = pad_if_needed
         self.fill = fill
         self.ignore_label = ignore_label
         self.padding_mode = padding_mode
 
+    @staticmethod
+    def get_params(img, output_size):
+        """Get parameters for ``crop`` for a random crop.
+
+        Args:
+            img (PIL Image): Image to be cropped.
+            output_size (tuple): Expected output size of the crop.
+
+        Returns:
+            tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
+        """
+        w, h = _get_image_size(img)
+        th, tw = output_size
+        if w == tw and h == th:
+            return 0, 0, h, w
+
+        i = random.randint(0, h - th)
+        j = random.randint(0, w - tw)
+        return i, j, th, tw
+
     def __call__(self, sample):
         """
         Args:
-            img (PIL Image or Tensor): Image to be cropped.
+            img (PIL Image): Image to be cropped.
 
         Returns:
-            PIL Image or Tensor: Cropped image.
+            PIL Image: Cropped image.
         """
         img, target = sample['image'], sample['target']
         if self.padding is not None:
             img = F.pad(img, self.padding, self.fill, self.padding_mode)
             target = F.pad(target, self.padding, self.ignore_label, self.padding_mode)
 
-        width, height = F._get_image_size(img)
         # pad the width if needed
-        if self.pad_if_needed and width < self.size[1]:
-            padding = [self.size[1] - width, 0]
-            img = F.pad(img, padding, self.fill, self.padding_mode)
-            target = F.pad(target, padding, self.ignore_label, self.padding_mode)
+        if self.pad_if_needed and img.size[0] < self.size[1]:
+            img = F.pad(img, (self.size[1] - img.size[0], 0), self.fill, self.padding_mode)
+            target = F.pad(target, (self.size[1] - img.size[0], 0), self.ignore_label, self.padding_mode)
         # pad the height if needed
-        if self.pad_if_needed and height < self.size[0]:
-            padding = [0, self.size[0] - height]
-            img = F.pad(img, padding, self.fill, self.padding_mode)
-            target = F.pad(target, padding, self.ignore_label, self.padding_mode)
+        if self.pad_if_needed and img.size[1] < self.size[0]:
+            img = F.pad(img, (0, self.size[0] - img.size[1]), self.fill, self.padding_mode)
+            target = F.pad(target, (0, self.size[0] - img.size[1]), self.ignore_label, self.padding_mode)
 
         i, j, h, w = self.get_params(img, self.size)
         return {'image': F.crop(img, i, j, h, w), 'target': F.crop(target, i, j, h, w)}
 
-
     def __repr__(self):
-        return self.__class__.__name__ + "(size={0}, padding={1})".format(self.size, self.padding)
+        return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
 
 class Resize(object):

@@ -5,10 +5,10 @@
 # @File : __init__.py
 
 import copy
-import CvPytorch.src.transforms.cls_transforms as cls_t
-import CvPytorch.src.transforms.seg_transforms as seg_t
-import CvPytorch.src.transforms.det_transforms as det_t
-import CvPytorch.src.transforms.ins_transforms as ins_t
+import src.transforms.cls_transforms as cls_t
+import src.transforms.seg_transforms as seg_t
+import src.transforms.det_transforms as det_t
+import src.transforms.ins_transforms as ins_t
 
 
 def build_transforms(dict_name, cfg, mode='train'):

@@ -6,7 +6,6 @@
 import copy
 import random
 
-import cv2
 import torch
 import torchvision
 from pycocotools import mask as coco_mask
@@ -19,8 +18,8 @@ from PIL import Image
 
 __all__ = ['RandomHorizontalFlip',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask',
-        'ColorJitter', 'RandomGaussianBlur',
-        'Normalize', 'DeNormalize', 'ToTensor']
+        'ColorJitter', 'GaussianBlur',
+        'Normalize', 'ToTensor']
 
 class Compose(object):
     def __init__(self, transforms):
@@ -40,7 +39,7 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         img, target = sample['image'], sample['target']
-        img = F.to_tensor(img.astype(np.uint8))
+        img = F.to_tensor(img)
         return {'image': img, 'target': target}
 
 
@@ -55,22 +54,8 @@ class Normalize(object):
         self.std = std
 
     def __call__(self, sample):
-        img,target = sample['image'], sample['target']
-        for t, m, s in zip(img, self.mean, self.std):
-            t.sub_(m).div_(s)
-        return {'image': img,'target': target}
-
-
-class DeNormalize(object):
-    def __init__(self, mean=(0., 0., 0.), std=(1., 1., 1.)):
-        self.mean = mean
-        self.std = std
-
-    def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        for t, m, s in zip(img, self.mean, self.std):
-            t.mul_(s).add_(m)
-        return {'image': img,'target': target}
+        return {'image': F.normalize(img, self.mean, self.std), 'target': target}
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
@@ -112,7 +97,7 @@ class FilterAndRemapCocoCategories(object):
 class ConvertCocoPolysToMask(object):
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        h, w, _ = img.shape
+        w, h = img.size
 
         image_id = target["image_id"]
         image_id = torch.tensor([image_id])
@@ -175,6 +160,7 @@ def _flip_coco_person_keypoints(kps, width):
     return flipped_data
 
 
+
 class RandomHorizontalFlip(object):
     def __init__(self, p):
         self.p = p
@@ -182,8 +168,8 @@ class RandomHorizontalFlip(object):
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            h, w, _ = img.shape
-            img = cv2.flip(img, 1)
+            w, h = img.size
+            img = F.hflip(img)
             bbox = target["boxes"]
             bbox[:, [0, 2]] = w - bbox[:, [2, 0]]
             target["boxes"] = bbox
@@ -196,15 +182,30 @@ class RandomHorizontalFlip(object):
         return {'image': img,'target': target}
 
 
-class RandomGaussianBlur(object):
-    def __init__(self, p=0.5, radius=5):
+class GaussianBlur(object):
+    def __init__(self, p=0.5, kernel_size=5, sigma=(0.1, 2.0)):
         self.p = p
-        self.radius = radius
+        self.kernel_size = kernel_size
+        self.sigma = sigma
+
+    @staticmethod
+    def get_params(sigma_min: float, sigma_max: float) -> float:
+        """Choose sigma for random gaussian blurring.
+
+        Args:
+            sigma_min (float): Minimum standard deviation that can be chosen for blurring kernel.
+            sigma_max (float): Maximum standard deviation that can be chosen for blurring kernel.
+
+        Returns:
+            float: Standard deviation to be passed to calculate kernel for gaussian blurring.
+        """
+        return torch.empty(1).uniform_(sigma_min, sigma_max).item()
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            img = cv2.GaussianBlur(img, (self.radius, self.radius), 0)
+            sigma = self.get_params(self.sigma[0], self.sigma[1])
+            img = F.gaussian_blur(img, self.kernel_size, [sigma, sigma])
         return {'image': img,'target': target}
 
 
@@ -217,23 +218,7 @@ class ColorJitter(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        img = Image.fromarray(img)
         img = T.ColorJitter(self.brightness, self.contrast, self.saturation,self.hue)(img)
-        img = np.asarray(img, dtype=np.int32)
         return {'image': img, 'target': target}
 
-class RGB2BGR(object):
-    # Converts image from RGB order to BGR order, for model initialized from Caffe
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        return {'image': img,'target': target}
-
-
-class BGR2RGB(object):
-    # Converts image from BGR order to RGB order, for model initialized from Pytorch
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        return {'image': img,'target': target}
 
