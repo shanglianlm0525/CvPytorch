@@ -291,6 +291,9 @@ class LossLogger(object):
         print('{} Total time: {} ({:.4f} s / it)'.format(
             header, total_time_str, total_time / len(iterable)))
 
+    def reset(self):
+        self.meters = defaultdict(SmoothedValue)
+
 
 class MetricLogger(object):
     'Using adapter design patterns'

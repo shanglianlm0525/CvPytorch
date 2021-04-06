@@ -24,7 +24,7 @@ consoleHandeler = logging.StreamHandler()
 consoleHandeler.setLevel(LOG_LEVEL)
 fileFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fmt = colored('%(asctime)s', 'blue') +' - '+ colored('%(name)s', 'magenta', attrs=['bold']) + ' - '+ \
-              colored('%(levelname)s:', 'green') +' - '+ colored('%(message)s', 'grey')
+              colored('%(levelname)s:', 'green') +' - '+ colored('%(message)s', 'white')
 consoleFormatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S")
 fileHandeler.setFormatter(fileFormatter)
 consoleHandeler.setFormatter(consoleFormatter)
