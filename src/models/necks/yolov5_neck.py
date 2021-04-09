@@ -3,74 +3,45 @@
 # @Time : 2021/4/2 18:03
 # @Author : liumin
 # @File : yolov5_neck.py
+import copy
 
 import torch
 import torch.nn as nn
-# from ..modules.yolov5_modules import parse_yolov5_model
-from CvPytorch.src.models.modules.yolov5_modules import parse_yolov5_model
+import torch.nn.functional as F
+from ..modules.yolov5_modules import C3, Conv
 
 
 class YOLOv5Neck(nn.Module):
-                # [from, number, module, args]
-    model_cfg = [[-1, 1, 'Conv', [512, 1, 1]],
-                 [-1, 1, 'nn.Upsample', [None, 2, 'nearest']],
-                 [[-1, 6], 1, 'Concat', [1]],  # cat backbone P4
-                 [-1, 3, 'C3', [512, False]],  # 13
-
-                 [-1, 1, 'Conv', [256, 1, 1]],
-                 [-1, 1, 'nn.Upsample', [None, 2, 'nearest']],
-                 [[-1, 4], 1, 'Concat', [1]],  # cat backbone P3
-                 [-1, 3, 'C3', [256, False]],  # 17 (P3/8-small)
-
-                 [-1, 1, 'Conv', [256, 3, 2]],
-                 [[-1, 14], 1, 'Concat', [1]],  # cat head P4
-                 [-1, 3, 'C3', [512, False]],  # 20 (P4/16-medium)
-
-                 [-1, 1, 'Conv', [512, 3, 2]],
-                 [[-1, 10], 1, 'Concat', [1]],  # cat head P5
-                 [-1, 3, 'C3', [1024, False]],  # 23 (P5/32-large)
-                 ]
-    def __init__(self, subtype='yolov5s', out_stages=[2, 3, 4], output_stride=32, backbone_path=None, pretrained=False):
+    def __init__(self, in_channels, out_channels):
         super(YOLOv5Neck, self).__init__()
-        self.subtype = subtype
-        self.out_stages = out_stages
-        self.output_stride = output_stride
-        self.backbone_path = backbone_path
-        self.pretrained = pretrained
+        assert isinstance(in_channels, list)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.num_ins = len(in_channels)
 
-        if self.subtype == 'yolov5s':
-            depth_mul = 0.33  # model depth multiple
-            width_mul = 0.50  # layer channel multiple
-            backbone = parse_yolov5_model(self.model_cfg, depth_mul, width_mul)
-            self.out_channels = [64, 128, 256, 512]
-        elif self.subtype == 'yolov5m':
-            depth_mul = 0.67  # model depth multiple
-            width_mul = 0.75  # layer channel multiple
-            backbone = parse_yolov5_model(self.model_cfg, depth_mul, width_mul)
-            self.out_channels = [96, 192, 384, 768]
-        elif self.subtype == 'yolov5l':
-            depth_mul = 1.0  # model depth multiple
-            width_mul = 1.0  # layer channel multiple
-            backbone = parse_yolov5_model(self.model_cfg, depth_mul, width_mul)
-            self.out_channels = [128, 256, 512, 1024]
-        elif self.subtype == 'yolov5x':
-            depth_mul = 1.33  # model depth multiple
-            width_mul = 1.25  # layer channel multiple
-            backbone = parse_yolov5_model(self.model_cfg, depth_mul, width_mul)
-            self.out_channels = [160, 320, 640, 1280]
-        else:
-            raise NotImplementedError
+        self.up_convs = nn.ModuleList()
+        for i in range(self.num_ins):
+            if i == 0:
+                up_conv = C3(in_channels[i]*2, in_channels[i], 3, False)
+            elif i< self.num_ins-1:
+                up_conv = nn.Sequential(
+                    C3(in_channels[i]* 2, in_channels[i], 3, False),
+                    Conv(in_channels[i], in_channels[i]//2, 1, 1, 0)
+                )
+            else:
+                up_conv = nn.Sequential(
+                    C3(in_channels[i] , in_channels[i], 3, False),
+                    Conv(in_channels[i], in_channels[i] // 2, 1, 1, 0)
+                )
+            self.up_convs.append(up_conv)
 
-        self.conv1 = nn.Sequential(list(backbone.children())[0])
-        self.layer1 = nn.Sequential(*list(backbone.children())[1:3])
-        self.layer2 = nn.Sequential(*list(backbone.children())[3:5])
-        self.layer3 = nn.Sequential(*list(backbone.children())[5:7])
-        self.layer4 = nn.Sequential(*list(backbone.children())[7:])
+        self.down_convs1 = nn.ModuleList()
+        self.down_convs2 = nn.ModuleList()
+        for i in range(self.num_ins-1):
+            self.down_convs1.append(Conv(in_channels[i], in_channels[i], 3, 2, 1))
+            self.down_convs2.append(C3(in_channels[i]*2 , in_channels[i]*2, 3, False))
 
         self.init_weights()
-        if self.pretrained:
-            self.load_pretrained_weights()
-
 
     def init_weights(self):
         for m in self.modules():
@@ -85,23 +56,31 @@ class YOLOv5Neck(nn.Module):
 
 
     def forward(self, x):
+        assert len(x) == len(self.in_channels)
+        outs = x
+        used_backbone_levels = len(outs)
+        for i in range(used_backbone_levels - 1, 0, -1):
+            if i<used_backbone_levels - 1:
+                prev_shape = x[i].shape[2:]
+                lateral_up = F.interpolate(outs[i+1], size=prev_shape, mode='nearest')
+                outs[i] = torch.cat([lateral_up, outs[i]], dim=1)
+            outs[i] = self.up_convs[i](outs[i])
 
+        for i, (down_conv1, down_conv2)  in enumerate(zip(self.down_convs1, self.down_convs2)):
+            outs[i+1] = down_conv2(torch.cat([down_conv1(outs[i]), outs[i+1]], dim=1))
 
+        return tuple(outs)
 
-        x = self.conv1(x)
-        output = []
-        for i in range(1, 5):
-            res_layer = getattr(self, 'layer{}'.format(i))
-            x = res_layer(x)
-            if i in self.out_stages:
-                output.append(x)
-        return tuple(output)
 
 if __name__ == "__main__":
-    model = YOLOv5Neck('yolov5s')
-    print(model)
-
-    input = torch.randn(1, 3, 640, 640)
-    out = model(input)
-    for o in out:
-        print(o.shape)
+    import torch
+    in_channels = [256, 512, 1024]
+    out_channels = [256, 512, 1024]
+    scales = [76, 38, 19]
+    inputs = [torch.rand(1, c, s, s) for c, s in zip(in_channels, scales)]
+    for i in range(len(inputs)):
+        print(f'inputs[{i}].shape = {inputs[i].shape}')
+    self = YOLOv5Neck(in_channels, out_channels, False).eval()
+    outputs = self.forward(inputs)
+    for i in range(len(outputs)):
+        print(f'outputs[{i}].shape = {outputs[i].shape}')
