@@ -5,17 +5,16 @@
 # @File : __init__.py
 
 from copy import deepcopy
-from .fcos_head import FcosHead
-from .nanodet_head import NanodetHead
+from .yolov5_head import YOLOv5Head
 
-__all__ = ['FcosHead','NanodetHead']
+__all__ = [
+    'YOLOv5Head'
+]
 
 def build_head(cfg):
     head_cfg = deepcopy(cfg)
     name = head_cfg.pop('name')
-    if name == 'FcosHead':
-        return FcosHead(**head_cfg)
-    elif name == 'NanodetHead':
-        return NanodetHead(**head_cfg)
+    if name == 'YOLOv5Head':
+        return YOLOv5Head(**head_cfg)
     else:
         raise NotImplementedError

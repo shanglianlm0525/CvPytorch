@@ -6,7 +6,7 @@
 
 import torch
 import torch.nn as nn
-from CvPytorch.src.models.modules.convs import ConvModule
+from src.models.modules.convs_org import ConvModule
 
 class YOLOV3Head(nn.Module):
     def __init__(self, num_classes=80, in_channels=[128, 256, 512],
