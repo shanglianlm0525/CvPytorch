@@ -7,15 +7,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from CvPytorch.src.models.modules.convs import ConvModule
+from src.models.modules.convs import ConvModule
 
 
-class YOLOV3Neck(nn.Module):
+class YOLOv3Neck(nn.Module):
     '''modified from MMDetection'''
 
     def __init__(self, in_channels=[256, 512, 1024],
                  out_channels=[128, 256, 512]):
-        super(YOLOV3Neck, self).__init__()
+        super(YOLOv3Neck, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     inputs = [torch.rand(1, c, s, s) for c, s in zip(in_channels, scales)]
     for i in range(len(inputs)):
         print(f'inputs[{i}].shape = {inputs[i].shape}')
-    model = YOLOV3Neck(in_channels, [128, 256, 512])
+    model = YOLOv3Neck(in_channels, [128, 256, 512])
     print(model)
     outputs = model(inputs)
     for i in range(len(outputs)):

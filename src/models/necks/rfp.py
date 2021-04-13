@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..backbones import build_backbone
-from ..modules.init_weights import kaiming_init
+from ..modules.init_weights_org import kaiming_init
 from ..necks import FPN
 
 """

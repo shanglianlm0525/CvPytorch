@@ -7,11 +7,13 @@
 from copy import deepcopy
 from .fpn import FPN
 from .pan import PAN
-from .yolov3_neck import YOLOV3Neck
+from .yolov3_neck import YOLOv3Neck
+from .yolov5_neck import YOLOv5Neck
 
 __all__ = [
     'FPN', 'PAN',
-    'YOLOV3Neck'
+    'YOLOv3Neck',
+    'YOLOv5Neck'
 ]
 
 def build_neck(cfg):
@@ -21,5 +23,9 @@ def build_neck(cfg):
         return FPN(**neck_cfg)
     elif name == 'PAN':
         return PAN(**neck_cfg)
+    elif name == 'YOLOv3Neck':
+        return YOLOv3Neck(**neck_cfg)
+    elif name == 'YOLOv5Neck':
+        return YOLOv5Neck(**neck_cfg)
     else:
         raise NotImplementedError

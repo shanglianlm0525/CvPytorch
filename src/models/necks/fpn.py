@@ -12,13 +12,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from ..modules.convs import ConvModule
+from ..modules.init_weights import xavier_init
 
 
 class FPN(nn.Module):
     '''modified from MMDetection'''
 
-    def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2):
+    def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2, conv_cfg=None, norm_cfg=None,activation=None):
         super(FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
@@ -32,9 +34,9 @@ class FPN(nn.Module):
 
         for i in range(self.num_ins):
             l_conv = ConvModule(in_channels[i],out_channels, kernel_size=1, stride=1,
-                padding=0, dilation=1, groups=1, bias=False,norm='BatchNorm2d',activation='ReLU')
+                padding=0, dilation=1, groups=1, bias=False,norm_cfg=norm_cfg,activation=activation)
             fpn_conv = ConvModule(out_channels,out_channels,kernel_size=3, stride=1,
-                                  padding=1, dilation=1, groups=1, bias=False,norm='BatchNorm2d',activation='ReLU')
+                                  padding=1, dilation=1, groups=1, bias=False, conv_cfg=conv_cfg, norm_cfg=norm_cfg,activation=activation)
             self.lateral_convs.append(l_conv)
             self.fpn_convs.append(fpn_conv)
 
@@ -43,18 +45,15 @@ class FPN(nn.Module):
             for i in range(extra_levels):
                 in_channels = out_channels
                 extra_fpn_conv = ConvModule(in_channels, out_channels, kernel_size=3, stride=2,
-                                    padding=1, dilation=1, groups=1, bias=False,norm='BatchNorm2d',activation='ReLU')
+                                    padding=1, dilation=1, groups=1, bias=False, conv_cfg=conv_cfg,norm_cfg=norm_cfg,activation=activation)
                 self.fpn_convs.append(extra_fpn_conv)
 
         self.init_weights()
 
-
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.xavier_uniform_(m.weight, gain=1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+                xavier_init(m, distribution='uniform')
 
 
     def forward(self, x):
@@ -71,7 +70,7 @@ class FPN(nn.Module):
         for i in range(used_backbone_levels - 1, 0, -1):
             prev_shape = laterals[i - 1].shape[2:]
             laterals[i - 1] += F.interpolate(
-                laterals[i], size=prev_shape, mode='bilinear')
+                laterals[i], size=prev_shape, mode='bilinear', align_corners=False)
 
         # build outputs
         # part 1: from original levels
@@ -95,12 +94,12 @@ class FPN(nn.Module):
 
 if __name__ == '__main__':
     import torch
-    in_channels = [2, 3, 5, 7]
-    scales = [340, 170, 84, 43]
+    in_channels = [2, 3, 5]
+    scales = [340, 170, 84]
     inputs = [torch.rand(1, c, s, s) for c, s in zip(in_channels, scales)]
     for i in range(len(inputs)):
         print(f'inputs[{i}].shape = {inputs[i].shape}')
-    self = FPN(in_channels, 11, True).eval()
+    self = FPN(in_channels, 11, False).eval()
     outputs = self.forward(inputs)
     for i in range(len(outputs)):
         print(f'outputs[{i}].shape = {outputs[i].shape}')
