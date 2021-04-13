@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+from torch.utils import model_zoo
 from torchvision.models.squeezenet import squeezenet1_0, squeezenet1_1
 
 """
@@ -19,16 +20,16 @@ model_urls = {
 
 class SqueezeNet(nn.Module):
 
-    def __init__(self, subtype='squeezenet1_1', out_stages=[1, 2, 3], backbone_path=None, pretrained = False):
+    def __init__(self, subtype='squeezenet1_1', out_stages=[1, 2, 3], output_stride = 32, backbone_path=None, pretrained = False):
         super(SqueezeNet, self).__init__()
+        self.subtype = subtype
         self.out_stages = out_stages
+        self.output_stride = output_stride  # 8, 16, 32
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        self.pretrained = False
-        if subtype == 'squeezenet1_1':
-            self.pretrained = True
-            features = squeezenet1_1(pretrained=self.pretrained).features
+        if self.subtype == 'squeezenet1_1':
+            features = squeezenet1_1().features
             self.out_channels = [96, 128, 256, 512]
         else:
             raise NotImplementedError
@@ -40,12 +41,9 @@ class SqueezeNet(nn.Module):
         self.layer2 = nn.Sequential(*list(features.children())[5:8])
         self.layer3 = nn.Sequential(*list(features.children())[8:13])
 
-        if not self.pretrained:
-            if self.backbone_path:
-                self.pretrained = True
-                self.backbone.load_state_dict(torch.load(self.backbone_path))
-            else:
-                self.init_weights()
+        self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
 
     def init_weights(self):
         for m in self.modules():
@@ -73,6 +71,15 @@ class SqueezeNet(nn.Module):
             if isinstance(layer, nn.BatchNorm2d):
                 layer.eval()
 
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
 if __name__=="__main__":
     model = SqueezeNet('squeezenet1_1')

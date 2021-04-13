@@ -35,7 +35,7 @@ def build_backbone(cfg):
         return MobileNetV2(**backbone_cfg)
     elif name == 'ShuffleNetV2':
         return ShuffleNetV2(**backbone_cfg)
-    elif name == 'YOLOv5':
+    elif name == 'YOLOv5Backbone':
         return YOLOv5Backbone(**backbone_cfg)
     else:
         raise NotImplementedError
