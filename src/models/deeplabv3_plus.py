@@ -9,42 +9,37 @@
     https://arxiv.org/pdf/1802.02611.pdf
 """
 from itertools import chain
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from src.models.modules.aspp import ASPP
 from src.models.backbones import build_backbone
-from src.losses.seg_loss import BCEWithLogitsLoss2d
+from src.losses.seg_loss import CrossEntropyLoss2d
+
 
 class Decoder(nn.Module):
     def __init__(self, num_classes, low_level_inplanes=256):
         super(Decoder, self).__init__()
         self.conv1 = nn.Conv2d(low_level_inplanes, 48, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(48)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
         self.last_conv = nn.Sequential(nn.Conv2d(304, 256, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(256),
                                        nn.ReLU(inplace=True),
-                                       nn.Dropout(0.5),
-                                       nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
-                                       nn.BatchNorm2d(256),
-                                       nn.ReLU(inplace=True),
-                                       nn.Dropout(0.1),
+                                       # nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
+                                       # nn.BatchNorm2d(256),
+                                       # nn.ReLU(inplace=True),
                                        nn.Conv2d(256, num_classes, kernel_size=1, stride=1))
         self._init_weight()
 
 
     def forward(self, x, low_level_feat):
-        low_level_feat = self.conv1(low_level_feat)
-        low_level_feat = self.bn1(low_level_feat)
-        low_level_feat = self.relu(low_level_feat)
+        low_level_feat = self.relu(self.bn1(self.conv1(low_level_feat)))
 
         x = F.interpolate(x, size=low_level_feat.size()[2:], mode='bilinear', align_corners=True)
         x = torch.cat((x, low_level_feat), dim=1)
         x = self.last_conv(x)
-
         return x
 
     def _init_weight(self):
@@ -71,14 +66,16 @@ class Deeplabv3Plus(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
+        # backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
+        backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16}
         self.backbone = build_backbone(backbone_cfg)
-        self.aspp = ASPP(inplanes=self.backbone.out_channels[-1])
+        self.aspp = ASPP(inplanes=self.backbone.out_channels[-1], output_stride=backbone_cfg['output_stride'])
         self.decoder = Decoder(self.num_classes, self.backbone.out_channels[0])
 
         # self._init_weight(self.aspp, self.decoder)
 
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
+        # self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
+        self.ce_criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
 
     def _init_weight(self, *stages):
@@ -103,8 +100,8 @@ class Deeplabv3Plus(nn.Module):
             return outputs
         else:
             losses = {}
-            losses['bce_loss'] = self.bce_criterion(outputs, targets)
-            losses['loss'] = losses['bce_loss']
+            losses['ce_loss'] = self.ce_criterion(outputs, targets)
+            losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
                 return losses, torch.argmax(outputs, dim=1)
