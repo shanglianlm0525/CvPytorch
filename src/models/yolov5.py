@@ -26,14 +26,14 @@ class YOLOv5(nn.Module):
         self.backbone = build_backbone(backbone_cfg)
         neck_cfg = {'name': 'YOLOv5Neck', 'in_channels': self.backbone.out_channels, 'out_channels': self.backbone.out_channels }
         self.neck = build_neck(neck_cfg)
-        head_cfg = {'name': 'YOLOv5Neck', 'in_channels': self.backbone.out_channels,
-                    'out_channels': self.backbone.out_channels}
+        head_cfg = {'name': 'YOLOv5Head', 'channels': self.backbone.out_channels,
+                    'anchors': [[10, 13, 16, 30, 33, 23],
+                   [30, 61, 62, 45, 59, 119],
+                   [116, 90, 156, 198, 373, 326]], 'num_classes': self.num_classes}
         self.head = build_head(head_cfg)
         print(self.backbone)
         print(self.neck)
         print(self.head)
-
-
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
 
@@ -46,7 +46,7 @@ class YOLOv5(nn.Module):
         else:
             losses = {}
             x = self.backbone(imgs)
-            x = self.fpn(x)
+            x = self.neck(x)
             x = self.head(x)
             preds = tuple(x)
 
