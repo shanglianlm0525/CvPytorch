@@ -35,9 +35,67 @@
 
 ## Evaluation metrics
 
-- AP: 
+- AP: is to calculate the area under the curve (AUC) of the Precision x Recall curve. \ 
+In practice AP is the precision averaged across all recall values between 0 and 1. \
+Currently, the interpolation performed by PASCAL VOC challenge uses all data points, \
+rather than interpolating only 11 equally spaced points. 
 
-- mAP: 
+11-point interpolation
+
+The 11-point interpolation tries to summarize the shape of the Precision x Recall curve \ 
+by averaging the precision at a set of eleven equally spaced recall levels [0, 0.1, 0.2, ... , 1]:
+
+<p align="center">
+<img src="https://latex.codecogs.com/gif.latex?%5Ctext%7BAP%7D%3D%5Cfrac%7B1%7D%7B11%7D%20%5Csum_%7Br%5Cin%20%5Cleft%20%5C%7B%200%2C%200.1%2C%20...%2C1%20%5Cright%20%5C%7D%7D%5Crho_%7B%5Ctext%7Binterp%7D%5Cleft%20%28%20r%20%5Cright%20%29%7D">
+</p>
+
+<!---
+\text{AP}=\frac{1}{11} \sum_{r\in \left \{ 0, 0.1, ...,1 \right \}}\rho_{\text{interp}\left ( r \right )}
+--->
+
+with
+
+<p align="center"> 
+<img src="https://latex.codecogs.com/gif.latex?%5Crho_%7B%5Ctext%7Binterp%7D%7D%20%3D%20%5Cmax_%7B%5Ctilde%7Br%7D%3A%5Ctilde%7Br%7D%20%5Cgeq%20r%7D%20%5Crho%5Cleft%20%28%20%5Ctilde%7Br%7D%20%5Cright%20%29">
+</p>
+
+<!--- 
+\rho_{\text{interp}} = \max_{\tilde{r}:\tilde{r} \geq r} \rho\left ( \tilde{r} \right )
+--->
+
+where \rho_{\text{interp}\left ( r \right ) is the measured precision at recall .
+
+Instead of using the precision observed at each point, the AP is obtained by interpolating the precision only at the 11 levels !  taking the **maximum precision whose recall value is greater than ![](http://latex.codecogs.com/gif.latex?r)**.
+
+Interpolating all points
+
+Instead of interpolating only in the 11 equally spaced points, you could interpolate through all points <img src="https://latex.codecogs.com/gif.latex?n"> in such way that:
+
+<p align="center"> 
+<img src="https://latex.codecogs.com/gif.latex?%5Csum_%7Bn%3D0%7D%20%5Cleft%20%28%20r_%7Bn&plus;1%7D%20-%20r_%7Bn%7D%20%5Cright%20%29%20%5Crho_%7B%5Ctext%7Binterp%7D%7D%5Cleft%20%28%20r_%7Bn&plus;1%7D%20%5Cright%20%29">
+</p>
+
+<!---
+\sum_{n=0} \left ( r_{n+1} - r_{n} \right ) \rho_{\text{interp}}\left ( r_{n+1} \right )
+--->
+
+with
+
+<p align="center"> 
+<img src="https://latex.codecogs.com/gif.latex?%5Crho_%7B%5Ctext%7Binterp%7D%7D%5Cleft%20%28%20r_%7Bn&plus;1%7D%20%5Cright%20%29%20%3D%20%5Cmax_%7B%5Ctilde%7Br%7D%3A%5Ctilde%7Br%7D%20%5Cge%20r_%7Bn&plus;1%7D%7D%20%5Crho%20%5Cleft%20%28%20%5Ctilde%7Br%7D%20%5Cright%20%29">
+</p>
+
+
+<!---
+\rho_{\text{interp}}\left ( r_{n+1} \right ) = \max_{\tilde{r}:\tilde{r} \ge r_{n+1}} \rho \left ( \tilde{r} \right )
+--->
+
+
+where ![](http://latex.codecogs.com/gif.latex?%5Crho%5Cleft%20%28%20%5Ctilde%7Br%7D%20%5Cright%20%29) is the measured precision at recall ![](http://latex.codecogs.com/gif.latex?%5Ctilde%7Br%7D).
+
+In this case, instead of using the precision observed at only few points, the AP is now obtained by interpolating the precision at **each level**, ![](http://latex.codecogs.com/gif.latex?r) taking the **maximum precision whose recall value is greater or equal than ![](http://latex.codecogs.com/gif.latex?r&plus;1)**. This way we calculate the estimated area under the curve.
+
+- mAP: is a metric used to measure the accuracy of object detectors over all classes in a specific database. The mAP is simply the average AP over all classes, that is
 
 ## REFERENCES
 
