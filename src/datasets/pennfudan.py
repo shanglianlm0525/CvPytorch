@@ -68,12 +68,13 @@ class PennFudanDetection(Dataset):
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            _img, _mask = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), np.asarray(Image.open(self._targets[idx]), dtype=np.uint8)
+            _img, _mask = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
             _target = self.encode_map(_mask, idx)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
     def encode_map(self, mask, idx):
+        mask = np.asarray(mask, dtype=np.uint8)
         # instances are encoded as different colors
         obj_ids = np.unique(mask)
         # first id is the background, so remove it
