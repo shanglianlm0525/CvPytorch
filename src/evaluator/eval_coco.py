@@ -28,6 +28,7 @@ class CocoEvaluator(BaseEvaluator):
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
+        self.dataset = dataset
 
         self.iou_types = iou_types
         self.coco_eval = {}
@@ -54,7 +55,7 @@ class CocoEvaluator(BaseEvaluator):
 
             coco_eval.cocoDt = coco_dt
             coco_eval.params.imgIds = list(img_ids)
-            img_ids, eval_imgs = evaluate(coco_eval)
+            img_ids, eval_imgs = evaluate_iou_type(coco_eval)
 
             self.eval_imgs[iou_type].append(eval_imgs)
         self.count = self.count + 1
@@ -93,6 +94,8 @@ class CocoEvaluator(BaseEvaluator):
             boxes = convert_to_xywh(boxes).tolist()
             scores = prediction["scores"].tolist()
             labels = prediction["labels"].tolist()
+            if hasattr(self.dataset, 'id2category'):
+                labels = [self.dataset.id2category[l] for l in labels]
 
             coco_results.extend(
                 [
@@ -154,6 +157,9 @@ class CocoEvaluator(BaseEvaluator):
             labels = prediction["labels"].tolist()
             keypoints = prediction["keypoints"]
             keypoints = keypoints.flatten(start_dim=1).tolist()
+
+            if hasattr(self.dataset, 'id2category'):
+                labels = [self.dataset.id2category[l] for l in labels]
 
             coco_results.extend(
                 [
@@ -333,7 +339,7 @@ def loadRes(self, resFile):
     return res
 
 
-def evaluate(self):
+def evaluate_iou_type(self):
     '''
     Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
     :return: None
