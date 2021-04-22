@@ -18,7 +18,7 @@ import numpy as np
 
 __all__ = ["SegNet"]
 
-from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
+from src.losses.seg_loss import BCEWithLogitsLoss2d
 
 
 def Conv3x3BNReLU(in_channels,out_channels,stride,groups=1):

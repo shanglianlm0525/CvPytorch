@@ -24,16 +24,16 @@ class ClsModel(nn.Module):
         self.dictionary = dictionary
         self.dummy_input = torch.zeros(1,3,224,224)
 
-        self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
-        self._num_classes = len(self.dictionary)
+        self.num_classes = len(self.dictionary)
+        self.category = [v for d in self.dictionary for v in d.keys()]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         self._model = torchvision.models.__dict__['resnet18'](pretrained=True)
         num_fc_fea = self._model.fc.in_features
-        self._model.fc = nn.Linear(num_fc_fea, self._num_classes)
+        self._model.fc = nn.Linear(num_fc_fea, self.num_classes)
 
         self.softmax =  nn.Softmax(dim=1)
-        self._criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array(self._weight)).float(),ignore_index=-1).cuda()
+        self._criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array(self.weight)).float(),ignore_index=-1).cuda()
 
         # self.init_params()
 

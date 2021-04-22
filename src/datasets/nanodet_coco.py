@@ -20,6 +20,13 @@ from torch.utils.data import Dataset
     http://mscoco.org/dataset/#detections-challenge2016
 """
 
+def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
+    # https://tech.amikelive.com/node-718/what-object-categories-labels-are-in-coco-dataset/
+    x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34,
+         35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+         64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
+    return x
+
 class CocoDetection(Dataset):
     """
           A base class of detection dataset. Referring from MMDetection.
@@ -51,7 +58,7 @@ class CocoDetection(Dataset):
         self.img_path = data_cfg.IMG_DIR
         self.ann_path = os.path.join(data_cfg.LABELS.DET_DIR, 'instances_{}.json'.format(os.path.basename(data_cfg.IMG_DIR)))
 
-        self.input_size = [320, 320]
+        self.input_size = data_cfg.INPUT_SIZE
         if self.stage=='train':
             pipeline = {'perspective': 0.0,
                       'scale': [0.6, 1.4],
@@ -106,7 +113,6 @@ class CocoDetection(Dataset):
         self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
         self.cats = self.coco_api.loadCats(self.cat_ids)
         self.img_ids = sorted(self.coco_api.imgs.keys())
-        img_info = self.coco_api.loadImgs(self.img_ids)
 
         # check annos, filtering invalid data
         valid_img_ids = []
@@ -117,6 +123,11 @@ class CocoDetection(Dataset):
                 valid_img_ids.append(id)
         self.img_ids = valid_img_ids
 
+        img_info = self.coco_api.loadImgs(self.img_ids)
+
+        # just for test
+        # img_info = img_info[:4]
+        # self.img_ids = self.img_ids[:4]
         return img_info
 
     def _has_only_empty_bbox(self,annot):

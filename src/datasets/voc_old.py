@@ -9,7 +9,6 @@ import numpy as np
 import os
 
 import random
-import scipy
 import torch
 import torch.nn as nn
 from PIL import Image
@@ -19,10 +18,9 @@ from torch.utils.data import Dataset
 import xml.etree.ElementTree as ET
 
 from torchvision import transforms as tf
-from .transforms import custom_transforms as ctf
+from src.transforms import seg_transforms_old as ctf
 
 from src.utils import palette
-from src.models.ext.ssd.augmentations import SSDAugmentation
 
 from ..models.ext.fcos_aug import FcosTransforms
 

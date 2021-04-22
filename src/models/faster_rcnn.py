@@ -10,8 +10,6 @@ import torchvision
 from torchvision import ops
 from torchvision.models import detection
 from torchvision.models.detection.rpn import AnchorGenerator
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection import fasterrcnn_resnet50_fpn, fasterrcnn_mobilenet_v3_large_fpn, fasterrcnn_mobilenet_v3_large_320_fpn
 
 """
     Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks

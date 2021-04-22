@@ -7,6 +7,7 @@ DATASET:
   CLASS: 'src.datasets.pennfudan.PennFudanDetection'
   DICTIONARY: 'conf/dicts/pennfudan_dict.yml'
   DICTIONARY_NAME: 'INS_CLASSES'
+  BACKGROUND_AS_CATEGORY: True
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/PennFudanPed'
@@ -45,7 +46,7 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.fasterrcnn.FasterRCNN'
+USE_MODEL: 'src.models.faster_rcnn.FasterRCNN'
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mIoU'

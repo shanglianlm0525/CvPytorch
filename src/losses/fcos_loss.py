@@ -7,6 +7,95 @@
 import torch
 import torch.nn as nn
 
+
+def compute_cls_loss_list(preds,targets,mask):
+    '''
+    Args
+    preds: list contains five level pred [batch_size,class_num,_h,_w]
+    targets: [batch_size,sum(_h*_w),1]
+    mask: [batch_size,sum(_h*_w)]
+    '''
+    batch_size = len(targets)
+    preds_reshape = []
+    class_num = preds[0].shape[1]
+    mask = [m.unsqueeze(dim=-1) for m in mask]
+    num_pos = [torch.sum(m, dim=[0, 1]).clamp_(min=1).float() for m in mask]  # [batch_size,]
+    for pred in preds:
+        pred = pred.permute(0, 2, 3, 1)
+        pred = torch.reshape(pred, [batch_size, -1, class_num])
+        preds_reshape.append(pred)
+    preds = torch.cat(preds_reshape, dim=1)  # [batch_size,sum(_h*_w),class_num]
+    assert preds.shape[0] == len(targets) and preds.shape[1] and targets[0].shape[0]
+    loss=[]
+    for batch_index in range(batch_size):
+        pred_pos=preds[batch_index]#[sum(_h*_w),class_num]
+        target_pos=targets[batch_index]#[sum(_h*_w),1]
+        target_pos=(torch.arange(1,class_num+1,device=target_pos.device)[None,:]==target_pos).float()#sparse-->onehot
+        loss.append(focal_loss_from_logits(pred_pos,target_pos).view(1))
+    return torch.cat([l/(n+1e-6) for l,n in zip(loss,num_pos)],dim=0) #[batch_size,]
+
+def compute_cnt_loss_list(preds,targets,mask):
+    '''
+    Args
+    preds: list contains five level pred [batch_size,1,_h,_w]
+    targets: [batch_size,sum(_h*_w),1]
+    mask: [batch_size,sum(_h*_w)]
+    '''
+    batch_size = len(targets)
+    c=targets[0].shape[-1]
+    preds_reshape=[]
+    mask = [m.unsqueeze(dim=-1) for m in mask]
+    # mask=targets>-1#[batch_size,sum(_h*_w),1]
+    num_pos = [torch.sum(m, dim=[0, 1]).clamp_(min=1).float() for m in mask]  # [batch_size,]
+    for pred in preds:
+        pred=pred.permute(0,2,3,1)
+        pred=torch.reshape(pred,[batch_size,-1,c])
+        preds_reshape.append(pred)
+    preds=torch.cat(preds_reshape,dim=1)
+    assert preds.shape[0] == len(targets) and preds.shape[1] == targets[0].shape[0]
+
+    loss=[]
+    for batch_index in range(batch_size):
+        pred_pos = preds[batch_index][mask[batch_index]]  # [num_pos_b,]
+        target_pos = targets[batch_index][mask[batch_index]]  # [num_pos_b,]
+        assert len(pred_pos.shape) == 1
+        loss.append(nn.functional.binary_cross_entropy_with_logits(input=pred_pos,target=target_pos,reduction='sum').view(1))
+    return torch.cat([l / (n + 1e-6) for l, n in zip(loss, num_pos)], dim=0) #[batch_size,]
+
+def compute_reg_loss_list(preds,targets,mask,mode='giou'):
+    '''
+    Args
+    preds: list contains five level pred [batch_size,4,_h,_w]
+    targets: [batch_size,sum(_h*_w),4]
+    mask: [batch_size,sum(_h*_w)]
+    '''
+    batch_size = len(targets)
+    c = targets[0].shape[-1]
+    preds_reshape=[]
+    # mask=targets>-1#[batch_size,sum(_h*_w),4]
+    num_pos = [torch.sum(m, dim=[0]).clamp_(min=1).float() for m in mask]  # [batch_size,]
+
+    for pred in preds:
+        pred=pred.permute(0,2,3,1)
+        pred=torch.reshape(pred,[batch_size,-1,c])
+        preds_reshape.append(pred)
+    preds=torch.cat(preds_reshape,dim=1)
+    assert preds.shape[0] == len(targets) and preds.shape[1] and targets[0].shape[0] #[batch_size,sum(_h*_w),4]
+
+    loss=[]
+    for batch_index in range(batch_size):
+        pred_pos=preds[batch_index][mask[batch_index]]#[num_pos_b,4]
+        target_pos=targets[batch_index][mask[batch_index]]#[num_pos_b,4]
+        assert len(pred_pos.shape)==2
+        if mode=='iou':
+            loss.append(iou_loss(pred_pos,target_pos).view(1))
+        elif mode=='giou':
+            loss.append(giou_loss(pred_pos,target_pos).view(1))
+        else:
+            raise NotImplementedError("reg loss only implemented ['iou','giou']")
+    return torch.cat([l / (n + 1e-6) for l, n in zip(loss, num_pos)], dim=0) #[batch_size,]
+
+
 def compute_cls_loss(preds,targets,mask):
     '''
     Args
@@ -155,10 +244,11 @@ class ClsCntRegLoss(nn.Module):
         preds,targets=inputs
         cls_logits,cnt_logits,reg_preds=preds
         cls_targets,cnt_targets,reg_targets=targets
-        mask_pos=(cnt_targets>-1).squeeze(dim=-1)# [batch_size,sum(_h*_w)]
-        cls_loss=compute_cls_loss(cls_logits,cls_targets,mask_pos).mean()#[]
-        cnt_loss=compute_cnt_loss(cnt_logits,cnt_targets,mask_pos).mean()
-        reg_loss=compute_reg_loss(reg_preds,reg_targets,mask_pos).mean()
+        # mask_pos=(cnt_targets>-1).squeeze(dim=-1)# [batch_size,sum(_h*_w)]
+        mask_pos = [(cnt_target > -1).squeeze(dim=-1) for cnt_target in cnt_targets]  # [batch_size,sum(_h*_w)]
+        cls_loss=compute_cls_loss_list(cls_logits,cls_targets,mask_pos).mean()#[]
+        cnt_loss=compute_cnt_loss_list(cnt_logits,cnt_targets,mask_pos).mean()
+        reg_loss=compute_reg_loss_list(reg_preds,reg_targets,mask_pos).mean()
 
         total_loss=cls_loss+cnt_loss+reg_loss
         return cls_loss,cnt_loss,reg_loss,total_loss

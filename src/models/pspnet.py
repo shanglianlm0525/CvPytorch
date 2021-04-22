@@ -14,8 +14,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from itertools import chain
 import numpy as np
-from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d
-from CvPytorch.src.models.backbones import build_backbone
+from src.losses.seg_loss import BCEWithLogitsLoss2d
+from src.models.backbones import build_backbone
 
 class PPM(nn.Module):
     def __init__(self, channels = 2048):

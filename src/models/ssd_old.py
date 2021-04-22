@@ -97,16 +97,16 @@ class SSD(nn.Module):
 
         self.dummy_input = torch.zeros(1, 3, self.input_size[0], self.input_size[1])
 
-        self._num_classes = len(self.dictionary)+1
+        self.num_classes = len(self.dictionary)+1
         self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
         self._priorbox = PriorBox(coco)
         self._priors = self._priorbox.forward()
 
         base_, extras_, head_ = multibox(vgg(base[str(self.input_size[0])], 3),
                                          add_extras(extras[str(self.input_size[0])], 1024),
-                                         mbox[str(self.input_size[0])], self._num_classes)
+                                         mbox[str(self.input_size[0])], self.num_classes)
 
         # SSD network
         self.vgg = nn.ModuleList(base_)
@@ -117,10 +117,10 @@ class SSD(nn.Module):
         self.loc = nn.ModuleList(head_[0])
         self.conf = nn.ModuleList(head_[1])
 
-        self._criterion = MultiBoxLoss(self._num_classes, 0.5, True, 0, True, 3, 0.5, False)
+        self._criterion = MultiBoxLoss(self.num_classes, 0.5, True, 0, True, 3, 0.5, False)
 
         self.softmax = nn.Softmax(dim=-1)
-        self._detect = Detect(self._num_classes, 0, 200, 0.01, 0.45)
+        self._detect = Detect(self.num_classes, 0, 200, 0.01, 0.45)
 
         self.init_params()
 
@@ -191,7 +191,7 @@ class SSD(nn.Module):
         if mode == 'infer':
             out = self._detect(
                 loc.view(loc.size(0), -1, 4),  # loc preds
-                self.softmax(conf.view(conf.size(0), -1, self._num_classes)),  # conf preds
+                self.softmax(conf.view(conf.size(0), -1, self.num_classes)),  # conf preds
                 self._priors.type(type(x.data))  # default boxes
             )
             return out
@@ -200,7 +200,7 @@ class SSD(nn.Module):
 
             output = (
                 loc.view(loc.size(0), -1, 4),
-                conf.view(conf.size(0), -1, self._num_classes),
+                conf.view(conf.size(0), -1, self.num_classes),
                 self._priors.cuda(device=device_id)
             )
 
@@ -213,7 +213,7 @@ class SSD(nn.Module):
                 '''
                 out = self._detect(
                     loc.view(loc.size(0), -1, 4),  # loc preds
-                    self.softmax(conf.view(conf.size(0), -1, self._num_classes)),  # conf preds
+                    self.softmax(conf.view(conf.size(0), -1, self.num_classes)),  # conf preds
                     self._priors.cuda(device=device_id)  # default boxes
                 )
                 detections = out.data

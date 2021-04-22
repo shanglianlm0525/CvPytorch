@@ -23,7 +23,6 @@ class _ASPPModule(nn.Module):
     def forward(self, x):
         x = self.atrous_conv(x)
         x = self.bn(x)
-
         return self.relu(x)
 
     def _init_weight(self):
@@ -33,6 +32,7 @@ class _ASPPModule(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+
 
 class ASPP(nn.Module):
     def __init__(self, inplanes=2048, output_stride=16, drop_rate=0.1):

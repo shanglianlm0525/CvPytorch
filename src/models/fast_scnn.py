@@ -13,7 +13,7 @@ import numpy as np
 from src.losses.seg_loss import MixSoftmaxCrossEntropyOHEMLoss
 from src.losses.metric import SegmentationMetric
 
-from CvPytorch.src.losses.metric import batch_pix_accuracy, batch_intersection_union
+from src.losses.metric import batch_pix_accuracy, batch_intersection_union
 
 
 class _ConvBNReLU(nn.Module):
@@ -203,29 +203,29 @@ class FastSCNN(nn.Module):
         self.dictionary = dictionary
         self.dummy_input = torch.zeros(1, 3, 256, 512)
 
-        self._num_classes = len(self.dictionary)
+        self.num_classes = len(self.dictionary)
         self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
         self.aux = False
         self.learning_to_downsample = LearningToDownsample(32, 48, 64)
         self.global_feature_extractor = GlobalFeatureExtractor(64, [64, 96, 128], 128, 6, [3, 3, 3])
         self.feature_fusion = FeatureFusionModule(64, 128, 128)
-        self.classifier = Classifer(128, self._num_classes)
+        self.classifier = Classifer(128, self.num_classes)
         if self.aux:
             self.auxlayer = nn.Sequential(
                 nn.Conv2d(64, 32, 3, padding=1, bias=False),
                 nn.BatchNorm2d(32),
                 nn.ReLU(True),
                 nn.Dropout(0.1),
-                nn.Conv2d(32, self._num_classes, 1)
+                nn.Conv2d(32, self.num_classes, 1)
             )
 
         # criterion
         self._criterion = MixSoftmaxCrossEntropyOHEMLoss(aux=self.aux, aux_weight=0.4,
                                                         ignore_index=19).cuda()
-        # evaluation metrics
-        self._metric = SegmentationMetric(self._num_classes)
+        # evaluator metrics
+        self._metric = SegmentationMetric(self.num_classes)
 
         self.init_params()
 
@@ -274,7 +274,7 @@ class FastSCNN(nn.Module):
                 labels_numpy = labels.cpu().data.numpy()
 
                 correct, ground = batch_pix_accuracy(pred, labels_numpy)
-                inter, union = batch_intersection_union(pred, labels_numpy, self._num_classes)
+                inter, union = batch_intersection_union(pred, labels_numpy, self.num_classes)
 
                 pixAcc = 1.0 * correct / (np.spacing(1) + ground)
                 IoU = 1.0 * inter / (np.spacing(1) + union)

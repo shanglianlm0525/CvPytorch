@@ -13,7 +13,7 @@ DATASET:
     IMG_DIR: '/home/lmin/data/coco/images/train2017'
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
-    SHUFFLE: False
+    SHUFFLE: True
     BATCH_SIZE: 160
     NUM_WORKER: 12
     LABELS:
@@ -24,23 +24,16 @@ DATASET:
     TRANSFORMS:
       FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
-      # RandomHorizontalFlip: { p: 0.5 }
-      # ColorJitter: { brightness: 0.1, contrast: 0.1, saturation: 0.1, hue: 0.1 }
-      # RandomRotate: { degrees: 10 }
       NanoDetPreprocess: { cfg: {perspective: 0.0,
                            scale: [0.6, 1.4],
                            stretch: [[1, 1], [1, 1]],
                            rotation: 0,
                            shear: 0,
                            translate: 0
-                           # flip: 0.5,
-                           # brightness: 0.2,
-                           # contrast: [0.8, 1.2],
-                           # saturation: [0.8, 1.2]
                       },
                       keep_ratio: True, dst_shape: [320, 320]}
       RandomHorizontalFlip: { p: 0.5 }
-      ColorJitter: { brightness: 0.2, contrast: [0.8, 1.2], saturation: [0.8, 1.2], hue: 0 }
+      ColorJitter: { p: 0.5, brightness: 0.2, contrast: [0.8, 1.2], saturation: [0.8, 1.2], hue: 0 }
       ToTensor:
       Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
 
@@ -67,11 +60,11 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.nanodet_org.NanoDet'
+USE_MODEL: 'src.models.nanodet.NanoDet'
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mIoU'
-  EVAL_INTERVALS: 10
+  EVAL_INTERVALS: 5
 
 
 #########################################
@@ -86,7 +79,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 190
 
 INIT_LR: 0.14

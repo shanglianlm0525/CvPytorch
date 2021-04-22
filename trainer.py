@@ -230,7 +230,7 @@ class Trainer:
             data_samplers['val'] = SequentialSampler(datasets['val'])
 
         dataloaders = {x: DataLoader(datasets[x], batch_size=self.batch_size,sampler=data_samplers[x], num_workers=cfg.NUM_WORKERS,
-                                      collate_fn=default_collate2, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
+                                      collate_fn=dataset_class.collate_fn if dataset_class.collate_fn else default_collate, pin_memory=True,drop_last=True) for x in ['train', 'val']} # collate_fn=detection_collate,
 
         return datasets, dataloaders, data_samplers
 
@@ -256,6 +256,7 @@ class Trainer:
 
         ## parser_dict
         dictionary = self._parser_dict()
+        self.dictionary = dictionary
 
         ## parser_datasets
         datasets, dataloaders,data_samplers = self._parser_datasets(dictionary)

@@ -1,0 +1,8 @@
+checkpoints/*
+runs/*
+refs/*
+logs/*
+*.log
+*.pyc
+src/datasets/*/*.pyc
+src/utils/*/*.pyc

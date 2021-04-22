@@ -2,20 +2,14 @@
 # -- coding: utf-8 --
 # @Time : 2021/1/4 18:51
 # @Author : liumin
-# @File : trainer_fcos_coco_new.py
-
+# @File : trainer.py
 
 import argparse
 import os
 from collections import defaultdict
 
-import math
-import random
 import torch
-import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
-import torchvision
-from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
@@ -46,32 +40,20 @@ from src.evaluator import build_evaluator
 from src.utils.distributed import LossLogger
 from src.optimizers import build_optimizer, get_current_lr
 from src.lr_schedulers import build_lr_scheduler
+from src.transforms import build_transforms
 from src.utils.freeze import freeze_models
 from src.lr_schedulers.warmup import get_warmup_lr
 from src.datasets.prefetch_dataLoader import PrefetchDataLoader
+from src.utils.torch_utils import setup_seed
+
 
 torch.backends.cudnn.enabled = True
 torch.set_default_tensor_type(torch.FloatTensor)
 
-def seed_torch(seed=1029):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-
-def get_class_name(full_class_name):
-    return full_class_name.split(".")[-1]
-
-
-# logger = logging.getLogger("pytorch")
 
 class Trainer:
     def __init__(self, cfg):
-        seed_torch(1029)
+        setup_seed(1029)
         self.cfg = cfg
         self.start_epoch = -1
         self.n_iters_elapsed = 0
@@ -91,11 +73,15 @@ class Trainer:
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
         return dictionary[cfg.DATASET.DICTIONARY_NAME]
 
+    def _parser_transform(self, mode):
+        return build_transforms(cfg.DATASET.DICTIONARY_NAME,cfg.DATASET[mode.upper()].TRANSFORMS,mode)
+
     def _parser_datasets(self):
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
         dataset_class = getattr(import_module(".".join(dataset_str_parts)), dataset_class_str)
 
-        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=self.dictionary, transform=None,
+        datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=self.dictionary,
+                                     transform=self._parser_transform(x),
                                      target_transform=None, stage=x) for x in ['train', 'val']}
 
         data_samplers = defaultdict()
@@ -416,7 +402,10 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/camvid_enet.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/pennfudan_maskrcnn.yml', help='The path to the configuration file.')
 
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)

@@ -59,9 +59,9 @@ class SSD(nn.Module):
 
         self.dummy_input = torch.zeros(1, 3, self.input_size[0], self.input_size[1])
 
-        self._num_classes = len(self.dictionary) + 1
+        self.num_classes = len(self.dictionary) + 1
         self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
         self.feature_extractor = ResNet('resnet50', None)
         self.add_extras(self.feature_extractor.out_channels)
@@ -71,7 +71,7 @@ class SSD(nn.Module):
 
         for nd, oc in zip(self.num_defaults, self.feature_extractor.out_channels):
             self.loc.append(nn.Conv2d(oc, nd * 4, kernel_size=3, padding=1))
-            self.conf.append(nn.Conv2d(oc, nd * self._num_classes, kernel_size=3, padding=1))
+            self.conf.append(nn.Conv2d(oc, nd * self.num_classes, kernel_size=3, padding=1))
 
         self.loc = nn.ModuleList(self.loc)
         self.conf = nn.ModuleList(self.conf)
@@ -81,7 +81,7 @@ class SSD(nn.Module):
         self._priorbox = PriorBox()
         self._priors = self._priorbox.forward().cuda()
 
-        self._criterion = MultiBoxLoss(self._num_classes, 0.5, True, 0, True, 3, 0.5, False)
+        self._criterion = MultiBoxLoss(self.num_classes, 0.5, True, 0, True, 3, 0.5, False)
 
         self.top_k = 200
         self.variance = [0.1, 0.2]
@@ -126,7 +126,7 @@ class SSD(nn.Module):
     def multibox(self, src, loc, conf):
         ret = []
         for s, l, c in zip(src, loc, conf):
-            ret.append((l(s).view(s.size(0), -1, 4), c(s).view(s.size(0), -1, self._num_classes)))
+            ret.append((l(s).view(s.size(0), -1, 4), c(s).view(s.size(0), -1, self.num_classes)))
 
         locs, confs = list(zip(*ret))
         locs, confs = torch.cat(locs, 1).contiguous(), torch.cat(confs, 1).contiguous()
@@ -170,14 +170,14 @@ class SSD(nn.Module):
     def eval_voc(self,loc_data,conf_data,prior_data):
         batch_size = loc_data.size(0)  # batch size
         num_priors = prior_data.size(0)
-        output = torch.zeros(batch_size, self._num_classes, self.top_k, 5)
-        conf_preds = conf_data.view(batch_size, num_priors, self._num_classes).transpose(2, 1)
+        output = torch.zeros(batch_size, self.num_classes, self.top_k, 5)
+        conf_preds = conf_data.view(batch_size, num_priors, self.num_classes).transpose(2, 1)
 
         for i in range(batch_size):
             decoded_boxes = decode(loc_data[i], prior_data, self.variance)
             # For each class, perform nms
             conf_scores = conf_preds[i].clone()
-            for cl in range(1, self._num_classes):
+            for cl in range(1, self.num_classes):
                 c_mask = conf_scores[cl].gt(self.conf_thresh)
                 scores = conf_scores[cl][c_mask]
                 if scores.size(0) == 0:

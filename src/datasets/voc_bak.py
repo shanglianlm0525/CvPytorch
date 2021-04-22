@@ -7,7 +7,6 @@
 
 import numpy as np
 import os
-import scipy
 import torch
 from PIL import Image
 import cv2
@@ -16,7 +15,7 @@ from torch.utils.data import Dataset
 import xml.etree.ElementTree as ET
 
 from torchvision import transforms as tf
-from .transforms import custom_transforms as ctf
+from src.transforms import seg_transforms_old as ctf
 
 from src.utils import palette
 from src.models.ext.ssd.augmentations import SSDAugmentation

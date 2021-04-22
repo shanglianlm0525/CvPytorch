@@ -6,16 +6,18 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.nn.functional as F
 from torch.nn.functional import interpolate
 import numpy as np
 
-from src.losses.metric import SegmentationMetric
+from src.losses.seg_loss import CrossEntropyLoss2d
 
-from CvPytorch.src.losses.metric import batch_pix_accuracy
-from pytorch_segmentation.utils.metrics import batch_intersection_union
+"""
+    LEDNet: A Lightweight Encoder-Decoder Network for Real-time Semantic Segmentation
+    https://arxiv.org/pdf/1905.02423.pdf
+"""
 
+__all__ = ["LEDNet"]
 
 def split(x):
     c = int(x.size()[1])
@@ -282,7 +284,7 @@ class Decoder(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        self.apn = APN_Module(in_ch=128, out_ch=20)
+        self.apn = APN_Module(in_ch=128, out_ch=num_classes)
         # self.upsample = Interpolate(size=(512, 1024), mode="bilinear")
         # self.output_conv = nn.ConvTranspose2d(16, num_classes, kernel_size=4, stride=2, padding=1, output_padding=0, bias=True)
         # self.output_conv = nn.ConvTranspose2d(16, num_classes, kernel_size=3, stride=2, padding=1, output_padding=1, bias=True)
@@ -296,14 +298,6 @@ class Decoder(nn.Module):
         return out
 
 
-class CrossEntropyLoss2d(nn.Module):
-    def __init__(self, weight=None):
-        super(CrossEntropyLoss2d,self).__init__()
-
-        self.loss = nn.NLLLoss(weight)
-
-    def forward(self, outputs, targets):
-        return self.loss(F.log_softmax(outputs, dim=1), targets)
 
 def computeIoU(x, y, nClasses,ignoreIndex):  # x=preds, y=targets
     # sizes should be "batch_size x nClasses x H x W"
@@ -360,16 +354,16 @@ class LEDNet(nn.Module):
     def __init__(self, dictionary=None):
         super().__init__()
         self.dictionary = dictionary
-        self.dummy_input = torch.zeros(1, 3, 512, 1024)
+        self.dummy_input = torch.zeros(1, 3, 512, 512)
 
-        self._num_classes = len(self.dictionary) +1
+        self.num_classes = len(self.dictionary)
         self._category = [v for d in self.dictionary for v in d.keys()]
-        self._weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
+        self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self._category]
 
-        self.encoder = Encoder(self._num_classes)
-        self.decoder = Decoder(self._num_classes)
+        self.encoder = Encoder(self.num_classes)
+        self.decoder = Decoder(self.num_classes)
 
-        weight = torch.ones(self._num_classes)
+        weight = torch.ones(self.num_classes)
         weight[0] = 2.3653597831726
         weight[1] = 4.4237880706787
         weight[2] = 2.9691488742828
@@ -389,12 +383,10 @@ class LEDNet(nn.Module):
         weight[16] = 5.433765411377
         weight[17] = 5.4631009101868
         weight[18] = 5.3947434425354
-        weight[19] = 0
 
         # criterion
-        self._criterion = CrossEntropyLoss2d(weight.cuda()).cuda() # torch.nn.CrossEntropyLoss(weight=weight.cuda(), ignore_index=-1, reduction='mean').cuda()
-        # evaluation metrics
-        self._metric = SegmentationMetric(self._num_classes)
+        # self._criterion = CrossEntropyLoss2d(weight.cuda()).cuda() # torch.nn.CrossEntropyLoss(weight=weight.cuda(), ignore_index=-1, reduction='mean').cuda()
+        self.ce_criterion = CrossEntropyLoss2d(torch.from_numpy(np.array(self.weight)).float()).cuda()
 
         self.init_params()
 
@@ -408,34 +400,21 @@ class LEDNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, imgs, labels=None, mode='infer', **kwargs):
-        '''
-        x = self.encoder(imgs)
-        outputs = self.decoder.forward(x)
-        '''
-        outputs = self.encoder.forward(imgs, predict=True)
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
+
+        enc = self.encoder(imgs)
+        outputs = self.decoder(enc)
 
         if mode == 'infer':
             pred = torch.argmax(outputs[0], 1).squeeze(0).cpu().data.numpy()
             return pred
         else:
-            device_id = labels.data.device
-            dtype = imgs.data.dtype
-
             losses = {}
 
-            losses['loss_crossEntropy'] = self._criterion(outputs, labels[:, 0])
-            losses['loss'] = losses['loss_crossEntropy']
+            losses['ce_loss'] = self.ce_criterion(outputs, targets)
+            losses['loss'] = losses['ce_loss']
             if mode == 'val':
-                performances = {}
-
-                preds =  outputs.max(1)[1].unsqueeze(1).data
-                labels = labels.data
-
-                performances['performance_mIoU'] = computeIoU(preds, labels, self._num_classes, 19)
-                performances['performance'] = performances['performance_mIoU']
-
-                return losses, performances
+                return losses, torch.argmax(outputs, dim=1).unsqueeze(1)
             else:
                 return losses
 

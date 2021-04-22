@@ -15,7 +15,7 @@ import numpy as np
 
 __all__ = ["ENet"]
 
-from CvPytorch.src.losses.seg_loss import CrossEntropyLoss2d, BCEWithLogitsLoss2d, DiceLoss, FocalLoss, \
+from src.losses.seg_loss import CrossEntropyLoss2d, BCEWithLogitsLoss2d, DiceLoss, FocalLoss, \
     LovaszSoftmax, CE_DiceLoss, OhemCrossEntropyLoss2d
 
 

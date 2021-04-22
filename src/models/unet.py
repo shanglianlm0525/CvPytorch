@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from CvPytorch.src.losses.seg_loss import BCEWithLogitsLoss2d, CrossEntropyLoss2d, FocalLoss, LovaszSoftmax, DiceLoss, \
+from src.losses.seg_loss import BCEWithLogitsLoss2d, CrossEntropyLoss2d, FocalLoss, LovaszSoftmax, DiceLoss, \
     CE_DiceLoss
 
 
