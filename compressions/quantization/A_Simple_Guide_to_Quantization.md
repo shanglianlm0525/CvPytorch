@@ -5,7 +5,7 @@
 
 ## Post Training Quantization
 
-- (**DFQ**) Data-Free Quantization Through Weight Equalization and Bias Correction [[Paper\]](https://arxiv.org/pdf/1906.04721.pdf)
+- (**TensorRT int8**) 8-bit Inference with TensorRT [[Paper\]](https://on-demand.gputechconf.com/gtc/2017/presentation/s7310-8-bit-inference-with-tensorrt.pdf)
 
 - (**Google Whitepaper**) Quantizing deep convolutional networks for efficient inference: A whitepaper [[Paper\]](https://arxiv.org/pdf/1806.08342.pdf)
 
