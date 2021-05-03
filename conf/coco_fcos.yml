@@ -13,9 +13,9 @@ DATASET:
     IMG_DIR: '/home/lmin/data/coco/images/train2017'
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
-    SHUFFLE: False
+    SHUFFLE: True
     BATCH_SIZE: 8
-    NUM_WORKER: 4
+    NUM_WORKER: 16
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -36,8 +36,8 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: False
-    BATCH_SIZE: 1
-    NUM_WORKER: 1
+    BATCH_SIZE: 8
+    NUM_WORKER: 16
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -73,7 +73,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [0]
+GPU_IDS: [1]
 N_MAX_EPOCHS: 26
 
 INIT_LR: 0.001
