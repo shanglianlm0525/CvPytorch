@@ -402,9 +402,9 @@ class Trainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
-    # parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/camvid_enet.yml', help='The path to the configuration file.')
-    parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_maskrcnn.yml', help='The path to the configuration file.')
 
     # distributed training parameters
