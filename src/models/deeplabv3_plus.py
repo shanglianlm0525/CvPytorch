@@ -67,7 +67,7 @@ class Deeplabv3Plus(nn.Module):
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
         # backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
-        backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16}
+        backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
         self.aspp = ASPP(inplanes=self.backbone.out_channels[-1], output_stride=backbone_cfg['output_stride'])
         self.decoder = Decoder(self.num_classes, self.backbone.out_channels[0])
