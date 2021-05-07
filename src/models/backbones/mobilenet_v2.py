@@ -20,11 +20,12 @@ model_urls = {
 
 class MobileNetV2(nn.Module):
 
-    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, classifier=False, backbone_path=None, pretrained = False):
         super(MobileNetV2, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
+        self.classifier = classifier
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
@@ -44,10 +45,15 @@ class MobileNetV2(nn.Module):
         self.stage5 = nn.Sequential(*list(features.children())[11:14])
         self.stage6 = nn.Sequential(*list(features.children())[14:17])
         self.stage7 = nn.Sequential(list(features.children())[17])
+        if self.classifier:
+            self.last_conv = nn.Sequential(list(features.children())[18])
+            self.fc = mobilenet_v2(self.pretrained).classifier
+            self.out_channels = [1000]
 
-        self.init_weights()
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

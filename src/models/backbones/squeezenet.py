@@ -29,7 +29,7 @@ class SqueezeNet(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'squeezenet1_1':
-            features = squeezenet1_1().features
+            features = squeezenet1_1(self.pretrained).features
             self.out_channels = [96, 128, 256, 512]
         else:
             raise NotImplementedError
@@ -41,9 +41,10 @@ class SqueezeNet(nn.Module):
         self.layer2 = nn.Sequential(*list(features.children())[5:8])
         self.layer3 = nn.Sequential(*list(features.children())[8:13])
 
-        self.init_weights()
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

@@ -36,16 +36,16 @@ class VGG(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'vgg11':
-            features = vgg11_bn(pretrained=self.pretrained).features
+            features = vgg11_bn(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg13':
-            features = vgg13_bn(pretrained=self.pretrained).features
+            features = vgg13_bn(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg16':
-            features = vgg16_bn(pretrained=self.pretrained).features
+            features = vgg16_bn(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg19':
-            features = vgg19_bn(pretrained=self.pretrained).features
+            features = vgg19_bn(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         else:
             raise NotImplementedError
@@ -58,9 +58,10 @@ class VGG(nn.Module):
         self.layer3 = nn.Sequential(*list(features.children())[24:34])
         self.layer4 = nn.Sequential(*list(features.children())[34:43])
 
-        self.init_weights()
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

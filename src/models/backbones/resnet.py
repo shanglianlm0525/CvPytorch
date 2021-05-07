@@ -34,19 +34,19 @@ class ResNet(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'resnet18':
-            backbone = resnet18()
+            backbone = resnet18(self.pretrained)
             self.out_channels = [64, 64, 128, 256, 512]
         elif self.subtype == 'resnet34':
-            backbone = resnet34()
+            backbone = resnet34(self.pretrained)
             self.out_channels = [64, 64, 128, 256, 512]
         elif self.subtype == 'resnet50':
-            backbone = resnet50()
+            backbone = resnet50(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif self.subtype == 'resnet101':
-            backbone = resnet101()
+            backbone = resnet101(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif self.subtype == 'resnet152':
-            backbone = resnet152()
+            backbone = resnet152(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -84,9 +84,10 @@ class ResNet(nn.Module):
                 elif 'downsample.0' in n:
                     m.stride = (s4, s4)
 
-        self.init_weights()
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
 
     def forward(self, x):

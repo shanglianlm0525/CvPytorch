@@ -31,10 +31,10 @@ class WideResNet(nn.Module):
         self.pretrained = pretrained
 
         if subtype == 'wide_resnet50_2':
-            backbone = resnext50_32x4d()
+            backbone = resnext50_32x4d(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif subtype == 'wide_resnet101_2':
-            backbone = resnext101_32x8d()
+            backbone = resnext101_32x8d(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -48,9 +48,10 @@ class WideResNet(nn.Module):
         self.layer3 = nn.Sequential(list(backbone.children())[6])
         self.layer4 = nn.Sequential(list(backbone.children())[7])
 
-        self.init_weights()
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

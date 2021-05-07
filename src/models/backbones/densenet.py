@@ -26,16 +26,16 @@ class Densenet(nn.Module):
 
         if subtype == 'densenet121':
             self.pretrained = True
-            features = densenet121(pretrained=self.pretrained).features
+            features = densenet121(self.pretrained).features
         elif subtype == 'densenet161':
             self.pretrained = True
-            features = densenet161(pretrained=self.pretrained).features
+            features = densenet161(self.pretrained).features
         elif subtype == 'densenet169':
             self.pretrained = True
-            features = densenet169(pretrained=self.pretrained).features
+            features = densenet169(self.pretrained).features
         elif subtype == 'densenet201':
             self.pretrained = True
-            features = densenet201(pretrained=self.pretrained).features
+            features = densenet201(self.pretrained).features
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
@@ -59,12 +59,10 @@ class Densenet(nn.Module):
         )
         self.layer4 = features.denseblock4
 
-        if not self.pretrained:
-            if self.backbone_path:
-                self.pretrained = True
-                self.backbone.load_state_dict(torch.load(self.backbone_path))
-            else:
-                self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

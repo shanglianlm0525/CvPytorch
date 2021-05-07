@@ -31,10 +31,10 @@ class ResNeXt(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'resnext50_32x4d':
-            backbone = resnext50_32x4d()
+            backbone = resnext50_32x4d(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif self.subtype == 'resnext101_32x8d':
-            backbone = resnext101_32x8d()
+            backbone = resnext101_32x8d(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
@@ -69,9 +69,10 @@ class ResNeXt(nn.Module):
                 elif 'downsample.0' in n:
                     m.stride = (s4, s4)
 
-        self.init_weights()
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

@@ -31,16 +31,16 @@ class ShuffleNetV2(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'shufflenetv2_x0.5':
-            backbone = shufflenet_v2_x0_5()
+            backbone = shufflenet_v2_x0_5(self.pretrained)
             self.out_channels = [24, 48, 96, 192, 1024]
         elif self.subtype == 'shufflenetv2_x1.0':
-            backbone = shufflenet_v2_x1_0()
+            backbone = shufflenet_v2_x1_0(self.pretrained)
             self.out_channels = [24, 116, 232, 464, 1024]
         elif self.subtype == 'shufflenetv2_x1.5':
-            backbone = shufflenet_v2_x1_5()
+            backbone = shufflenet_v2_x1_5(self.pretrained)
             self.out_channels = [24, 176, 352, 704, 1024]
         elif self.subtype == 'shufflenetv2_x2.0':
-            backbone = shufflenet_v2_x2_0()
+            backbone = shufflenet_v2_x2_0(self.pretrained)
             self.out_channels = [24, 244, 488, 976, 2048]
         else:
             raise NotImplementedError
@@ -52,9 +52,11 @@ class ShuffleNetV2(nn.Module):
         self.layer4 = backbone.stage4
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
-        self.init_weights()
+
         if self.pretrained:
             self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def forward(self, x):
         x = self.conv1(x)
