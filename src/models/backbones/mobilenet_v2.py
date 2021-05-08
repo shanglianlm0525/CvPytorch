@@ -76,8 +76,13 @@ class MobileNetV2(nn.Module):
         for i in range(1, 8):
             stage = getattr(self, 'stage{}'.format(i))
             x = stage(x)
-            if i in self.out_stages:
+            if i in self.out_stages and not self.classifier:
                 output.append(x)
+        if self.classifier:
+            x = self.last_conv(x)
+            x = nn.functional.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
+            x = self.fc(x)
+            return x
         return tuple(output)
 
 
