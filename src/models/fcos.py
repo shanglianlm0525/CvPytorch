@@ -214,22 +214,22 @@ class DetectHead(nn.Module):
         cls_classes_topk [batch_size,max_num]
         boxes_topk [batch_size,max_num,4]
         '''
-        _cls_scores_post = []
-        _cls_classes_post = []
+        _scores_post = []
+        _classes_post = []
         _boxes_post = []
-        cls_scores_topk, cls_classes_topk, boxes_topk = preds_topk
-        for batch in range(cls_classes_topk.shape[0]):
-            mask = cls_scores_topk[batch] >= self.score_threshold
-            _cls_scores_b = cls_scores_topk[batch][mask]  # [?]
-            _cls_classes_b = cls_classes_topk[batch][mask]  # [?]
+        _scores_topk, _classes_topk, boxes_topk = preds_topk
+        for batch in range(_classes_topk.shape[0]):
+            mask = _scores_topk[batch] >= self.score_threshold
+            _scores_b = _scores_topk[batch][mask]  # [?]
+            _classes_b = _classes_topk[batch][mask]  # [?]
             _boxes_b = boxes_topk[batch][mask]  # [?,4]
-            nms_ind = self.batched_nms(_boxes_b, _cls_scores_b, _cls_classes_b, self.nms_iou_threshold)
-            _cls_scores_post.append(_cls_scores_b[nms_ind])
-            _cls_classes_post.append(_cls_classes_b[nms_ind])
+            nms_ind = self.batched_nms(_boxes_b, _scores_b, _classes_b, self.nms_iou_threshold)
+            _scores_post.append(_scores_b[nms_ind])
+            _classes_post.append(_classes_b[nms_ind])
             _boxes_post.append(_boxes_b[nms_ind])
-        scores, classes, boxes = torch.stack(_cls_scores_post, dim=0), torch.stack(_cls_classes_post,
-                                                                                   dim=0), torch.stack(_boxes_post,
-                                                                                                       dim=0)
+        scores, classes, boxes = torch.stack(_scores_post, dim=0), \
+                                 torch.stack(_classes_post,dim=0), \
+                                 torch.stack(_boxes_post,dim=0)
 
         return scores, classes, boxes
 
