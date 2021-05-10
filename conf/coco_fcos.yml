@@ -15,7 +15,7 @@ DATASET:
     INDICES: ''
     SHUFFLE: True
     BATCH_SIZE: 8
-    NUM_WORKER: 16
+    NUM_WORKER: 8
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -36,8 +36,8 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: False
-    BATCH_SIZE: 8
-    NUM_WORKER: 16
+    BATCH_SIZE: 1
+    NUM_WORKER: 8
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
