@@ -45,7 +45,7 @@ class NanoDet(nn.Module):
         self.num_classes = len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
-
+        '''
         backbone_cfg = {
             'model_size': '1.0x',
             'out_stages': [2,3,4],
@@ -53,9 +53,10 @@ class NanoDet(nn.Module):
         }
         self.backbone = ShuffleNetV2(**backbone_cfg)
         '''
-        backbone_cfg = {'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x1.0', 'out_stages': [2, 3, 4], 'output_stride': 32}
+
+        backbone_cfg = {'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x1.0', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
-        '''
+
         fpn_cfg = {
             'in_channels': [116, 232, 464],
             'out_channels': 96,
