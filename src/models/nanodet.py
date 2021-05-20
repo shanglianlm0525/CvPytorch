@@ -92,7 +92,6 @@ class NanoDet(nn.Module):
                 }}
         self.head = NanoDetHead(**head_cfg)
 
-        # self.init_params()
 
     def init_params(self):
         for m in self.modules():
