@@ -9,6 +9,8 @@ import torch.nn as nn
 from torch.utils import model_zoo
 from torchvision.models.mobilenet import mobilenet_v2
 
+from compressions.quantization.quant_ops import QuantConv, PassThroughOp, QuantLinear, Quantizers, LSQActivations
+
 """
     MobileNetV2: Inverted Residuals and Linear Bottlenecks
     https://arxiv.org/abs/1801.04381
@@ -46,6 +48,122 @@ def fuse_conv_and_bn(conv, bn):
 
     return fusedconv
 
+def fusebn(model):
+    print('Fusing layers... ')
+    modules_to_fuse = [['conv1.0.0', 'conv1.0.1'],
+
+                       ['stage1.0.conv.0.0', 'stage1.0.conv.0.1'],
+                       ['stage1.0.conv.1', 'stage1.0.conv.2'],
+
+                       ['stage2.0.conv.0.0', 'stage2.0.conv.0.1'],
+                       ['stage2.0.conv.1.0', 'stage2.0.conv.1.1'],
+                       ['stage2.0.conv.2', 'stage2.0.conv.3'],
+                       ['stage2.1.conv.0.0', 'stage2.1.conv.0.1'],
+                       ['stage2.1.conv.1.0', 'stage2.1.conv.1.1'],
+                       ['stage2.1.conv.2', 'stage2.1.conv.3'],
+
+                       ['stage3.0.conv.0.0', 'stage3.0.conv.0.1'],
+                       ['stage3.0.conv.1.0', 'stage3.0.conv.1.1'],
+                       ['stage3.0.conv.2', 'stage3.0.conv.3'],
+                       ['stage3.1.conv.0.0', 'stage3.1.conv.0.1'],
+                       ['stage3.1.conv.1.0', 'stage3.1.conv.1.1'],
+                       ['stage3.1.conv.2', 'stage3.1.conv.3'],
+                       ['stage3.2.conv.0.0', 'stage3.2.conv.0.1'],
+                       ['stage3.2.conv.1.0', 'stage3.2.conv.1.1'],
+                       ['stage3.2.conv.2', 'stage3.2.conv.3'],
+
+                       ['stage4.0.conv.0.0', 'stage4.0.conv.0.1'],
+                       ['stage4.0.conv.1.0', 'stage4.0.conv.1.1'],
+                       ['stage4.0.conv.2', 'stage4.0.conv.3'],
+                       ['stage4.1.conv.0.0', 'stage4.1.conv.0.1'],
+                       ['stage4.1.conv.1.0', 'stage4.1.conv.1.1'],
+                       ['stage4.1.conv.2', 'stage4.1.conv.3'],
+                       ['stage4.2.conv.0.0', 'stage4.2.conv.0.1'],
+                       ['stage4.2.conv.1.0', 'stage4.2.conv.1.1'],
+                       ['stage4.2.conv.2', 'stage4.2.conv.3'],
+                       ['stage4.3.conv.0.0', 'stage4.3.conv.0.1'],
+                       ['stage4.3.conv.1.0', 'stage4.3.conv.1.1'],
+                       ['stage4.3.conv.2', 'stage4.3.conv.3'],
+
+                       ['stage5.0.conv.0.0', 'stage5.0.conv.0.1'],
+                       ['stage5.0.conv.1.0', 'stage5.0.conv.1.1'],
+                       ['stage5.0.conv.2', 'stage5.0.conv.3'],
+                       ['stage5.1.conv.0.0', 'stage5.1.conv.0.1'],
+                       ['stage5.1.conv.1.0', 'stage5.1.conv.1.1'],
+                       ['stage5.1.conv.2', 'stage5.1.conv.3'],
+                       ['stage5.2.conv.0.0', 'stage5.2.conv.0.1'],
+                       ['stage5.2.conv.1.0', 'stage5.2.conv.1.1'],
+                       ['stage5.2.conv.2', 'stage5.2.conv.3'],
+
+                       ['stage6.0.conv.0.0', 'stage6.0.conv.0.1'],
+                       ['stage6.0.conv.1.0', 'stage6.0.conv.1.1'],
+                       ['stage6.0.conv.2', 'stage6.0.conv.3'],
+                       ['stage6.1.conv.1.0', 'stage6.1.conv.1.1'],
+                       ['stage6.1.conv.2', 'stage6.1.conv.3'],
+                       ['stage6.2.conv.0.0', 'stage6.2.conv.0.1'],
+                       ['stage6.2.conv.1.0', 'stage6.2.conv.1.1'],
+                       ['stage6.2.conv.2', 'stage6.2.conv.3'],
+
+                       ['stage7.0.conv.0.0', 'stage7.0.conv.0.1'],
+                       ['stage7.0.conv.1.0', 'stage7.0.conv.1.1'],
+                       ['stage7.0.conv.2', 'stage7.0.conv.3'],
+
+                       ['last_conv.0.0', 'last_conv.0.1']]
+
+    return torch.quantization.fuse_modules(model, modules_to_fuse)
+
+
+def replace_quant_ops_new(model, num_bits, quant_scheme):
+    for child_name, child in model.named_children():
+        if isinstance(child, torch.nn.Conv2d):
+            new_op = QuantConv(quant_scheme, child)
+            setattr(model, child_name, new_op)
+        elif isinstance(child, torch.nn.Linear):
+            new_op = QuantLinear(quant_scheme, child)
+            setattr(model, child_name, new_op)
+        elif isinstance(child, (torch.nn.ReLU, torch.nn.ReLU6)):
+            # prev_module.activation_function = child
+            setattr(model, child_name, PassThroughOp())
+        elif isinstance(child, torch.nn.BatchNorm2d):
+            setattr(model, child_name, PassThroughOp())
+        else:
+            replace_quant_ops(child, num_bits, quant_scheme)
+    return model
+
+
+def replace_quant_ops(model, num_bits, quant_scheme):
+    prev_module = None
+    for child_name, child in model.named_children():
+        if isinstance(child, torch.nn.Conv2d):
+            new_op = QuantConv(quant_scheme, child)
+            setattr(model, child_name, new_op)
+            prev_module = getattr(model, child_name)
+        elif isinstance(child, torch.nn.Linear):
+            new_op = QuantLinear(quant_scheme, child)
+            setattr(model, child_name, new_op)
+            prev_module = getattr(model, child_name)
+        elif isinstance(child, (torch.nn.ReLU, torch.nn.ReLU6)):
+            # prev_module.activation_function = child
+            prev_module.activation_function = torch.nn.ReLU()
+            setattr(model, child_name, PassThroughOp())
+        elif isinstance(child, torch.nn.BatchNorm2d):
+            setattr(model, child_name, PassThroughOp())
+        else:
+            replace_quant_ops(child, num_bits, quant_scheme)
+
+def run_calibration(calibration):
+    def estimate_range(module):
+        if isinstance(module, Quantizers):
+            module.estimate_range(flag = calibration)
+    return estimate_range
+
+def set_quant_mode(quantized):
+    def set_precision_mode(module):
+        if isinstance(module, (Quantizers, LSQActivations)):
+            module.set_quantize(quantized)
+            module.estimate_range(flag = False)
+    return set_precision_mode
+
 class MobileNetV2(nn.Module):
 
     def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, classifier=False, backbone_path=None, pretrained = False):
@@ -82,86 +200,6 @@ class MobileNetV2(nn.Module):
             self.load_pretrained_weights()
         else:
             self.init_weights()
-
-    def fusebn(self):
-        print('Fusing layers... ')
-        modules_to_fuse = [['conv1.0.0', 'conv1.0.1'],
-
-                           ['stage1.0.conv.0.0', 'stage1.0.conv.0.1'],
-                           ['stage1.0.conv.1', 'stage1.0.conv.2'],
-
-                           ['stage2.0.conv.0.0', 'stage2.0.conv.0.1'],
-                           ['stage2.0.conv.1.0', 'stage2.0.conv.1.1'],
-                           ['stage2.0.conv.2', 'stage2.0.conv.3'],
-                           ['stage2.1.conv.0.0', 'stage2.1.conv.0.1'],
-                           ['stage2.1.conv.1.0', 'stage2.1.conv.1.1'],
-                           ['stage2.1.conv.2', 'stage2.1.conv.3'],
-
-                           ['stage3.0.conv.0.0', 'stage3.0.conv.0.1'],
-                           ['stage3.0.conv.1.0', 'stage3.0.conv.1.1'],
-                           ['stage3.0.conv.2', 'stage3.0.conv.3'],
-                           ['stage3.1.conv.0.0', 'stage3.1.conv.0.1'],
-                           ['stage3.1.conv.1.0', 'stage3.1.conv.1.1'],
-                           ['stage3.1.conv.2', 'stage3.1.conv.3'],
-                           ['stage3.2.conv.0.0', 'stage3.2.conv.0.1'],
-                           ['stage3.2.conv.1.0', 'stage3.2.conv.1.1'],
-                           ['stage3.2.conv.2', 'stage3.2.conv.3'],
-
-                           ['stage4.0.conv.0.0', 'stage4.0.conv.0.1'],
-                           ['stage4.0.conv.1.0', 'stage4.0.conv.1.1'],
-                           ['stage4.0.conv.2', 'stage4.0.conv.3'],
-                           ['stage4.1.conv.0.0', 'stage4.1.conv.0.1'],
-                           ['stage4.1.conv.1.0', 'stage4.1.conv.1.1'],
-                           ['stage4.1.conv.2', 'stage4.1.conv.3'],
-                           ['stage4.2.conv.0.0', 'stage4.2.conv.0.1'],
-                           ['stage4.2.conv.1.0', 'stage4.2.conv.1.1'],
-                           ['stage4.2.conv.2', 'stage4.2.conv.3'],
-                           ['stage4.3.conv.0.0', 'stage4.3.conv.0.1'],
-                           ['stage4.3.conv.1.0', 'stage4.3.conv.1.1'],
-                           ['stage4.3.conv.2', 'stage4.3.conv.3'],
-
-                           ['stage5.0.conv.0.0', 'stage5.0.conv.0.1'],
-                           ['stage5.0.conv.1.0', 'stage5.0.conv.1.1'],
-                           ['stage5.0.conv.2', 'stage5.0.conv.3'],
-                           ['stage5.1.conv.0.0', 'stage5.1.conv.0.1'],
-                           ['stage5.1.conv.1.0', 'stage5.1.conv.1.1'],
-                           ['stage5.1.conv.2', 'stage5.1.conv.3'],
-                           ['stage5.2.conv.0.0', 'stage5.2.conv.0.1'],
-                           ['stage5.2.conv.1.0', 'stage5.2.conv.1.1'],
-                           ['stage5.2.conv.2', 'stage5.2.conv.3'],
-
-                           ['stage6.0.conv.0.0', 'stage6.0.conv.0.1'],
-                           ['stage6.0.conv.1.0', 'stage6.0.conv.1.1'],
-                           ['stage6.0.conv.2', 'stage6.0.conv.3'],
-                           ['stage6.1.conv.1.0', 'stage6.1.conv.1.1'],
-                           ['stage6.1.conv.2', 'stage6.1.conv.3'],
-                           ['stage6.2.conv.0.0', 'stage6.2.conv.0.1'],
-                           ['stage6.2.conv.1.0', 'stage6.2.conv.1.1'],
-                           ['stage6.2.conv.2', 'stage6.2.conv.3'],
-
-                           ['stage7.0.conv.0.0', 'stage7.0.conv.0.1'],
-                           ['stage7.0.conv.1.0', 'stage7.0.conv.1.1'],
-                           ['stage7.0.conv.2', 'stage7.0.conv.3'],
-
-                           ['last_conv.0.0', 'last_conv.0.1']]
-
-        self = torch.quantization.fuse_modules(self, modules_to_fuse)
-        # delattr(m, 'bn')  # remove batchnorm
-        return self
-
-
-    def quantize(self, num_bits=8):
-        self.qconv1 = QConv2d(self.conv1, qi=True, qo=True, num_bits=num_bits)
-        self.conv1 = nn.Sequential(list(features.children())[0])
-        self.stage1 = nn.Sequential(list(features.children())[1])
-        self.stage2 = nn.Sequential(*list(features.children())[2:4])
-        self.stage3 = nn.Sequential(*list(features.children())[4:7])
-        self.stage4 = nn.Sequential(*list(features.children())[7:11])
-        self.stage5 = nn.Sequential(*list(features.children())[11:14])
-        self.stage6 = nn.Sequential(*list(features.children())[14:17])
-        self.stage7 = nn.Sequential(list(features.children())[17])
-        self.last_conv = nn.Sequential(list(features.children())[18])
-        self.fc = mobilenet_v2(self.pretrained).classifier
 
     def init_weights(self):
         for m in self.modules():
