@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
 from tqdm import tqdm
 import argparse
-from compressions.quantization.custom_model import MobileNetV2
+from compressions.quantization.custom_model import MobileNetV2, fusebn
 
 
 def val_model(model, dataloader):
@@ -103,3 +103,23 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load('ckpt/mobilenet_v2_train.pt', map_location='cpu'))
     model.to(device)
     val_model(model, dataloaders['val'])
+
+    model = fusebn(model)
+    val_model(model, dataloaders['val'])
+
+    # Specify quantization configuration
+    # Start with simple min/max range estimation and per-tensor quantization of weights
+    model.qconfig = torch.quantization.default_qconfig
+    print(model.qconfig)
+    torch.quantization.prepare(model, inplace=True)
+
+    # Calibrate first
+    print('Post Training Quantization Prepare: Inserting Observers')
+
+    # Calibrate with the training set
+    val_model(model, dataloaders['val'])
+    print('Post Training Quantization: Calibration done')
+
+    # Convert to quantized model
+    torch.quantization.convert(model, inplace=True)
+    print('Post Training Quantization: Convert done')
