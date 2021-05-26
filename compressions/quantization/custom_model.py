@@ -6,9 +6,10 @@
 
 import torch
 import torch.nn as nn
+from torch.quantization import QuantStub, DeQuantStub
 from torch.utils import model_zoo
-from torchvision.models.mobilenet import mobilenet_v2
-
+# from torchvision.models.mobilenet import mobilenet_v2
+from base_model import mobilenet_v2
 from compressions.quantization.quant_ops import QuantConv, PassThroughOp, QuantLinear, Quantizers, LSQActivations
 
 """
@@ -201,6 +202,9 @@ class MobileNetV2(nn.Module):
         else:
             self.init_weights()
 
+        self.quant = QuantStub()
+        self.dequant = DeQuantStub()
+
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -216,6 +220,7 @@ class MobileNetV2(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
+        x = self.quant(x)
         x = self.conv1(x)
         output = []
         for i in range(1, 8):
@@ -227,8 +232,15 @@ class MobileNetV2(nn.Module):
             x = self.last_conv(x)
             x = nn.functional.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
             x = self.fc(x)
+            x = self.dequant(x)
             return x
         return tuple(output)
+
+    def quant_forward(self, x):
+        x = self.quant(x)
+        x = self.forward(x)
+        x = self.dequant(x)
+        return x
 
 
     def freeze_bn(self):
