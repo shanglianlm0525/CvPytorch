@@ -15,7 +15,20 @@ from torchvision import transforms, datasets
 from tqdm import tqdm
 import argparse
 from compressions.quantization.custom_model import MobileNetV2, fusebn
-
+from torch.quantization import get_default_qconfig, quantize_jit
+import sys
+sys.setrecursionlimit(1000000)
+# # Setup warnings
+import warnings
+warnings.filterwarnings(
+    action='ignore',
+    category=DeprecationWarning,
+    module=r'.*'
+)
+warnings.filterwarnings(
+    action='default',
+    module=r'torch.quantization'
+)
 
 def val_model(model, dataloader):
     print('-' * 10)
@@ -25,8 +38,8 @@ def val_model(model, dataloader):
     running_corrects = 0
     # Iterate over data.
     for inputs, labels in dataloader:
-        inputs = inputs.to(device)
-        labels = labels.to(device)
+        # inputs = inputs.to(device)
+        # labels = labels.to(device)
 
         # forward
         # track history if only in train
@@ -101,21 +114,25 @@ if __name__ == '__main__':
     num_ftrs = model.fc[1].in_features
     model.fc[1] = nn.Linear(num_ftrs, 2)
     model.load_state_dict(torch.load('ckpt/mobilenet_v2_train.pt', map_location='cpu'))
-    model.to(device)
+    # model.to(device)
+    model.to('cpu')
+    model.eval()
+
     val_model(model, dataloaders['val'])
 
     model = fusebn(model)
     val_model(model, dataloaders['val'])
 
+
     # Specify quantization configuration
     # Start with simple min/max range estimation and per-tensor quantization of weights
-    model.qconfig = torch.quantization.default_qconfig
+    # model.qconfig = torch.quantization.default_qconfig
+    model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
     print(model.qconfig)
     torch.quantization.prepare(model, inplace=True)
 
     # Calibrate first
     print('Post Training Quantization Prepare: Inserting Observers')
-
     # Calibrate with the training set
     val_model(model, dataloaders['val'])
     print('Post Training Quantization: Calibration done')
@@ -123,3 +140,8 @@ if __name__ == '__main__':
     # Convert to quantized model
     torch.quantization.convert(model, inplace=True)
     print('Post Training Quantization: Convert done')
+    # out = torch.nn.quantized.modules.FloatFunctional().add(out, identity)
+    val_model(model, dataloaders['val'])
+
+
+
