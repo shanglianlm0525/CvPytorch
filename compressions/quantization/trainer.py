@@ -18,7 +18,7 @@ from torchvision.models import mobilenet_v2
 from compressions.quantization.custom_model import MobileNetV2
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, num_epochs=25, use_qat=False):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -74,6 +74,14 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
+
+        if use_qat:
+            if epoch > 3:
+                # Freeze quantizer parameters
+                model.apply(torch.quantization.disable_observer)
+            if epoch > 2:
+                # Freeze batch norm mean and variance estimates
+                model.apply(torch.nn.intrinsic.qat.freeze_bn_stats)
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format( time_elapsed // 60, time_elapsed % 60))
