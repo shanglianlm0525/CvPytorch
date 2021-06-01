@@ -36,15 +36,15 @@ def get_input_sequences(model, dummy_shape=[1, 3, 224, 224]):
     return layer_bn_pairs
 
 
-def replace_quant_ops(model, num_bits, quant_scheme):
+def replace_quant_ops(model, w_bit, w_scheme, b_bit, a_bit, a_scheme):
     prev_module = None
     for child_name, child in model.named_children():
         if isinstance(child, torch.nn.Conv2d):
-            new_op = QConv2d(quant_scheme, child)
+            new_op = QConv2d(child, w_scheme='mse', w_bit = 8, b_bit=8, a_scheme='mse', a_bit=8)
             setattr(model, child_name, new_op)
             prev_module = getattr(model, child_name)
         elif isinstance(child, torch.nn.Linear):
-            new_op = QLinear(quant_scheme, child)
+            new_op = QLinear(child, w_scheme='mse', w_bit = 8, b_bit=8, a_scheme='mse', a_bit=8)
             setattr(model, child_name, new_op)
             prev_module = getattr(model, child_name)
         elif isinstance(child, (torch.nn.ReLU, torch.nn.ReLU6)):
@@ -54,4 +54,4 @@ def replace_quant_ops(model, num_bits, quant_scheme):
         elif isinstance(child, torch.nn.BatchNorm2d):
             setattr(model, child_name, QIdentity())
         else:
-            replace_quant_ops(child, num_bits, quant_scheme)
+            replace_quant_ops(child, w_bit, w_scheme, b_bit, a_bit, a_scheme)
