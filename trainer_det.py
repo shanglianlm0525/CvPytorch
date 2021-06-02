@@ -230,7 +230,7 @@ class Trainer:
                 lr = get_warmup_lr(cur_iter, cfg)
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = lr
-                losses = self.run_step(scaler, model, sample, optimizer, None, None, prefix)
+                losses = self.run_step(scaler, model, sample, optimizer, None, None, 'train')
 
                 if self.cfg.local_rank == 0:
                     template = "[iter {}/{}, lr {}] Total train loss: {:.4f} \n" "{}"
@@ -329,7 +329,6 @@ class Trainer:
             self.tb_writer.close()
 
         dist.destroy_process_group() if cfg.local_rank!=0 else None
-        torch.cuda.empty_cache()
 
     def train_epoch(self, scaler, epoch, model, dataset, dataloader, optimizer, timer, lossLogger, performanceLogger, prefix="train"):
         model.train()
