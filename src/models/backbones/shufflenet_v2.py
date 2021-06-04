@@ -53,9 +53,7 @@ class ShuffleNetV2(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        if self.pretrained:
-            self.load_pretrained_weights()
-        else:
+        if not self.pretrained:
             self.init_weights()
 
     def forward(self, x):

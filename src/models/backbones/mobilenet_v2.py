@@ -30,7 +30,7 @@ class MobileNetV2(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'mobilenet_v2':
-            features = mobilenet_v2().features
+            features = mobilenet_v2(self.pretrained).features
             self.out_channels = [32, 16, 24, 32, 64, 96, 160, 320]
         else:
             raise NotImplementedError
@@ -50,9 +50,7 @@ class MobileNetV2(nn.Module):
             self.fc = mobilenet_v2(self.pretrained).classifier
             self.out_channels = [1000]
 
-        if self.pretrained:
-            self.load_pretrained_weights()
-        else:
+        if not self.pretrained:
             self.init_weights()
 
     def init_weights(self):
