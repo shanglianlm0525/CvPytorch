@@ -24,8 +24,7 @@ def build_optimizer(cfg, model):
         if p.requires_grad:
             _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS if "bias" in n else cfg.OPTIMIZER.WEIGHT_PARAMS)
             _args.pop("data")
-            _params += [{"params": [p], "lr": cfg.INIT_LR, **_args}]
-            # _params += [{"params": [p], "lr": cfg.INIT_LR * 0.1 if n.startswith('backbone') and model.backbone.pretrained else cfg.INIT_LR, **_args}]
+            _params += [{"params": [p], "lr": cfg.BACKBONE_LR if 'backbone' in n else cfg.INIT_LR, **_args}]
             if "bias" in n:
                 _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
 
