@@ -6,9 +6,11 @@
 
 import math
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, ExponentialLR, ReduceLROnPlateau, CosineAnnealingLR, CosineAnnealingWarmRestarts, LambdaLR
+from src.lr_schedulers.poly_lr import PolyLR
+
+__all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts','ExponentialLR', 'PolyLR']
 
 
-__all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts','ExponentialLR']
 
 '''
         schedule_cfg = copy.deepcopy(self.cfg.schedule.lr_schedule)
@@ -50,6 +52,9 @@ def build_lr_scheduler(cfg, optimizer):
     elif cfg.LR_SCHEDULER.TYPE == "CosineAnnealingWarmRestarts":
         lr_scheduler_ft = CosineAnnealingWarmRestarts(optimizer, T_0=cfg.N_MAX_EPOCHS, T_mult=1, eta_min=0.02)
         # torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0, T_mult=1, eta_min=0.02, last_epoch=-1)
+    elif cfg.LR_SCHEDULER.TYPE == "PolyLR":
+        lr_scheduler_ft = PolyLR(optimizer, max_iters=cfg.N_MAX_EPOCHS, power=cfg.LR_SCHEDULER.POWER, last_epoch=-1, min_lr=1e-6)
+        # PolyLR(optimizer, max_iters, power=0.9, last_epoch=-1, min_lr=1e-6)
     else:
         raise ValueError("Unsupported lr_scheduler type: {}".format(cfg.LR_SCHEDULER.TYPE))
 
