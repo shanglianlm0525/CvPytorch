@@ -66,15 +66,11 @@ class Deeplabv3Plus(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        # backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
         backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
         self.aspp = ASPP(inplanes=self.backbone.out_channels[-1], output_stride=backbone_cfg['output_stride'])
         self.decoder = Decoder(self.num_classes, self.backbone.out_channels[0])
 
-        # self._init_weight(self.aspp, self.decoder)
-
-        # self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
         self.ce_criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
 
@@ -104,7 +100,7 @@ class Deeplabv3Plus(nn.Module):
             losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
-                return losses, torch.argmax(outputs, dim=1)
+                return losses, outputs.detach().max(dim=1)[1] #torch.argmax(outputs, dim=1)
             else:
                 return losses
 
