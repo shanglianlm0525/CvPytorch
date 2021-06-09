@@ -35,7 +35,7 @@ class MobileNetV2(nn.Module):
         else:
             raise NotImplementedError
 
-        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
+        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
         self.conv1 = nn.Sequential(list(features.children())[0])
         self.stage1 = nn.Sequential(list(features.children())[1])
