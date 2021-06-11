@@ -8,6 +8,7 @@ import os
 import numpy as np
 import random
 import torch
+from torch import nn
 
 
 def setup_seed(seed=0):
@@ -24,3 +25,15 @@ def setup_seed(seed=0):
 
 def get_class_name(full_class_name):
     return full_class_name.split(".")[-1]
+
+
+def set_bn_momentum(model, momentum=0.1):
+    for m in model.modules():
+        if isinstance(m, nn.BatchNorm2d):
+            m.momentum = momentum
+
+
+def fix_bn(model):
+    for m in model.modules():
+        if isinstance(m, nn.BatchNorm2d):
+            m.eval()
