@@ -10,10 +10,8 @@ import torch.nn as nn
 import numpy as np
 
 from .backbones import build_backbone
-from .backbones.nanodet_shufflenet import ShuffleNetV2
-from .heads.nanodet_head import NanoDetHead
-from .necks import PAN
-
+from .necks import build_neck
+from .heads import build_head
 
 
 def warp_boxes(boxes, M, width, height):
@@ -45,26 +43,19 @@ class NanoDet(nn.Module):
         self.num_classes = len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
-        '''
-        backbone_cfg = {
-            'model_size': '1.0x',
-            'out_stages': [2,3,4],
-            'activation': 'LeakyReLU'
-        }
-        self.backbone = ShuffleNetV2(**backbone_cfg)
-        '''
 
         backbone_cfg = {'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x1.0', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
 
         fpn_cfg = {
+            'name': 'PAN',
             'in_channels': [116, 232, 464],
             'out_channels': 96,
-            # 'start_level': 0,
-            # 'num_outs': 3
         }
-        self.fpn = PAN(**fpn_cfg)
+        # self.fpn = PAN(**fpn_cfg)
+        self.fpn = build_neck(fpn_cfg)
         head_cfg = {
+              'name': 'NanoDetHead',
               'num_classes': self.num_classes,
               'input_channel': 96,
               'feat_channels': 96,
@@ -90,7 +81,8 @@ class NanoDet(nn.Module):
                 {'name': 'GIoULoss',
                 'loss_weight': 2.0}
                 }}
-        self.head = NanoDetHead(**head_cfg)
+        # self.head = NanoDetHead(**head_cfg)
+        self.head = build_head(head_cfg)
 
 
     def init_params(self):
