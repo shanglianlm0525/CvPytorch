@@ -11,7 +11,8 @@ from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
 
 __all__ = [
-    'FPN', 'PAN',
+    'FPN',
+    'PAN',
     'YOLOv3Neck',
     'YOLOv5Neck'
 ]
