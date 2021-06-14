@@ -16,7 +16,7 @@ from .densenet import Densenet
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
 
-__all__ = ['VGG','ResNet','ResNeXt','WideResNet','SqueezeNet','MobileNetV2','ShuffleNetV2']
+__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'ShuffleNetV2']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
