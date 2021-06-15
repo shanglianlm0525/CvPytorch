@@ -16,38 +16,34 @@ import numpy as np
 from src.models.modules.aspp import ASPP
 from src.models.backbones import build_backbone
 from src.losses.seg_loss import CrossEntropyLoss2d
+from src.utils.torch_utils import set_bn_momentum
 
 
 class Decoder(nn.Module):
-    def __init__(self, num_classes, low_level_inplanes=256):
+    def __init__(self, low_level_channels, in_channels, dilations, num_classes):
         super(Decoder, self).__init__()
-        self.conv1 = nn.Conv2d(low_level_inplanes, 48, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(48)
-        self.relu = nn.ReLU(inplace=True)
-        self.last_conv = nn.Sequential(nn.Conv2d(304, 256, kernel_size=3, stride=1, padding=1, bias=False),
+        self.project = nn.Sequential(nn.Conv2d(low_level_channels, 48, 1, bias=False),
+                                    nn.BatchNorm2d(48),
+                                    nn.ReLU(inplace=True))
+
+        self.aspp = ASPP(inplanes=in_channels, dilations = dilations)
+
+        self.classifier = nn.Sequential(nn.Conv2d(304, 256, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(256),
                                        nn.ReLU(inplace=True),
-                                       # nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
-                                       # nn.BatchNorm2d(256),
-                                       # nn.ReLU(inplace=True),
                                        nn.Conv2d(256, num_classes, kernel_size=1, stride=1))
         self._init_weight()
 
-
-    def forward(self, x, low_level_feat):
-        low_level_feat = self.relu(self.bn1(self.conv1(low_level_feat)))
-
-        x = F.interpolate(x, size=low_level_feat.size()[2:], mode='bilinear', align_corners=True)
-        x = torch.cat((x, low_level_feat), dim=1)
-        x = self.last_conv(x)
-        return x
+    def forward(self, high_level_feat, low_level_feat):
+        low_level_feat = self.project(low_level_feat)
+        high_level_feat = self.aspp(high_level_feat)
+        high_level_feat = F.interpolate(high_level_feat, size=low_level_feat.size()[2:], mode='bilinear', align_corners=True)
+        return self.classifier(torch.cat((high_level_feat, low_level_feat), dim=1))
 
     def _init_weight(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                # m.weight.data.normal_(0, math.sqrt(2. / n))
-                torch.nn.init.kaiming_normal_(m.weight)
+                nn.init.kaiming_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
@@ -68,10 +64,12 @@ class Deeplabv3Plus(nn.Module):
 
         backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
-        self.aspp = ASPP(inplanes=self.backbone.out_channels[-1], output_stride=backbone_cfg['output_stride'])
-        self.decoder = Decoder(self.num_classes, self.backbone.out_channels[0])
+        decoder_cfg = { 'low_level_channels': self.backbone.out_channels[0], 'in_channels': self.backbone.out_channels[1],
+                        'dilations': [6, 12, 18], 'num_classes': self.num_classes }
+        self.decoder = Decoder(**decoder_cfg)
 
         self.ce_criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
+        set_bn_momentum(self.backbone, momentum=0.01)
 
 
     def _init_weight(self, *stages):
@@ -87,7 +85,6 @@ class Deeplabv3Plus(nn.Module):
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
         batch_size, ch, _, _ = imgs.shape
         low_level_feat, x  = self.backbone(imgs)
-        x = self.aspp(x)
         x = self.decoder(x, low_level_feat)
         outputs = F.interpolate(x, size=imgs.size()[2:], mode='bilinear', align_corners=True)
 
