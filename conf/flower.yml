@@ -42,9 +42,9 @@ USE_MODEL: 'src.models.cls_model.ClsModel'
 EVAL_FUNC: 'classification'
 
 
-CHECKPOINT_DIR: 'checkpoints'
+CHECKPOINT_DIR: 'checkpoints1'
 N_EPOCHS_TO_SAVE_MODEL: 2
-#PRETRAIN_MODEL: 'checkpoints/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
+#PRETRAIN_MODEL: 'checkpoints1/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
 RESUME: False
 
 

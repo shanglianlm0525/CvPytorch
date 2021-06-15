@@ -41,8 +41,8 @@ DATASET:
 USE_MODEL: 'src.models.cls_model.ClsModel'
 
 RESUME_TRAINING: False
-#PRETRAIN_MODEL: 'checkpoints/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
-CHECKPOINT_SAVE_DIR: 'checkpoints'
+#PRETRAIN_MODEL: 'checkpoints1/first_shufflenet_v2/Parking#ParkingDataset#DeepLabv3_plus#0.0002#10-15-25-40-60#20181130#66000iters.pth'
+CHECKPOINT_SAVE_DIR: 'checkpoints1'
 USE_GLOBAL_BN_STATS: False
 
 

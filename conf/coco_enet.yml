@@ -62,9 +62,9 @@ EVALUATOR:
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
-CHECKPOINT_DIR: 'checkpoints'
+CHECKPOINT_DIR: 'checkpoints1'
 N_EPOCHS_TO_SAVE_MODEL: 10
-# PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+# PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
 
 

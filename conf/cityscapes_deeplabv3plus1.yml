@@ -1,56 +1,59 @@
-EXPERIMENT_NAME: 'PennFudanPed_MaskRCNN'
+EXPERIMENT_NAME: 'Cityscapes_Deeplabv3plus'
 
 #########################################
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.pennfudan.PennFudanDetection'
-  DICTIONARY: 'conf/dicts/pennfudan_dict.yml'
-  DICTIONARY_NAME: 'INS_CLASSES'
-  BACKGROUND_AS_CATEGORY: True
+  CLASS: 'src.datasets.cityscapes.CityscapesSegmentation'
+  DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
+  DICTIONARY_NAME: 'SEG_CLASSES'
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/PennFudanPed'
+    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/PennFudanPed/train_ins.txt'
-    SHUFFLE: False
-    BATCH_SIZE: 2
-    NUM_WORKER: 2
+    INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
+    SHUFFLE: True
+    BATCH_SIZE: 24
+    NUM_WORKER: 8
     LABELS:
-      DET_DIR: '/home/lmin/data/PennFudanPed'
-      DET_SUFFIX: '.txt'
-      SEG_DIR: '/home/lmin/data/PennFudanPed'
-      SEG_SUFFIX: '*.png'
+      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      SEG_SUFFIX: '*_gtFine_labelTrainIds.png'
     TRANSFORMS:
+      RandomCrop: { size: [768, 768] }
+      ColorJitter: { brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.01 }
       RandomHorizontalFlip: { p: 0.5 }
       ToTensor:
-      # Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
+      Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
   VAL:
-    IMG_DIR: '/home/lmin/data/PennFudanPed'
+    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/PennFudanPed/val_ins.txt'
+    INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
     SHUFFLE: False
-    BATCH_SIZE: 2
-    NUM_WORKER: 2
+    BATCH_SIZE: 4
+    NUM_WORKER: 4
     LABELS:
-      DET_DIR: '/home/lmin/data/PennFudanPed'
-      DET_SUFFIX: '.txt'
-      SEG_DIR: '/home/lmin/data/PennFudanPed'
-      SEG_SUFFIX: '*.png'
+      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      SEG_SUFFIX: '*_gtFine_labelTrainIds.png'
     TRANSFORMS:
+      # Resize: { size: [1024, 2048] }
       ToTensor:
-      # Normalize: { mean: [0.414, 0.405, 0.391], std: [0.279, 0.281, 0.266] }
+      Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
 
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.maskrcnn.MaskRCNN'
+USE_MODEL: 'src.models.deeplabv3_plus1.Deeplabv3Plus'
 EVALUATOR:
-  NAME: 'coco_instance'
+  NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'
   EVAL_INTERVALS: 2
+
 
 #########################################
 # Checkpoints / Resume Configurations
@@ -60,35 +63,38 @@ N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
 
+
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
 GPU_IDS: [0]
-N_MAX_EPOCHS: 10
+N_MAX_EPOCHS: 160
 
-INIT_LR: 0.005
+INIT_LR: 0.1
+BACKBONE_LR: 0.01
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
   TYPE: 'SGD' # Adam, RMSprop
   BIAS_PARAMS:
     momentum: 0.9
-    weight_decay: 0.0005
+    weight_decay: 0.0001
   WEIGHT_PARAMS:
     momentum: 0.9
-    weight_decay: 0.0005
+    weight_decay: 0.0001
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
-  TYPE: 'MultiStepLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
-  MILESTONES: [3, 6]
+  TYPE: 'CosineAnnealingLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [20, 40, 60, 80, 120]
   GAMMA: 0.1
+  POWER: 0.9
   STEP: 300
 
 WARMUP:
   NAME: 'linear'
   ITERS: 0
-  FACTOR: 0.1
+  FACTOR: 0.33
 
 
 #########################################
