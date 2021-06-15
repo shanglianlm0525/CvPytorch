@@ -5,6 +5,8 @@
 # @File : cityscapes.py
 
 import os
+from collections import namedtuple
+
 from glob2 import glob
 import numpy as np
 from PIL import Image
@@ -12,8 +14,8 @@ from torch.utils.data import Dataset
 from ..utils import palette
 
 """
-    ADE20K dataset
-    http://groups.csail.mit.edu/vision/datasets/ADE20K/
+    Cityscapes dataset
+    https://www.cityscapes-dataset.com/
 """
 
 class CityscapesSegmentation(Dataset):
@@ -61,6 +63,7 @@ class CityscapesSegmentation(Dataset):
 
             assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._targets)'
             assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
+
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
