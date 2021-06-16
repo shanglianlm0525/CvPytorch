@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2020/6/12 9:15
 # @Author : liumin
-# @File : checkpoints.py
+# @File : checkpoints1.py
 
 import os
 import torch
