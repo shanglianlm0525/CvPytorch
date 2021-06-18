@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils import model_zoo
 from torchvision.models.mobilenet import mobilenet_v2
 
@@ -37,7 +38,7 @@ class MobileNetV2(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.conv1 = nn.Sequential(list(features.children())[0])
+        self.conv1 = nn.Sequential(list(features.children())[0]) # x2
         self.stage1 = nn.Sequential(list(features.children())[1])
         self.stage2 = nn.Sequential(*list(features.children())[2:4])
         self.stage3 = nn.Sequential(*list(features.children())[4:7])
@@ -50,7 +51,23 @@ class MobileNetV2(nn.Module):
             self.fc = mobilenet_v2(self.pretrained).classifier
             self.out_channels = [1000]
 
-        if not self.pretrained:
+        if self.output_stride == 16:
+            s4, s6, d4, d6 = (2, 1, 1, 2)
+        elif self.output_stride == 8:
+            s4, s6, d4, d6 = (1, 1, 2, 4)
+
+            for n, m in self.stage4.named_modules():
+                if '0.conv.1.0' in n:
+                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
+
+        if self.output_stride == 8 or self.output_stride == 16:
+            for n, m in self.stage6.named_modules():
+                if '0.conv.1.0' in n:
+                    m.dilation, m.padding, m.stride = (d6, d6), (d6, d6), (s6, s6)
+
+        if self.pretrained:
+            self.load_pretrained_weights()
+        else:
             self.init_weights()
 
     def init_weights(self):
@@ -78,7 +95,7 @@ class MobileNetV2(nn.Module):
                 output.append(x)
         if self.classifier:
             x = self.last_conv(x)
-            x = nn.functional.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
+            x = F.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
             x = self.fc(x)
             return x
         return tuple(output)
