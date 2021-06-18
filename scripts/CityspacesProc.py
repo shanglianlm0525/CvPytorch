@@ -22,6 +22,7 @@ def produceImgAndLabelsList():
 
         for line1,line2 in zip(images_txt,labels_txt):
             print(line1.strip()+' '+line2.strip())
+            line2 = line2.replace('_labelTrainIds.png','_labelIds.png')
             seg_txt.write(line1.strip()+' '+line2.strip() + '\n')
         images_txt.close()
         labels_txt.close()
