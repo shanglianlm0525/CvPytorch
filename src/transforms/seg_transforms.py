@@ -10,6 +10,7 @@ import math
 import torch
 from torch import Tensor
 import torchvision
+from typing import Tuple, List, Optional
 from torchvision import transforms as T
 import torchvision.transforms.functional as F
 from pycocotools import mask as coco_mask
@@ -19,18 +20,19 @@ import numpy as np
 from PIL import Image
 import collections
 from collections.abc import Sequence
-
+from torchvision.transforms.functional import InterpolationMode, _interpolation_modes_from_int
 
 __all__ = ['Compose', 'ToTensor', 'Normalize',
         'RandomHorizontalFlip', 'RandomVerticalFlip',
         'RandomScale',
         'Resize', 'RandomResizedCrop',
         'RandomCrop', 'CenterCrop',
-        'RandomRotate', 'RandomPerspective',
+        'RandomRotation', 'RandomPerspective',
         'ColorJitter', 'GaussianBlur',
         'Pad', 'Lambda', 'Encrypt',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
+from torchvision.transforms.transforms import _setup_angle, _check_sequence_input
 
 _pil_interpolation_to_str = {
     Image.NEAREST: 'PIL.Image.NEAREST',
@@ -39,6 +41,7 @@ _pil_interpolation_to_str = {
     Image.LANCZOS: 'PIL.Image.LANCZOS',
 }
 
+
 def _get_image_size(img):
     if F._is_pil_image(img):
         return img.size
@@ -46,6 +49,7 @@ def _get_image_size(img):
         return img.shape[-2:][::-1]
     else:
         raise TypeError("Unexpected type {}".format(type(img)))
+
 
 def _setup_size(size, error_msg):
     if isinstance(size, numbers.Number):
@@ -76,7 +80,10 @@ class Compose(object):
 
     def __call__(self, sample):
         for t in self.transforms:
+            img, target = sample['image'], sample['target']
+            # print(t, np.asarray(target, dtype=np.uint8).shape, np.asarray(target, dtype=np.uint8))
             sample = t(sample)
+            # print(t, np.asarray(target, dtype=np.uint8).shape, np.asarray(target, dtype=np.uint8))
         return sample
 
     def __repr__(self):
@@ -110,10 +117,12 @@ class ToTensor(object):
         if self.normalize:
             return {'image': F.to_tensor(img), 'target': torch.from_numpy( np.array( target, dtype=self.target_type) )}
         else:
-            return {'image': torch.from_numpy( np.array(img, dtype=np.float32).transpose(2, 0, 1) ), 'target': torch.from_numpy( np.array( target, dtype=self.target_type) )}
+            return {'image': torch.from_numpy( np.array(img, dtype=np.float32).transpose(2, 0, 1) ),
+                    'target': torch.from_numpy( np.array( target, dtype=self.target_type) )}
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
+
 
 
 class Normalize(object):
@@ -157,21 +166,14 @@ class RandomHorizontalFlip(object):
         self.p = p
 
     def __call__(self, sample):
-        """
-        Args:
-            img (PIL Image): Image to be flipped.
-            target (PIL Image): Label to be flipped.
-        Returns:
-            PIL Image: Randomly flipped image.
-            PIL Image: Randomly flipped label.
-        """
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            return {'image': F.hflip(img),'target': F.hflip(target)}
-        return {'image': img,'target': target}
+            return {'image': F.hflip(img), 'target': F.hflip(target)}
+        return {'image': img, 'target': target}
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
 
 
 class RandomVerticalFlip(object):
@@ -254,44 +256,21 @@ class CenterCrop(object):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
-
 class RandomCrop(object):
     """Crop the given PIL Image at a random location.
-
     Args:
         size (sequence or int): Desired output size of the crop. If size is an
             int instead of sequence like (h, w), a square crop (size, size) is
             made.
         padding (int or sequence, optional): Optional padding on each border
-            of the image. Default is None, i.e no padding. If a sequence of length
+            of the image. Default is 0, i.e no padding. If a sequence of length
             4 is provided, it is used to pad left, top, right, bottom borders
-            respectively. If a sequence of length 2 is provided, it is used to
-            pad left/right, top/bottom borders, respectively.
+            respectively.
         pad_if_needed (boolean): It will pad the image if smaller than the
-            desired size to avoid raising an exception. Since cropping is done
-            after padding, the padding seems to be done at a random offset.
-        fill: Pixel fill value for constant fill. Default is 0. If a tuple of
-            length 3, it is used to fill R, G, B channels respectively.
-            This value is only used when the padding_mode is constant
-        padding_mode: Type of padding. Should be: constant, edge, reflect or symmetric. Default is constant.
-
-             - constant: pads with a constant value, this value is specified with fill
-
-             - edge: pads with the last value on the edge of the image
-
-             - reflect: pads with reflection of image (without repeating the last value on the edge)
-
-                padding [1, 2, 3, 4] with 2 elements on both sides in reflect mode
-                will result in [3, 2, 1, 2, 3, 4, 3, 2]
-
-             - symmetric: pads with reflection of image (repeating the last value on the edge)
-
-                padding [1, 2, 3, 4] with 2 elements on both sides in symmetric mode
-                will result in [2, 1, 1, 2, 3, 4, 4, 3]
-
+            desired size to avoid raising an exception.
     """
 
-    def __init__(self, size, padding=None, pad_if_needed=False, fill=0, ignore_label=255, padding_mode='constant'):
+    def __init__(self, size, padding=0, pad_if_needed=False, fill=0, ignore_label=255, padding_mode='constant'):
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
         else:
@@ -305,15 +284,13 @@ class RandomCrop(object):
     @staticmethod
     def get_params(img, output_size):
         """Get parameters for ``crop`` for a random crop.
-
         Args:
             img (PIL Image): Image to be cropped.
             output_size (tuple): Expected output size of the crop.
-
         Returns:
             tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
         """
-        w, h = _get_image_size(img)
+        w, h = img.size
         th, tw = output_size
         if w == tw and h == th:
             return 0, 0, h, w
@@ -323,28 +300,24 @@ class RandomCrop(object):
         return i, j, th, tw
 
     def __call__(self, sample):
-        """
-        Args:
-            img (PIL Image): Image to be cropped.
-
-        Returns:
-            PIL Image: Cropped image.
-        """
         img, target = sample['image'], sample['target']
-        if self.padding is not None:
+        # assert img.size == target.size, 'size of img and lbl should be the same. %s, %s'%(img.size, target.size)
+        if self.padding > 0:
             img = F.pad(img, self.padding, self.fill, self.padding_mode)
             target = F.pad(target, self.padding, self.ignore_label, self.padding_mode)
 
         # pad the width if needed
         if self.pad_if_needed and img.size[0] < self.size[1]:
-            img = F.pad(img, (self.size[1] - img.size[0], 0), self.fill, self.padding_mode)
-            target = F.pad(target, (self.size[1] - img.size[0], 0), self.ignore_label, self.padding_mode)
+            img = F.pad(img, int((1 + self.size[1] - img.size[0]) / 2), self.fill, self.padding_mode)
+            target = F.pad(target, int((1 + self.size[1] - target.size[0]) / 2), self.ignore_label, self.padding_mode)
+
         # pad the height if needed
         if self.pad_if_needed and img.size[1] < self.size[0]:
-            img = F.pad(img, (0, self.size[0] - img.size[1]), self.fill, self.padding_mode)
-            target = F.pad(target, (0, self.size[0] - img.size[1]), self.ignore_label, self.padding_mode)
+            img = F.pad(img, int((1 + self.size[0] - img.size[1]) / 2), self.fill, self.padding_mode)
+            target = F.pad(target, int((1 + self.size[0] - target.size[1]) / 2), self.ignore_label, self.padding_mode)
 
         i, j, h, w = self.get_params(img, self.size)
+
         return {'image': F.crop(img, i, j, h, w), 'target': F.crop(target, i, j, h, w)}
 
     def __repr__(self):
@@ -494,68 +467,109 @@ class RandomResizedCrop(object):
         return format_string
 
 
-class RandomRotate(object):
+class RandomRotation(torch.nn.Module):
     """Rotate the image by angle.
+    If the image is torch Tensor, it is expected
+    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions.
+
     Args:
-        degrees (sequence or float or int): Range of degrees to select from.
+        degrees (sequence or number): Range of degrees to select from.
             If degrees is a number instead of sequence like (min, max), the range of degrees
             will be (-degrees, +degrees).
-        resample ({PIL.Image.NEAREST, PIL.Image.BILINEAR, PIL.Image.BICUBIC}, optional):
-            An optional resampling filter.
-            See http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#filters
-            If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
+        interpolation (InterpolationMode): Desired interpolation enum defined by
+            :class:`torchvision.transforms.InterpolationMode`. Default is ``InterpolationMode.NEAREST``.
+            If input is Tensor, only ``InterpolationMode.NEAREST``, ``InterpolationMode.BILINEAR`` are supported.
+            For backward compatibility integer values (e.g. ``PIL.Image.NEAREST``) are still acceptable.
         expand (bool, optional): Optional expansion flag.
             If true, expands the output to make it large enough to hold the entire rotated image.
             If false or omitted, make the output image the same size as the input image.
             Note that the expand flag assumes rotation around the center and no translation.
-        center (2-tuple, optional): Optional center of rotation.
-            Origin is the upper left corner.
+        center (sequence, optional): Optional center of rotation, (x, y). Origin is the upper left corner.
             Default is the center of the image.
+        fill (sequence or number): Pixel fill value for the area outside the rotated
+            image. Default is ``0``. If given a number, the value is used for all bands respectively.
+        resample (int, optional): deprecated argument and will be removed since v0.10.0.
+            Please use the ``interpolation`` parameter instead.
+
+    .. _filters: https://pillow.readthedocs.io/en/latest/handbook/concepts.html#filters
+
     """
 
-    def __init__(self, degrees, resample=False, expand=False, center=None):
-        if isinstance(degrees, numbers.Number):
-            if degrees < 0:
-                raise ValueError("If degrees is a single number, it must be positive.")
-            self.degrees = (-degrees, degrees)
-        else:
-            if len(degrees) != 2:
-                raise ValueError("If degrees is a sequence, it must be of len 2.")
-            self.degrees = degrees
+    def __init__(
+        self, degrees, interpolation=F.InterpolationMode.NEAREST, expand=False, center=None, fill=0, resample=None
+    ):
+        super().__init__()
+        if resample is not None:
+            warnings.warn(
+                "Argument resample is deprecated and will be removed since v0.10.0. Please, use interpolation instead"
+            )
+            interpolation = _interpolation_modes_from_int(resample)
 
-        self.resample = resample
-        self.expand = expand
+        # Backward compatibility with integer value
+        if isinstance(interpolation, int):
+            warnings.warn(
+                "Argument interpolation should be of type InterpolationMode instead of int. "
+                "Please, use InterpolationMode enum."
+            )
+            interpolation = _interpolation_modes_from_int(interpolation)
+
+        self.degrees = _setup_angle(degrees, name="degrees", req_sizes=(2, ))
+
+        if center is not None:
+            _check_sequence_input(center, "center", req_sizes=(2, ))
+
         self.center = center
 
-    @staticmethod
-    def get_params(degrees):
-        """Get parameters for ``rotate`` for a random rotation.
-        Returns:
-            sequence: params to be passed to ``rotate`` for random rotation.
-        """
-        angle = random.uniform(degrees[0], degrees[1])
+        self.resample = self.interpolation = interpolation
+        self.expand = expand
 
+        if fill is None:
+            fill = 0
+        elif not isinstance(fill, (Sequence, numbers.Number)):
+            raise TypeError("Fill should be either a sequence or a number.")
+
+        self.fill = fill
+
+    @staticmethod
+    def get_params(degrees: List[float]) -> float:
+        """Get parameters for ``rotate`` for a random rotation.
+
+        Returns:
+            float: angle parameter to be passed to ``rotate`` for random rotation.
+        """
+        angle = float(torch.empty(1).uniform_(float(degrees[0]), float(degrees[1])).item())
         return angle
 
-    def __call__(self, sample):
+    def forward(self, sample):
         """
-            img (PIL Image): Image to be rotated.
-            target (PIL Image): Label to be rotated.
+        Args:
+            img (PIL Image or Tensor): Image to be rotated.
+
         Returns:
-            PIL Image: Rotated image.
-            PIL Image: Rotated label.
+            PIL Image or Tensor: Rotated image.
         """
         img, target = sample['image'], sample['target']
+        fill = self.fill
+        if isinstance(img, Tensor):
+            if isinstance(fill, (int, float)):
+                fill = [float(fill)] * F._get_image_num_channels(img)
+            else:
+                fill = [float(f) for f in fill]
         angle = self.get_params(self.degrees)
-        return {'image': F.rotate(img, angle, self.resample, self.expand, self.center),
+
+        return {'image': F.rotate(img, angle, self.resample, self.expand, self.center, fill),
                 'target': F.rotate(target, angle, self.resample, self.expand, self.center)}
 
+
     def __repr__(self):
+        interpolate_str = self.interpolation.value
         format_string = self.__class__.__name__ + '(degrees={0}'.format(self.degrees)
-        format_string += ', resample={0}'.format(self.resample)
+        format_string += ', interpolation={0}'.format(interpolate_str)
         format_string += ', expand={0}'.format(self.expand)
         if self.center is not None:
             format_string += ', center={0}'.format(self.center)
+        if self.fill is not None:
+            format_string += ', fill={0}'.format(self.fill)
         format_string += ')'
         return format_string
 
@@ -843,9 +857,8 @@ class Lambda(object):
         assert callable(lambd), repr(type(lambd).__name__) + " object is not callable"
         self.lambd = lambd
 
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        return {'image': self.lambd(img), 'target': target}
+    def __call__(self, img):
+        return self.lambd(img)
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
