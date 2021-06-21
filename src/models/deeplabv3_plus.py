@@ -32,7 +32,9 @@ class Deeplabv3Plus(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True}
+        # backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True}
+        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet101', 'out_stages': [1, 4], 'output_stride': 16,
+                        'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
         if backbone_cfg['output_stride'] == 8:
             dilations = [12, 24, 36]
@@ -40,10 +42,9 @@ class Deeplabv3Plus(nn.Module):
             dilations = [6, 12, 18]
         decoder_cfg = {'name': 'Deeplabv3PlusHead', 'low_level_channels': self.backbone.out_channels[0], 'in_channels': self.backbone.out_channels[1],
                         'dilations': dilations, 'num_classes': self.num_classes }
-        # self.decoder = Deeplabv3PlusHead(**decoder_cfg)
         self.decoder = build_head(decoder_cfg)
 
-        self.ce_criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
+        self.criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
         set_bn_momentum(self.backbone, momentum=0.01)
 
 
@@ -62,14 +63,14 @@ class Deeplabv3Plus(nn.Module):
         batch_size, ch, _, _ = imgs.shape
         low_level_feat, x  = self.backbone(imgs)
         x = self.decoder(x, low_level_feat)
-        outputs = F.interpolate(x, size=imgs.size()[2:], mode='bilinear', align_corners=True)
+        outputs = F.interpolate(x, size=imgs.size()[2:], mode='bilinear', align_corners=False)
 
         if mode == 'infer':
 
             return outputs
         else:
             losses = {}
-            losses['ce_loss'] = self.ce_criterion(outputs, targets)
+            losses['ce_loss'] = self.criterion(outputs, targets)
             losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
