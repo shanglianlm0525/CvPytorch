@@ -3,7 +3,7 @@
 # @Time : 2020/8/6 10:24
 # @Author : liumin
 # @File : cityscapes.py
-
+import json
 import os
 from collections import namedtuple
 
@@ -73,21 +73,27 @@ class CityscapesSegmentation(Dataset):
             return self.transform(sample), img_id
         else:
             _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
-            _target = self.encode_map(_target)
+            _target = self.encode_target(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_map(self, mask):
+    def encode_target(self, target):
         # This is used to convert tags
-        mask = np.asarray(mask, dtype=np.uint8).copy()
+        target = np.asarray(target, dtype=np.uint8).copy()
         # Put all void classes to zero
         for _voidc in self.invalid_classes:
-            mask[mask == _voidc] = self.ignore_index
+            target[target == _voidc] = self.ignore_index
         # index from zero 0:18
         for _validc in self.valid_classes:
-            mask[mask == _validc] = self.class_map[_validc]
-        mask = Image.fromarray(mask.astype(np.uint8))
-        return mask
+            target[target == _validc] = self.class_map[_validc]
+        target = Image.fromarray(target.astype(np.uint8))
+        return target
+
+    @classmethod
+    def decode_target(self, target):
+        target[target == 255] = 19
+        # target = target.astype('uint8') + 1
+        return target
 
     def __len__(self):
         return len(self._imgs)
