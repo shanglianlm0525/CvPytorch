@@ -98,7 +98,7 @@ class MobileNetV2(nn.Module):
             x = F.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
             x = self.fc(x)
             return x
-        return tuple(output)
+        return tuple(output) if len(self.out_stages) > 1 else output[0]
 
 
     def freeze_bn(self):
