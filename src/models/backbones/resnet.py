@@ -51,7 +51,7 @@ class ResNet(nn.Module):
         else:
             raise NotImplementedError
 
-        self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1]+1]
+        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
         self.conv1 = backbone.conv1
         self.bn1 = backbone.bn1
@@ -99,7 +99,7 @@ class ResNet(nn.Module):
             if i in self.out_stages:
                 output.append(x)
 
-        return tuple(output)
+        return tuple(output) if len(self.out_stages) > 1 else output[0]
 
     def freeze_bn(self):
         for layer in self.modules():
