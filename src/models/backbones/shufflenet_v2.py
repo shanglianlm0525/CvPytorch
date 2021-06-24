@@ -53,7 +53,9 @@ class ShuffleNetV2(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        if not self.pretrained:
+        if self.pretrained:
+            self.load_pretrained_weights()
+        else:
             self.init_weights()
 
     def forward(self, x):
@@ -65,7 +67,7 @@ class ShuffleNetV2(nn.Module):
             x = stage(x)
             if i in self.out_stages:
                 output.append(x)
-        return tuple(output)
+        return tuple(output)  if len(self.out_stages) > 1 else output[0]
 
 
     def freeze_bn(self):
