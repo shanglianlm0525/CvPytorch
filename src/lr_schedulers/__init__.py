@@ -19,7 +19,8 @@ __all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR', 'C
         self.lr_scheduler = Scheduler(optimizer=self.optimizer, **schedule_cfg)
 '''
 
-def build_lr_scheduler(cfg, optimizer):
+def build_lr_scheduler(cfg, iters_per_epoch, optimizer):
+    max_iters = cfg.N_MAX_EPOCHS * iters_per_epoch
 
     if cfg.LR_SCHEDULER.TYPE == "StepLR":
         lr_scheduler_ft = StepLR(
@@ -53,7 +54,7 @@ def build_lr_scheduler(cfg, optimizer):
         lr_scheduler_ft = CosineAnnealingWarmRestarts(optimizer, T_0=cfg.N_MAX_EPOCHS, T_mult=1, eta_min=0.02)
         # torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0, T_mult=1, eta_min=0.02, last_epoch=-1)
     elif cfg.LR_SCHEDULER.TYPE == "PolyLR":
-        lr_scheduler_ft = PolyLR(optimizer, max_iters=cfg.N_MAX_EPOCHS, power=cfg.LR_SCHEDULER.POWER, last_epoch=-1, min_lr=1e-6)
+        lr_scheduler_ft = PolyLR(optimizer, max_iters=max_iters, power=cfg.LR_SCHEDULER.POWER, min_lr=cfg.LR_SCHEDULER.MIN_LR if cfg.LR_SCHEDULER.MIN_LR is not None else 1e-6)
         # PolyLR(optimizer, max_iters, power=0.9, last_epoch=-1, min_lr=1e-6)
     else:
         raise ValueError("Unsupported lr_scheduler type: {}".format(cfg.LR_SCHEDULER.TYPE))
