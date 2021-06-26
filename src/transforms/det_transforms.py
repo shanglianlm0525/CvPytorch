@@ -17,7 +17,7 @@ import math
 import torch
 from PIL import Image
 from torchvision import transforms as T
-from torchvision.transforms import functional as F
+from torchvision.transforms import functional as F, InterpolationMode
 from pycocotools import mask as coco_mask
 import numpy as np
 
@@ -83,9 +83,10 @@ class Resize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, interpolation=Image.BILINEAR):
+    def __init__(self, size, alignment=False, interpolation=InterpolationMode.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
         self.size = size
+        self.alignment = alignment
         self.interpolation = interpolation
 
     def __call__(self, sample):
@@ -98,16 +99,41 @@ class Resize(object):
         img, target = sample['image'], sample['target']
         w, h = img.size
         boxes = target["boxes"]
-        if isinstance(self.size, int):
-            scale = min(self.size / h, self.size / w)
-            boxes[:, 0::2] = boxes[:, 0::2] * scale
-            boxes[:, 1::2] = boxes[:, 1::2] * scale
+
+        if self.alignment:
+            min_side, max_side = self.size
+            small_side = min(w, h)
+            large_side = max(w, h)
+            align_scale = min_side / small_side
+            if large_side * align_scale > max_side:
+                align_scale = max_side / large_side
+            align_W, align_H = int(align_scale * w), int(align_scale * h)
+
+            # pad_W = 32 - align_W % 32
+            # pad_H = 32 - align_H % 32
+
+            img_resized = F.resize(img, (align_W, align_H), self.interpolation)
+            # img_paded = np.zeros(shape=[align_H + pad_H, align_W + pad_W, 3], dtype=np.uint8)
+            # img_paded[:align_H, :align_W, :] = img_resized
+
+            boxes[:, [0, 2]] = boxes[:, [0, 2]] * align_scale
+            boxes[:, [1, 3]] = boxes[:, [1, 3]] * align_scale
+
+            target["scales"] = torch.tensor(align_scale, dtype=torch.float)
+            target["boxes"] = boxes  # boxes.numpy()
+            return {'image': img_resized, 'target': target}
         else:
-            scale_h, scale_w = self.size[0] / w , self.size[1] / h
-            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
-            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
-        target["boxes"] = boxes
-        return {'image': F.resize(img, self.size, self.interpolation), 'target': target}
+            if isinstance(self.size, int):
+                scale = min(self.size / h, self.size / w)
+                boxes[:, 0::2] = boxes[:, 0::2] * scale
+                boxes[:, 1::2] = boxes[:, 1::2] * scale
+            else:
+                scale_h, scale_w = self.size[0] / w , self.size[1] / h
+                boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+                boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+
+            target["boxes"] = boxes
+            return {'image': F.resize(img, self.size, self.interpolation), 'target': target}
 
 
 class RandomHorizontalFlip(object):
@@ -162,6 +188,7 @@ class ColorJitter(object):
             return {'image': T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)(img), 'target': target}
         return {'image': img, 'target': target}
 
+
 class RandomRotate(object):
     def __init__(self, p=0.5, degrees=0):
         self.p = p
@@ -215,7 +242,7 @@ class RandomRotate(object):
 
 
 class RandomResizedCrop(object):
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=Image.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), alignment=False, interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
@@ -236,6 +263,7 @@ class RandomResizedCrop(object):
         self.interpolation = interpolation
         self.scale = scale
         self.ratio = ratio
+        self.alignment = alignment
 
     @staticmethod
     def get_params(img, scale, ratio):
@@ -295,12 +323,51 @@ class RandomResizedCrop(object):
         boxes = target["boxes"]
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
-        boxes = torch.from_numpy(boxes)
+        # boxes = torch.from_numpy(boxes)
         boxes -= torch.Tensor([i, j, i, j])
+        w, h = img.size
+        boxes = target["boxes"]
         boxes[:, 1::2].clamp_(min=0, max=h - 1)
         boxes[:, 0::2].clamp_(min=0, max=w - 1)
-        target["boxes"] = boxes.numpy()
-        return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation), 'target': target}
+
+        if self.alignment:
+            # crop
+            img = F.crop(img, i, j, h, w)
+            w, h = img.size
+            min_side, max_side = self.size
+            small_side = min(w, h)
+            large_side = max(w, h)
+            align_scale = min_side / small_side
+            if large_side * align_scale > max_side:
+                align_scale = max_side / large_side
+            align_W, align_H = int(align_scale * w), int(align_scale * h)
+
+            # pad_W = 32 - align_W % 32
+            # pad_H = 32 - align_H % 32
+
+            img_resized = F.resize(img, (align_W, align_H), self.interpolation)
+            # print(img_resized.size)
+            # img_paded = torch.zeros([align_H + pad_H, align_W + pad_W, 3], dtype=np.uint8)
+            # img_paded[:align_H, :align_W, :] = img_resized
+
+            boxes[:, [0, 2]] = boxes[:, [0, 2]] * align_scale
+            boxes[:, [1, 3]] = boxes[:, [1, 3]] * align_scale
+
+            target["scales"] = torch.tensor(align_scale, dtype=torch.float)
+            target["boxes"] = boxes  # boxes.numpy()
+            return {'image': img_resized, 'target': target}
+        else:
+            if isinstance(self.size, int):
+                scale = min(self.size / h, self.size / w)
+                boxes[:, 0::2] = boxes[:, 0::2] * scale
+                boxes[:, 1::2] = boxes[:, 1::2] * scale
+            else:
+                scale_h, scale_w = self.size[0] / w, self.size[1] / h
+                boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+                boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+
+            target["boxes"] = boxes # boxes.numpy()
+            return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation), 'target': target}
 
 
 class GaussianBlur(object):
