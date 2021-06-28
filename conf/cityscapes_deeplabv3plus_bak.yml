@@ -22,9 +22,9 @@ DATASET:
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
       RandomRotation: { degrees: [-0.5, 0.5] }
-      RandomHorizontalFlip: { p: 0.5 }
-      RandomResizedCrop: { size: [768, 768], scale: [0.5, 2.] }
+      RandomCrop: { size: [768, 768] }
       ColorJitter: { brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.01 }
+      RandomHorizontalFlip: { p: 0.5 }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -33,8 +33,8 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
     SHUFFLE: False
-    BATCH_SIZE: 8
-    NUM_WORKER: 8
+    BATCH_SIZE: 4
+    NUM_WORKER: 4
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
@@ -48,7 +48,7 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.deeplabv3_plus1.Deeplabv3Plus'
+USE_MODEL: 'src.models.deeplabv3_plus.Deeplabv3Plus'
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'
@@ -67,11 +67,11 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [3]
-N_MAX_EPOCHS: 400
+GPU_IDS: [2]
+N_MAX_EPOCHS: 160
 
-INIT_LR: 0.2
-BACKBONE_LR: 0.02
+INIT_LR: 0.1
+BACKBONE_LR: 0.01
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -85,9 +85,8 @@ OPTIMIZER:
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
-  TYPE: 'PolyLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  TYPE: 'CosineAnnealingLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
   MILESTONES: [20, 40, 60, 80, 120]
-  MIN_LR: 0.00000001
   GAMMA: 0.1
   POWER: 0.9
   STEP: 300

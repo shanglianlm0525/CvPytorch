@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Cityspaces_PSPNet'
+EXPERIMENT_NAME: 'Cityscapes_Pspnet'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -13,17 +13,19 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 4
-    NUM_WORKER: 2
+    BATCH_SIZE: 16
+    NUM_WORKER: 8
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      RandomCrop: { size: [768, 768] }
-      ColorJitter: { brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.1 }
+      RandomRotation: { degrees: [-0.5, 0.5] }
       RandomHorizontalFlip: { p: 0.5 }
+      RandomResizedCrop: { size: [712, 712], scale: [0.5, 2.] }
+      ColorJitter: { brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.01 }
+      # GaussianBlur: { p: 0.5, kernel_size: [3, 3] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -32,15 +34,14 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
     SHUFFLE: False
-    BATCH_SIZE: 4
-    NUM_WORKER: 2
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      Resize: { size: [1024, 2048] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -58,7 +59,7 @@ EVALUATOR:
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
-CHECKPOINT_DIR: 'checkpoints1'
+CHECKPOINT_DIR: 'checkpoints'
 N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
@@ -67,10 +68,11 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [2]
 N_MAX_EPOCHS: 200
 
-INIT_LR: 0.01
+INIT_LR: 0.1
+BACKBONE_LR: 0.01
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -84,15 +86,17 @@ OPTIMIZER:
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
-  TYPE: 'CosineAnnealingLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
-  MILESTONES: [40,55,60,65]
-  GAMMA: 0.01
+  TYPE: 'PolyLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [20, 40, 60, 80, 120]
+  MIN_LR: 0.00000001
+  GAMMA: 0.1
+  POWER: 0.9
   STEP: 300
 
 WARMUP:
   NAME: 'linear'
   ITERS: 0
-  FACTOR: 0.1
+  FACTOR: 0.33
 
 
 #########################################
