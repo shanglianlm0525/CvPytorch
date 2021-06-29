@@ -272,7 +272,7 @@ class RandomCrop(object):
             desired size to avoid raising an exception.
     """
 
-    def __init__(self, size, padding=0, pad_if_needed=True, fill=0, ignore_label=255, padding_mode='constant'):
+    def __init__(self, size, padding=0, pad_if_needed=False, fill=0, ignore_label=255, padding_mode='constant'):
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
         else:
@@ -358,6 +358,75 @@ class Resize(object):
         return self.__class__.__name__ + '(size={0}, interpolation={1})'.format(self.size, interpolate_str)
 
 
+class RandomScaleCrop(object):
+    def __init__(self, size, scale=(0.08, 1.0), fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+        super().__init__()
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        elif isinstance(size, Sequence) and len(size) == 1:
+            self.size = (size[0], size[0])
+        else:
+            if len(size) != 2:
+                raise ValueError("Please provide only two dimensions (h, w) for size.")
+            self.size = size
+
+        if not isinstance(scale, Sequence):
+            raise TypeError("Scale should be a sequence")
+
+        self.scale = scale
+        self.fill = fill
+        self.ignore_label = ignore_label
+        self.padding_mode = padding_mode
+        self.interpolation = interpolation
+
+
+    def __call__(self, sample):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be cropped and resized.
+
+        Returns:
+            PIL Image or Tensor: Randomly cropped and resized image.
+        """
+        img, target = sample['image'], sample['target']
+        width, height = F._get_image_size(img)
+        base_size = min(width, height)
+        # random scale (short edge)
+        short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
+        w, h = img.size
+        if h > w:
+            ow = short_size
+            oh = int(1.0 * h * ow / w)
+        else:
+            oh = short_size
+            ow = int(1.0 * w * oh / h)
+        img = F.resize(img, [oh, ow], self.interpolation)
+        target = F.resize(target, [oh, ow], InterpolationMode.NEAREST)
+        # pad crop
+        if short_size < min(self.size):
+            padh = self.size[0] - oh if oh < self.size[0] else 0
+            padw = self.size[1] - ow if ow < self.size[1] else 0
+            # left, top, right and bottom
+            img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+            target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
+
+        # random crop crop_size
+        w, h = img.size
+        x1 = random.randint(0, w - self.size[1])
+        y1 = random.randint(0, h - self.size[0])
+
+        return {'image': F.crop(img, x1, y1, self.size[0], self.size[1]),
+                'target': F.crop(target, x1, y1, self.size[0], self.size[1])}
+
+    def __repr__(self):
+        interpolate_str = _pil_interpolation_to_str[self.interpolation]
+        format_string = self.__class__.__name__ + '(size={0}'.format(self.size)
+        format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
+        format_string += ', interpolation={0})'.format(interpolate_str)
+        return format_string
+
+
+
 class RandomResizedCrop(object):
     """Crop the given image to random size and aspect ratio.
     The image can be a PIL Image or a Tensor, in which case it is expected
@@ -420,9 +489,7 @@ class RandomResizedCrop(object):
         for _ in range(10):
             target_area = area * torch.empty(1).uniform_(scale[0], scale[1]).item()
             log_ratio = torch.log(torch.tensor(ratio))
-            aspect_ratio = torch.exp(
-                torch.empty(1).uniform_(log_ratio[0], log_ratio[1])
-            ).item()
+            aspect_ratio = torch.exp(torch.empty(1).uniform_(log_ratio[0], log_ratio[1])).item()
 
             w = int(round(math.sqrt(target_area * aspect_ratio)))
             h = int(round(math.sqrt(target_area / aspect_ratio)))
