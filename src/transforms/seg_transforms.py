@@ -25,8 +25,8 @@ from torchvision.transforms.transforms import _setup_angle, _check_sequence_inpu
 
 __all__ = ['Compose', 'ToTensor', 'Normalize',
         'RandomHorizontalFlip', 'RandomVerticalFlip',
-        'RandomScale',
-        'Resize', 'RandomResizedCrop',
+        'Resize', 
+        'RandomResizedCrop', 'RandomScaleCrop',
         'RandomCrop', 'CenterCrop',
         'RandomRotation', 'RandomPerspective',
         'ColorJitter', 'GaussianBlur',
@@ -201,32 +201,6 @@ class RandomVerticalFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
-
-
-class RandomScale(object):
-    def __init__(self, scale, interpolation=InterpolationMode.BILINEAR):
-        self.scale = scale
-        self.interpolation = interpolation
-
-    def __call__(self, sample):
-        """
-        Args:
-            img (PIL Image): Image to be scaled.
-            lbl (PIL Image): Label to be scaled.
-        Returns:
-            PIL Image: Rescaled image.
-            PIL Image: Rescaled label.
-        """
-        img, target = sample['image'], sample['target']
-        assert img.size == target.size
-        scale = random.uniform(self.scale[0], self.scale[1])
-        target_size = (int(img.size[1] * scale), int(img.size[0] * scale))
-        return {'image': F.resize(img, target_size, self.interpolation),
-                'target': F.resize(target, target_size, InterpolationMode.NEAREST)}
-
-    def __repr__(self):
-        interpolate_str = _pil_interpolation_to_str[self.interpolation]
-        return self.__class__.__name__ + '(scale_range={0}, interpolation={1})'.format(self.scale, interpolate_str)
 
 
 class CenterCrop(object):
