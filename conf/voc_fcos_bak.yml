@@ -1,47 +1,47 @@
-EXPERIMENT_NAME: 'Cityscapes_Deeplabv3'
+EXPERIMENT_NAME: 'VOC_FCOS'
 
 #########################################
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.cityscapes.CityscapesSegmentation'
-  DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
-  DICTIONARY_NAME: 'SEG_CLASSES'
+  CLASS: 'src.datasets.voc_det.VOCDetection'
+  DICTIONARY: 'conf/dicts/voc_dict.yml'
+  DICTIONARY_NAME: 'DET_CLASSES'
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+    IMG_DIR: '/home/lmin/data/VOCdevkit'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
+    INDICES: '/home/lmin/data/VOCdevkit/train_det.txt'
     SHUFFLE: True
-    BATCH_SIZE: 24
-    NUM_WORKER: 8
+    BATCH_SIZE: 8
+    NUM_WORKER: 4
     LABELS:
-      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      DET_DIR: '/home/lmin/data/VOCdevkit'
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
-      SEG_SUFFIX: '*_gtFine_labelIds.png'
+      SEG_DIR: '/home/lmin/data/VOCdevkit'
+      SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      RandomRotation: { degrees: [-0.5, 0.5] }
       RandomHorizontalFlip: { p: 0.5 }
-      RandomScaleCrop: { size: [768, 768], scale: [0.5, 2.0] }
-      ColorJitter: { brightness: 0.2, contrast: 0.2, saturation: 0.1, hue: 0.01 }
+      ColorJitter: { brightness: 0.1, contrast: 0.1, saturation: 0.1, hue: 0.1 }
+      RandomRotate: { degrees: 10 }
+      FcosPreprocess: { size: [800, 1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: True }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
   VAL:
-    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+    IMG_DIR: '/home/lmin/data/VOCdevkit'
     IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
+    INDICES: '/home/lmin/data/VOCdevkit/val_det.txt'
     SHUFFLE: False
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    BATCH_SIZE: 1
+    NUM_WORKER: 1
     LABELS:
-      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      DET_DIR: '/home/lmin/data/VOCdevkit'
       DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
-      SEG_SUFFIX: '*_gtFine_labelIds.png'
+      SEG_DIR: '/home/lmin/data/VOCdevkit'
+      SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      # Resize: { size: [1024, 2048] }
+      FcosPreprocess: { size: [800,1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: False }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -49,9 +49,9 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.deeplabv3.Deeplabv3'
+USE_MODEL: 'src.models.fcos.FCOS'
 EVALUATOR:
-  NAME: 'segmentation'
+  NAME: 'voc_detection'
   EVAL_TYPE: 'mIoU'
   EVAL_INTERVALS: 2
 
@@ -59,7 +59,7 @@ EVALUATOR:
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
-CHECKPOINT_DIR: 'checkpoints'
+CHECKPOINT_DIR: 'checkpoints1'
 N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
@@ -68,11 +68,10 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
-N_MAX_EPOCHS: 400
+GPU_IDS: [0]
+N_MAX_EPOCHS: 30
 
-INIT_LR: 0.2
-BACKBONE_LR: 0.02
+INIT_LR: 0.002
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -86,16 +85,15 @@ OPTIMIZER:
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
-  TYPE: 'PolyLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
-  MILESTONES: [20, 40, 60, 80, 120]
+  TYPE: 'MultiStepLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [20,27]
   GAMMA: 0.1
-  POWER: 0.9
-  STEP: 300
+  STEP: 10
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 0
-  FACTOR: 0.33
+  ITERS: 500
+  FACTOR: 0.1
 
 
 #########################################

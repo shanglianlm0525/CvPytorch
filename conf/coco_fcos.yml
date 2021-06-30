@@ -15,7 +15,7 @@ DATASET:
     INDICES: ''
     SHUFFLE: True
     BATCH_SIZE: 8
-    NUM_WORKER: 8
+    NUM_WORKER: 1
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -27,7 +27,8 @@ DATASET:
       RandomHorizontalFlip: { p: 0.5 }
       ColorJitter: { p: 0.3, brightness: 0.1, contrast: 0.1, saturation: 0.1, hue: 0.1 }
       RandomRotate: { p: 0.5, degrees: 10 }
-      FcosPreprocess: { p: 0.5, size: [800, 1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: True }
+      RandomResizedCrop: { size: [800,1333], scale: [0.6, 1.], ratio: [0.75, 1.33], alignment: True }
+      # FcosPreprocess: { p: 1, size: [800, 1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: True }
       ToTensor:
       Normalize: { mean: [0.408, 0.447, 0.470], std: [0.289, 0.274, 0.278] }
 
@@ -46,7 +47,8 @@ DATASET:
     TRANSFORMS:
       FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
-      FcosPreprocess: { p: 0, size: [800,1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: False }
+      # FcosPreprocess: { p: 0, size: [800,1333], scale: [0.2, 1.0], ratio: [0.75., 1.33], crop: False }
+      Resize: { size: [800, 1333], alignment: True }
       ToTensor:
       Normalize: { mean: [0.408, 0.447, 0.470], std: [0.289, 0.274, 0.278] }
 
@@ -64,7 +66,7 @@ EVALUATOR:
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
-CHECKPOINT_DIR: 'checkpoints1'
+CHECKPOINT_DIR: 'checkpoints'
 N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
@@ -73,10 +75,11 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [0]
+GPU_IDS: [1]
 N_MAX_EPOCHS: 26
 
-INIT_LR: 0.001
+INIT_LR: 0.01
+BACKBONE_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -97,7 +100,7 @@ LR_SCHEDULER:
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 300
+  ITERS: 500
   FACTOR: 0.3
 
 
@@ -112,7 +115,7 @@ GRAD_CLIP:
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 200
+N_ITERS_TO_DISPLAY_STATUS: 100
 
 ## TENSORBOARD
 TENSORBOARD: True

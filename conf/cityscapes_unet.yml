@@ -22,9 +22,9 @@ DATASET:
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
       RandomRotation: { degrees: [-0.5, 0.5] }
-      RandomCrop: { size: [512, 512] }
-      ColorJitter: { brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.01 }
       RandomHorizontalFlip: { p: 0.5 }
+      RandomScaleCrop: { size: [512, 512], scale: [0.5, 2.0] }
+      ColorJitter: { brightness: 0.2, contrast: 0.2, saturation: 0.1, hue: 0.01 }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -41,6 +41,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
+      # Resize: { size: [1024, 2048] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -48,7 +49,7 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.unet1.UNet'
+USE_MODEL: 'src.models.unet.UNet'
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'
@@ -67,10 +68,10 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [0]
+GPU_IDS: [2]
 N_MAX_EPOCHS: 400
 
-INIT_LR: 0.001
+INIT_LR: 0.01
 BACKBONE_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
