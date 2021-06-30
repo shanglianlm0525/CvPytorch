@@ -241,6 +241,25 @@ class RandomRotate(object):
         return {'image': img, 'target': target}
 
 
+class ToArrayImage(object):
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        return {'image': np.asarray(img, dtype=np.float32), 'target': target}
+
+
+class ToPercentCoords(object):
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        width, height = img.size
+        boxes[:, 0] /= width
+        boxes[:, 2] /= width
+        boxes[:, 1] /= height
+        boxes[:, 3] /= height
+        target["boxes"] = boxes
+        return {'image': img, 'target': target}
+
+
 class RandomResizedCrop(object):
     def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), alignment=False, interpolation=InterpolationMode.BILINEAR):
         super().__init__()
@@ -332,7 +351,7 @@ class RandomResizedCrop(object):
 
         if self.alignment:
             # crop
-            img = F.crop(img, i, j, h, w)
+            img = F.crop(img, j, i, h, w)
             w, h = img.size
             min_side, max_side = self.size
             small_side = min(w, h)
@@ -367,7 +386,7 @@ class RandomResizedCrop(object):
                 boxes[:, 1::2] = boxes[:, 1::2] * scale_h
 
             target["boxes"] = boxes # boxes.numpy()
-            return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation), 'target': target}
+            return {'image': F.resized_crop(img, j, i, h, w, self.size, self.interpolation), 'target': target}
 
 
 class GaussianBlur(object):

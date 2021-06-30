@@ -21,7 +21,7 @@ from PIL import Image, ImageOps, ImageFilter
 import collections
 from collections.abc import Sequence
 from torchvision.transforms.functional import InterpolationMode, _interpolation_modes_from_int
-
+from torchvision.transforms.transforms import _setup_angle, _check_sequence_input
 
 __all__ = ['Compose', 'ToTensor', 'Normalize',
         'RandomHorizontalFlip', 'RandomVerticalFlip',
@@ -33,8 +33,6 @@ __all__ = ['Compose', 'ToTensor', 'Normalize',
         'Pad', 'Lambda', 'Encrypt',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
-
-from torchvision.transforms.transforms import _setup_angle, _check_sequence_input
 
 _pil_interpolation_to_str = {
     InterpolationMode.NEAREST: 'InterpolationMode.NEAREST',
@@ -222,8 +220,9 @@ class RandomScale(object):
         img, target = sample['image'], sample['target']
         assert img.size == target.size
         scale = random.uniform(self.scale[0], self.scale[1])
-        target_size = ( int(img.size[1]*scale), int(img.size[0]*scale) )
-        return {'image': F.resize(img, target_size, self.interpolation), 'target': F.resize(target, target_size, InterpolationMode.NEAREST)}
+        target_size = (int(img.size[1] * scale), int(img.size[0] * scale))
+        return {'image': F.resize(img, target_size, self.interpolation),
+                'target': F.resize(target, target_size, InterpolationMode.NEAREST)}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -319,8 +318,8 @@ class RandomCrop(object):
             target = F.pad(target, int((1 + self.size[0] - target.size[1]) / 2), self.ignore_label, self.padding_mode)
 
         i, j, h, w = self.get_params(img, self.size)
+        return {'image': F.crop(img, j, i, h, w), 'target': F.crop(target, j, i, h, w)}
 
-        return {'image': F.crop(img, i, j, h, w), 'target': F.crop(target, i, j, h, w)}
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
@@ -351,7 +350,8 @@ class Resize(object):
             PIL Image: Rescaled image.
         """
         img, target = sample['image'], sample['target']
-        return {'image': F.resize(img, self.size, self.interpolation), 'target': F.resize(target, self.size, InterpolationMode.NEAREST)}
+        return {'image': F.resize(img, self.size, self.interpolation),
+                'target': F.resize(target, self.size, InterpolationMode.NEAREST)}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -389,11 +389,10 @@ class RandomScaleCrop(object):
             PIL Image or Tensor: Randomly cropped and resized image.
         """
         img, target = sample['image'], sample['target']
-        width, height = F._get_image_size(img)
-        base_size = min(width, height)
+        w, h = F._get_image_size(img)
+        base_size = min(w, h)
         # random scale (short edge)
         short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
-        w, h = img.size
         if h > w:
             ow = short_size
             oh = int(1.0 * h * ow / w)
@@ -411,12 +410,12 @@ class RandomScaleCrop(object):
             target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
 
         # random crop crop_size
-        w, h = img.size
+        w, h = F._get_image_size(img)
         x1 = random.randint(0, w - self.size[1])
         y1 = random.randint(0, h - self.size[0])
-
-        return {'image': F.crop(img, x1, y1, self.size[0], self.size[1]),
-                'target': F.crop(target, x1, y1, self.size[0], self.size[1])}
+        # top, left, height, width
+        return {'image': F.crop(img, y1, x1, self.size[0], self.size[1]),
+                'target': F.crop(target, y1, x1, self.size[0], self.size[1])}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -524,8 +523,8 @@ class RandomResizedCrop(object):
         """
         img, target = sample['image'], sample['target']
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
-        return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation),
-                'target': F.resized_crop(target, i, j, h, w, self.size, InterpolationMode.NEAREST)}
+        return {'image': F.resized_crop(img, j, i, h, w, self.size, self.interpolation),
+                'target': F.resized_crop(target, j, i, h, w, self.size, InterpolationMode.NEAREST)}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -565,7 +564,7 @@ class RandomRotation(torch.nn.Module):
     """
 
     def __init__(
-        self, degrees, interpolation=F.InterpolationMode.NEAREST, expand=False, center=None, fill=0, resample=None
+        self, degrees, interpolation=InterpolationMode.NEAREST, expand=False, center=None, fill=0, ignore_label=255, resample=None
     ):
         super().__init__()
         if resample is not None:
@@ -598,6 +597,7 @@ class RandomRotation(torch.nn.Module):
             raise TypeError("Fill should be either a sequence or a number.")
 
         self.fill = fill
+        self.ignore_label = ignore_label
 
     @staticmethod
     def get_params(degrees: List[float]) -> float:
@@ -627,7 +627,7 @@ class RandomRotation(torch.nn.Module):
         angle = self.get_params(self.degrees)
 
         return {'image': F.rotate(img, angle, self.resample, self.expand, self.center, fill),
-                'target': F.rotate(target, angle, self.resample, self.expand, self.center)}
+                'target': F.rotate(target, angle, self.resample, self.expand, self.center, self.ignore_label)}
 
 
     def __repr__(self):
@@ -848,7 +848,7 @@ class RandomPerspective(object):
 
     """
 
-    def __init__(self, distortion_scale=0.5, p=0.5, interpolation=InterpolationMode.BILINEAR, fill=0, ignore_label=255):
+    def __init__(self, distortion_scale=0.5, p=0.5, fill=0, ignore_label=255, interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         self.p = p
         self.interpolation = interpolation
@@ -910,94 +910,6 @@ class RandomPerspective(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-
-class SYNC_TRANSFORM(object):
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=InterpolationMode.BILINEAR):
-        super().__init__()
-        self.size = size
-        self.interpolation = interpolation
-        self.scale = scale
-        self.ratio = ratio
-
-        self.base_size = 1024
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        w, h = img.size
-
-        # random mirror
-        if random.random() < 0.5:
-            img = img.transpose(Image.FLIP_LEFT_RIGHT)
-            target = target.transpose(Image.FLIP_LEFT_RIGHT)
-
-        # random scale (short edge)
-        short_size = random.randint(int(self.base_size * 0.5), int(self.base_size * 2.0))
-        w, h = img.size
-        if h > w:
-            ow = short_size
-            oh = int(1.0 * h * ow / w)
-        else:
-            oh = short_size
-            ow = int(1.0 * w * oh / h)
-        img = img.resize((ow, oh), Image.BILINEAR)
-        target = target.resize((ow, oh), Image.NEAREST)
-        # pad crop
-        if short_size < min(self.size):
-            padh = self.size[0] - oh if oh < self.size[0] else 0
-            padw = self.size[1] - ow if ow < self.size[1] else 0
-            img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
-            target = ImageOps.expand(target, border=(0, 0, padw, padh), fill=-1)
-        # random crop crop_size
-        w, h = img.size
-        x1 = random.randint(0, w - self.size[1])
-        y1 = random.randint(0, h - self.size[0])
-        img = img.crop((x1, y1, x1 + self.size[1], y1 + self.size[0]))
-        target = target.crop((x1, y1, x1 + self.size[1], y1 + self.size[0]))
-        # gaussian blur as in PSP
-        '''
-        if random.random() < 0:
-            radius = cfg.AUG.BLUR_RADIUS if cfg.AUG.BLUR_RADIUS > 0 else random.random()
-            img = img.filter(ImageFilter.GaussianBlur(radius=radius))
-        # color jitter
-        if self.color_jitter:
-            img = self.color_jitter(img)
-        '''
-        return {'image': img,'target': target}
-
-
-class VAL_TRANSFORM(object):
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=InterpolationMode.BILINEAR):
-        super().__init__()
-        self.size = size
-        self.interpolation = interpolation
-        self.scale = scale
-        self.ratio = ratio
-
-        self.base_size = 1024
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        w, h = img.size
-
-        outsize = self.size
-        short_size = min(outsize)
-        w, h = img.size
-        if w > h:
-            oh = short_size
-            ow = int(1.0 * w * oh / h)
-        else:
-            ow = short_size
-            oh = int(1.0 * h * ow / w)
-        img = img.resize((ow, oh), Image.BILINEAR)
-        target = target.resize((ow, oh), Image.NEAREST)
-        # center crop
-        w, h = img.size
-        x1 = int(round((w - outsize[1]) / 2.))
-        y1 = int(round((h - outsize[0]) / 2.))
-        img = img.crop((x1, y1, x1 + outsize[1], y1 + outsize[0]))
-        target = target.crop((x1, y1, x1 + outsize[1], y1 + outsize[0]))
-
-        return {'image': img,'target': target}
 
 
 class Encrypt(object):

@@ -132,38 +132,53 @@ def warp_and_resize(sample, warp_kwargs, dst_shape, keep_ratio=True):
     height = raw_img.shape[0]  # shape(h,w,c)
     width = raw_img.shape[1]
 
+    # print(raw_img)
+    # print(height, width)
+    # print(target['boxes'])
+
     # center
     C = np.eye(3)
     C[0, 2] = - width / 2
     C[1, 2] = - height / 2
+    # print(C)
 
     # do not change the order of mat mul
     if 'perspective' in warp_kwargs and random.randint(0, 1):
         P = get_perspective_matrix(warp_kwargs['perspective'])
         C = P @ C
+        # print('perspective', P, C)
     if 'scale' in warp_kwargs and random.randint(0, 1):
         Scl = get_scale_matrix(warp_kwargs['scale'])
         C = Scl @ C
+        # print('scale', Scl, C)
     if 'stretch' in warp_kwargs and random.randint(0, 1):
         Str = get_stretch_matrix(*warp_kwargs['stretch'])
         C = Str @ C
+        # print('stretch', Str, C)
     if 'rotation' in warp_kwargs and random.randint(0, 1):
         R = get_rotation_matrix(warp_kwargs['rotation'])
         C = R @ C
+        # print('rotation', R, C)
     if 'shear' in warp_kwargs and random.randint(0, 1):
         Sh = get_shear_matrix(warp_kwargs['shear'])
         C = Sh @ C
+        # print('shear', Sh, C)
     if 'flip' in warp_kwargs:
         F = get_flip_matrix(warp_kwargs['flip'])
         C = F @ C
+        # print('flip', F, C)
     if 'translate' in warp_kwargs and random.randint(0, 1):
         T = get_translate_matrix(warp_kwargs['translate'], width, height)
+        # print('translate1', T, C)
     else:
         T = get_translate_matrix(0, width, height)
+        # print('translate2', T, C)
     M = T @ C
+    # print('translate', M)
     # M = T @ Sh @ R @ Str @ P @ C
     ResizeM = get_resize_matrix((width, height), dst_shape, keep_ratio)
     M = ResizeM @ M
+    # print('ResizeM', ResizeM, M)
     img = cv2.warpPerspective(raw_img, M, dsize=tuple(dst_shape))
     sample['image'] = Image.fromarray(img.astype(np.uint8))
     # sample['image'] = img
@@ -181,6 +196,10 @@ def warp_and_resize(sample, warp_kwargs, dst_shape, keep_ratio=True):
     # TODO: keypoints
     # if 'gt_keypoints' in meta:
     sample['target'] = target
+    # print(img)
+    # print(img.shape)
+    # print(target['boxes'])
+    # print(target['warp_matrix'])
     return sample
 
 
