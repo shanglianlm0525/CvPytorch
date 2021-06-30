@@ -64,7 +64,6 @@ class CityscapesSegmentation(Dataset):
             assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._targets)'
             assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
 
-
     def __getitem__(self, idx):
         if self.stage == 'infer':
             _img = Image.open(self._imgs[idx]).convert('RGB')
