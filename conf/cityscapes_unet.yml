@@ -21,7 +21,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      RandomRotation: { degrees: [-0.5, 0.5] }
+      # RandomRotation: { degrees: [-0.5, 0.5] }
       RandomHorizontalFlip: { p: 0.5 }
       RandomScaleCrop: { size: [512, 512], scale: [0.5, 2.0] }
       ColorJitter: { brightness: 0.2, contrast: 0.2, saturation: 0.1, hue: 0.01 }
