@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from itertools import chain
 import numpy as np
-from src.losses.seg_loss import BCEWithLogitsLoss2d
+from src.losses.seg_loss import BCEWithLogitsLoss2d, CrossEntropyLoss2d
 from src.models.backbones import build_backbone
 
 class PPM(nn.Module):
@@ -50,9 +50,9 @@ class PSPNet(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8}
+        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [3, 4], 'output_stride':8, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
-        aux_b_channels, b_channels = self.backbone.out_channels[0], self.backbone.out_channels[-1]
+        aux_b_channels, b_channels = self.backbone.out_channels[0], self.backbone.out_channels[1]
         self.ppm = PPM(b_channels)
         self.cls = nn.Sequential(
             nn.Conv2d(b_channels*2, 512, kernel_size=3, padding=1, bias=False),
@@ -71,7 +71,8 @@ class PSPNet(nn.Module):
         )
 
         self._init_weight(self.cls, self.aux)
-        self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
+        # self.bce_criterion = BCEWithLogitsLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
+        self.criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
     def _init_weight(self, *stages):
         for m in chain(*stages):
@@ -97,16 +98,16 @@ class PSPNet(nn.Module):
         else:
             losses = {}
             losses['loss'] = 0
-            losses['bce_loss'] = self.bce_criterion(outputs, targets)
-            losses['loss'] = losses['bce_loss']
+            losses['ce_loss'] = self.criterion(outputs, targets)
+            losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
-                return losses, torch.argmax(outputs, dim=1).unsqueeze(1)
+                return losses, torch.argmax(outputs, dim=1) # outputs.detach().max(dim=1)[1]
             else:
                 aux = self.aux(aux_x)
                 aux = F.interpolate(aux, size=imgs.size()[2:], mode='bilinear', align_corners=True)
 
                 aux_weight = 0.4
-                losses['aux_loss'] = self.bce_criterion(outputs, targets)
-                losses['loss'] = losses['bce_loss'] + losses['aux_loss'] * aux_weight
+                losses['aux_loss'] = self.criterion(aux, targets)
+                losses['loss'] = losses['ce_loss'] + losses['aux_loss'] * aux_weight
                 return losses
