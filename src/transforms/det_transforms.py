@@ -27,7 +27,8 @@ from src.transforms.det_warp import warp_and_resize
 from src.transforms.seg_transforms import _setup_size
 
 __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
-        'Resize', 'RandomResizedCrop',
+        'Resize',
+        'RandomResizedCrop', 'RandomScaleCrop',
         'RandomRotate',
         'ColorJitter', 'GaussianBlur',
         'Normalize', 'ToTensor',
@@ -83,11 +84,17 @@ class Resize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, alignment=False, interpolation=InterpolationMode.BILINEAR):
-        assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
-        self.size = size
-        self.alignment = alignment
+    def __init__(self, size, keep_ratio=True, fill=0, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+        # assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
+        if isinstance(size, numbers.Number):
+            self.size = (size, size)
+        else:
+            self.size = size
+
+        self.keep_ratio = keep_ratio
         self.interpolation = interpolation
+        self.fill = fill
+        self.padding_mode = padding_mode
 
     def __call__(self, sample):
         """
@@ -100,39 +107,25 @@ class Resize(object):
         w, h = img.size
         boxes = target["boxes"]
 
-        if self.alignment:
-            min_side, max_side = self.size
-            small_side = min(w, h)
-            large_side = max(w, h)
-            align_scale = min_side / small_side
-            if large_side * align_scale > max_side:
-                align_scale = max_side / large_side
-            align_W, align_H = int(align_scale * w), int(align_scale * h)
-
-            # pad_W = 32 - align_W % 32
-            # pad_H = 32 - align_H % 32
-
-            img_resized = F.resize(img, (align_W, align_H), self.interpolation)
-            # img_paded = np.zeros(shape=[align_H + pad_H, align_W + pad_W, 3], dtype=np.uint8)
-            # img_paded[:align_H, :align_W, :] = img_resized
-
-            boxes[:, [0, 2]] = boxes[:, [0, 2]] * align_scale
-            boxes[:, [1, 3]] = boxes[:, [1, 3]] * align_scale
-
-            target["scales"] = torch.tensor(align_scale, dtype=torch.float)
-            target["boxes"] = boxes  # boxes.numpy()
-            return {'image': img_resized, 'target': target}
-        else:
-            if isinstance(self.size, int):
-                scale = min(self.size / h, self.size / w)
-                boxes[:, 0::2] = boxes[:, 0::2] * scale
-                boxes[:, 1::2] = boxes[:, 1::2] * scale
-            else:
-                scale_h, scale_w = self.size[0] / w , self.size[1] / h
-                boxes[:, 0::2] = boxes[:, 0::2] * scale_w
-                boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+        if self.keep_ratio:
+            scale = min(self.size[0] / h, self.size[1] / w)
+            ow = int(w * scale)
+            oh = int(h * scale)
+            img = F.resize(img, [oh, ow], self.interpolation)
+            # left, top, right and bottom
+            img = F.pad(img, [0, 0, self.size[1] - ow, self.size[0] - oh], self.fill, self.padding_mode)
+            boxes[:, :4] = boxes[:, :4] * scale
 
             target["boxes"] = boxes
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+            return {'image': img, 'target': target}
+        else:
+            scale_h, scale_w = self.size[0] / w, self.size[1] / h
+            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+
+            target["boxes"] = boxes
+            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
             return {'image': F.resize(img, self.size, self.interpolation), 'target': target}
 
 
@@ -252,16 +245,116 @@ class ToPercentCoords(object):
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
         width, height = img.size
-        boxes[:, 0] /= width
-        boxes[:, 2] /= width
-        boxes[:, 1] /= height
-        boxes[:, 3] /= height
+        boxes[:, 0::2] /= width
+        boxes[:, 1::2] /= height
         target["boxes"] = boxes
         return {'image': img, 'target': target}
 
 
+class RandomScaleCrop(object):
+    def __init__(self, size, scale=(0.08, 1.0), fill=0, padding_mode='constant', keep_ratio=True, interpolation=InterpolationMode.BILINEAR):
+        super().__init__()
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        elif isinstance(size, Sequence) and len(size) == 1:
+            self.size = (size[0], size[0])
+        else:
+            if len(size) != 2:
+                raise ValueError("Please provide only two dimensions (h, w) for size.")
+            self.size = size
+
+        if not isinstance(scale, Sequence):
+            raise TypeError("Scale should be a sequence")
+
+        self.scale = scale
+        self.fill = fill
+        self.padding_mode = padding_mode
+        self.keep_ratio = keep_ratio
+        self.interpolation = interpolation
+
+
+    def __call__(self, sample):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be cropped and resized.
+
+        Returns:
+            PIL Image or Tensor: Randomly cropped and resized image.
+        """
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        w, h = F._get_image_size(img)
+        if self.keep_ratio:
+            # random scale (short edge)
+            scale_r = random.uniform(self.scale[0], self.scale[1])
+            scale_h, scale_w = self.size[0] / (w * scale_r), self.size[1] / (h * scale_r)
+            oh, ow = int(scale_h * h), int(scale_w * w)
+            img = F.resize(img, [oh, ow], self.interpolation)
+            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+
+            # pad crop
+            if oh < self.size[0] or ow < self.size[1]:
+                padh = self.size[0] - oh if oh < self.size[0] else 0
+                padw = self.size[1] - ow if ow < self.size[1] else 0
+                # left, top, right and bottom
+                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+
+            # random crop crop_size
+            w, h = F._get_image_size(img)
+            x1 = random.randint(0, w - self.size[1])
+            y1 = random.randint(0, h - self.size[0])
+            img = F.resize(img, self.size, self.interpolation)
+            boxes -= torch.Tensor([x1, y1, x1, y1])
+
+            w, h = F._get_image_size(img)
+            boxes[:, 1::2].clamp_(min=0, max=h - 1)
+            boxes[:, 0::2].clamp_(min=0, max=w - 1)
+
+            target["boxes"] = boxes
+            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
+            return {'image': img, 'target': target}
+        else:
+            base_size = min(w, h)
+            # random scale (short edge)
+            short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
+            if h > w:
+                ow = short_size
+                oh = int(1.0 * h * ow / w)
+                scale = ow / w
+            else:
+                oh = short_size
+                ow = int(1.0 * w * oh / h)
+                scale = oh / h
+            img = F.resize(img, [oh, ow], self.interpolation)
+            boxes[:, :] = boxes[:, :] * scale
+            # pad crop
+            if short_size < min(self.size):
+                padh = self.size[0] - oh if oh < self.size[0] else 0
+                padw = self.size[1] - ow if ow < self.size[1] else 0
+                # left, top, right and bottom
+                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+
+            # random crop crop_size
+            w, h = F._get_image_size(img)
+            x1 = random.randint(0, w - self.size[1])
+            y1 = random.randint(0, h - self.size[0])
+            img = F.crop(img, y1, x1, self.size[0], self.size[1])
+            boxes -= torch.Tensor([x1, y1, x1, y1])
+
+            w, h = F._get_image_size(img)
+            boxes[:, 1::2].clamp_(min=0, max=h - 1)
+            boxes[:, 0::2].clamp_(min=0, max=w - 1)
+
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+            target["boxes"] = boxes
+            # top, left, height, width
+            return {'image': img, 'target': target}
+
+
+
 class RandomResizedCrop(object):
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), alignment=False, interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=False, fill=0, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
@@ -279,10 +372,12 @@ class RandomResizedCrop(object):
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
             warnings.warn("Scale and ratio should be of kind (min, max)")
 
-        self.interpolation = interpolation
         self.scale = scale
         self.ratio = ratio
-        self.alignment = alignment
+        self.keep_ratio = keep_ratio
+        self.fill = fill
+        self.padding_mode = padding_mode
+        self.interpolation = interpolation
 
     @staticmethod
     def get_params(img, scale, ratio):
@@ -340,53 +435,49 @@ class RandomResizedCrop(object):
         """
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
+        width, height = F._get_image_size(img)
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
-        # boxes = torch.from_numpy(boxes)
+        # crop
+        img = F.crop(img, j, i, h, w)
         boxes -= torch.Tensor([i, j, i, j])
-        w, h = img.size
-        boxes = target["boxes"]
-        boxes[:, 1::2].clamp_(min=0, max=h - 1)
-        boxes[:, 0::2].clamp_(min=0, max=w - 1)
 
-        if self.alignment:
-            # crop
-            img = F.crop(img, j, i, h, w)
-            w, h = img.size
-            min_side, max_side = self.size
-            small_side = min(w, h)
-            large_side = max(w, h)
-            align_scale = min_side / small_side
-            if large_side * align_scale > max_side:
-                align_scale = max_side / large_side
-            align_W, align_H = int(align_scale * w), int(align_scale * h)
+        if self.keep_ratio:
+            # resize
+            scale = min(self.size[0] / h, self.size[1] / w)
+            oh = int(1.0 * h * scale)
+            ow = int(1.0 * w * scale)
+            img = F.resize(img, [oh, ow], self.interpolation)
+            boxes[:, :] = boxes[:, :] * scale
 
-            # pad_W = 32 - align_W % 32
-            # pad_H = 32 - align_H % 32
+            # pad crop
+            if oh < self.size[0] or ow < self.size[1]:
+                padh = self.size[0] - oh if oh < self.size[0] else 0
+                padw = self.size[1] - ow if ow < self.size[1] else 0
+                # left, top, right and bottom
+                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
 
-            img_resized = F.resize(img, (align_W, align_H), self.interpolation)
-            # print(img_resized.size)
-            # img_paded = torch.zeros([align_H + pad_H, align_W + pad_W, 3], dtype=np.uint8)
-            # img_paded[:align_H, :align_W, :] = img_resized
+            width, height = F._get_image_size(img)
+            boxes[:, 1::2].clamp_(min=0, max=height - 1)
+            boxes[:, 0::2].clamp_(min=0, max=width - 1)
 
-            boxes[:, [0, 2]] = boxes[:, [0, 2]] * align_scale
-            boxes[:, [1, 3]] = boxes[:, [1, 3]] * align_scale
-
-            target["scales"] = torch.tensor(align_scale, dtype=torch.float)
             target["boxes"] = boxes  # boxes.numpy()
-            return {'image': img_resized, 'target': target}
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+            return {'image': img, 'target': target}
         else:
-            if isinstance(self.size, int):
-                scale = min(self.size / h, self.size / w)
-                boxes[:, 0::2] = boxes[:, 0::2] * scale
-                boxes[:, 1::2] = boxes[:, 1::2] * scale
-            else:
-                scale_h, scale_w = self.size[0] / w, self.size[1] / h
-                boxes[:, 0::2] = boxes[:, 0::2] * scale_w
-                boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            # resize
+            img = F.resize(img, self.size, self.interpolation)
+            scale_h, scale_w = self.size[0] / h, self.size[1] / w
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+
+            width, height = F._get_image_size(img)
+            boxes[:, 1::2].clamp_(min=0, max=height - 1)
+            boxes[:, 0::2].clamp_(min=0, max=width - 1)
 
             target["boxes"] = boxes # boxes.numpy()
-            return {'image': F.resized_crop(img, j, i, h, w, self.size, self.interpolation), 'target': target}
+            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
+            return {'image': img, 'target': target}
 
 
 class GaussianBlur(object):
