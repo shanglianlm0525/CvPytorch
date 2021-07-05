@@ -4,11 +4,14 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 
 
-## NEWS!!!
+## What's New!!!
 
-- [2021.06.20] Release **PSPNet** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**71.76mIoU**).
-- [2021.06.28] Release **Unet** models on [Cityscapes](https://www.cityscapes-dataset.com/) (**49.15mIoU**).
 - [2021.07.01] Release **deeplabv3plus** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.47mIoU**).
+
+- [2021.06.28] Release **Unet** models on [Cityscapes](https://www.cityscapes-dataset.com/) (**56.90mIoU**).
+- [2021.06.20] Release **PSPNet** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.59mIoU**).
+
+- [2021.06.15] Release **deeplabv3** models with mobilenet_v2, resnet50 and resnet101 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**68.06, 71.53 and 72.83mIoU**).
 
 
 
