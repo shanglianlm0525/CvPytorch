@@ -13,10 +13,11 @@ from .squeezenet import SqueezeNet
 from .mobilenet_v2 import MobileNetV2
 from .shufflenet_v2 import ShuffleNetV2
 from .densenet import Densenet
+from .stdcnet import STDCNet
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
 
-__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'ShuffleNetV2']
+__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'ShuffleNetV2', 'STDCNet']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
@@ -35,6 +36,8 @@ def build_backbone(cfg):
         return MobileNetV2(**backbone_cfg)
     elif name == 'ShuffleNetV2':
         return ShuffleNetV2(**backbone_cfg)
+    elif name == 'STDCNet':
+        return STDCNet(**backbone_cfg)
     elif name == 'YOLOv5Backbone':
         return YOLOv5Backbone(**backbone_cfg)
     else:
