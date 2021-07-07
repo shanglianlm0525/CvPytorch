@@ -91,7 +91,6 @@ class CityscapesSegmentation(Dataset):
     @classmethod
     def decode_target(self, target):
         target[target == 255] = 19
-        # target = target.astype('uint8') + 1
         return target
 
     def __len__(self):
