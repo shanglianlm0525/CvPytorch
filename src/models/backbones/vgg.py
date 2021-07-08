@@ -7,7 +7,7 @@
 import torch
 import torch.nn as nn
 from torch.utils import model_zoo
-from torchvision.models.vgg import vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
+from torchvision.models.vgg import vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn, vgg16, vgg19
 
 """
     Very Deep Convolutional Networks for Large-Scale Image Recognition
@@ -52,11 +52,16 @@ class VGG(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.conv1 = nn.Sequential(*list(features.children())[:7])
-        self.layer1 = nn.Sequential(*list(features.children())[7:14])
-        self.layer2 = nn.Sequential(*list(features.children())[14:24])
-        self.layer3 = nn.Sequential(*list(features.children())[24:34])
+        self.conv1 = nn.Sequential(*list(features.children())[:6])
+        self.conv1_pool = nn.Sequential(list(features.children())[6])
+        self.layer1 = nn.Sequential(*list(features.children())[6:13])
+        self.layer1_pool = nn.Sequential(list(features.children())[13])
+        self.layer2 = nn.Sequential(*list(features.children())[14:23])
+        self.layer2_pool = nn.Sequential(list(features.children())[23])
+        self.layer3 = nn.Sequential(*list(features.children())[24:33])
+        self.layer3_pool = nn.Sequential(list(features.children())[33])
         self.layer4 = nn.Sequential(*list(features.children())[34:43])
+        self.layer4_pool = nn.Sequential(list(features.children())[43])
 
         if self.pretrained:
             self.load_pretrained_weights()
@@ -77,10 +82,12 @@ class VGG(nn.Module):
         x = self.conv1(x)
         output = []
         for i in range(1, 5):
-            res_layer = getattr(self, 'layer{}'.format(i))
-            x = res_layer(x)
+            layer = getattr(self, 'layer{}'.format(i))
+            x = layer(x)
             if i in self.out_stages:
                 output.append(x)
+            layer_pool = getattr(self, 'layer{}_pool'.format(i))
+            x = layer_pool(x)
 
         return tuple(output) if len(self.out_stages) > 1 else output[0]
 
