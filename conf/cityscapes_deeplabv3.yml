@@ -88,6 +88,7 @@ OPTIMIZER:
 LR_SCHEDULER:
   TYPE: 'PolyLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
   MILESTONES: [20, 40, 60, 80, 120]
+  MIN_LR: 0.00000001
   GAMMA: 0.1
   POWER: 0.9
   STEP: 300
