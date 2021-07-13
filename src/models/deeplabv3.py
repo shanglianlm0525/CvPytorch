@@ -40,8 +40,8 @@ class Deeplabv3(nn.Module):
             dilations = [12, 24, 36]
         else:
             dilations = [6, 12, 18]
-        decoder_cfg = {'name': 'Deeplabv3Head',  'in_channels': self.backbone.out_channels[0], 'dilations': dilations, 'num_classes': self.num_classes }
-        self.decoder = build_head(decoder_cfg)
+        head_cfg = {'name': 'Deeplabv3Head',  'in_channels': self.backbone.out_channels[0], 'dilations': dilations, 'num_classes': self.num_classes }
+        self.head = build_head(head_cfg)
 
         self.criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
         set_bn_momentum(self.backbone, momentum=0.01)
@@ -61,18 +61,18 @@ class Deeplabv3(nn.Module):
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
         batch_size, ch, _, _ = imgs.shape
         x = self.backbone(imgs)
-        x = self.decoder(x)
+        x = self.head(x)
         outputs = F.interpolate(x, size=imgs.size()[2:], mode='bilinear', align_corners=False)
 
         if mode == 'infer':
 
-            return outputs
+            return torch.argmax(outputs, dim=1)
         else:
             losses = {}
             losses['ce_loss'] = self.criterion(outputs, targets)
             losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
-                return losses, outputs.detach().max(dim=1)[1] #torch.argmax(outputs, dim=1)
+                return losses, torch.argmax(outputs, dim=1)
             else:
                 return losses
