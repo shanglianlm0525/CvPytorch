@@ -84,14 +84,15 @@ class NanoDet(nn.Module):
         for target in targets:
             new_boxes.append(target['boxes'])
             new_labels.append(target['labels'])
-            new_scales.append(target['scales'])
+            if target.__contains__('scales'):
+                new_scales.append(target['scales'])
             new_heights.append(target['height'])
             new_widths.append(target['width'])
 
         t_targets = {}
         t_targets["boxes"] = new_boxes
         t_targets["labels"] = new_labels
-        t_targets["scales"] = new_scales
+        t_targets["scales"] = new_scales if len(new_scales) > 0 else []
         t_targets["height"] = new_heights
         t_targets["width"] = new_widths
         return torch.stack(imgs), t_targets
