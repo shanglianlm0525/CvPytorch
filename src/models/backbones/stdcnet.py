@@ -2,13 +2,12 @@
 # -- coding: utf-8 --
 # @Time : 2021/7/6 9:53
 # @Author : liumin
-# @File : stdc.py
+# @File : stdcnet.py
 import math
 
 import torch
 import torch.nn as nn
 from torch.utils import model_zoo
-from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
 """
     Rethinking BiSeNet For Real-time Semantic Segmentation
