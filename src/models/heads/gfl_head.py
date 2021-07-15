@@ -3,8 +3,8 @@
 # @Time : 2021/3/29 9:03
 # @Author : liumin
 # @File : gfl_head.py
-from functools import partial
 
+from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,14 +18,15 @@ from ..modules.nms import multiclass_nms
 from ...losses.det.general_focal_losses import QualityFocalLoss, DistributionFocalLoss
 from ...losses.det.iou_losses import GIoULoss, bbox_overlaps
 
+
 def multi_apply(func, *args, **kwargs):
     pfunc = partial(func, **kwargs) if kwargs else func
     map_results = map(pfunc, *args)
     return tuple(map(list, zip(*map_results)))
 
+
 def images_to_levels(target, num_level_anchors):
     """Convert targets by image to targets by feature level.
-
     [target_img0, target_img1] -> [target_level0, target_level1, ...]
     """
     target = torch.stack(target, 0)
@@ -37,34 +38,14 @@ def images_to_levels(target, num_level_anchors):
         start = end
     return level_targets
 
-def warp_boxes(boxes, M, width, height):
-    n = len(boxes)
-    if n:
-        # warp points
-        xy = np.ones((n * 4, 3))
-        xy[:, :2] = boxes[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
-        xy = xy @ M.T  # transform
-        xy = (xy[:, :2] / xy[:, 2:3]).reshape(n, 8)  # rescale
-        # create new boxes
-        x = xy[:, [0, 2, 4, 6]]
-        y = xy[:, [1, 3, 5, 7]]
-        xy = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
-        # clip boxes
-        xy[:, [0, 2]] = xy[:, [0, 2]].clip(0, width)
-        xy[:, [1, 3]] = xy[:, [1, 3]].clip(0, height)
-        return xy.astype(np.float32)
-    else:
-        return boxes
 
 def distance2bbox(points, distance, max_shape=None):
     """Decode distance prediction to bounding box.
-
     Args:
         points (Tensor): Shape (n, 2), [x, y].
         distance (Tensor): Distance from the given point to 4
             boundaries (left, top, right, bottom).
         max_shape (tuple): Shape of the image.
-
     Returns:
         Tensor: Decoded bboxes.
     """
@@ -82,13 +63,11 @@ def distance2bbox(points, distance, max_shape=None):
 
 def bbox2distance(points, bbox, max_dis=None, eps=0.1):
     """Decode bounding box based on distances.
-
     Args:
         points (Tensor): Shape (n, 2), [x, y].
         bbox (Tensor): Shape (n, 4), "xyxy" format
         max_dis (float): Upper bound of the distance.
         eps (float): a small value to ensure target < max_dis, instead <=
-
     Returns:
         Tensor: Decoded distances.
     """
@@ -147,15 +126,12 @@ class Integral(nn.Module):
 class GFLHead(nn.Module):
     """Generalized Focal Loss: Learning Qualified and Distributed Bounding
     Boxes for Dense Object Detection.
-
     GFL head structure is similar with ATSS, however GFL uses
     1) joint representation for classification and localization quality, and
     2) flexible General distribution for bounding box locations,
     which are supervised by
     Quality Focal Loss (QFL) and Distribution Focal Loss (DFL), respectively
-
     https://arxiv.org/abs/2006.04388
-
     :param num_classes: Number of categories excluding the background category.
     :param loss: Config of all loss functions.
     :param input_channel: Number of channels in the input feature map.
@@ -193,23 +169,12 @@ class GFLHead(nn.Module):
         self.loss_cfg = loss
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
-        self.use_sigmoid = self.loss_cfg["loss_qfl"]["use_sigmoid"] # self.loss_cfg.loss_qfl.use_sigmoid
-        if self.use_sigmoid:
-            self.cls_out_channels = num_classes
-        else:
-            self.cls_out_channels = num_classes + 1
+        self.cls_out_channels = num_classes
 
         self.assigner = ATSS(topk=9)
         self.distribution_project = Integral(self.reg_max)
-        '''
-        self.loss_qfl = QualityFocalLoss(use_sigmoid=self.use_sigmoid,
-                                         beta=self.loss_cfg.loss_qfl.beta,
-                                         loss_weight=self.loss_cfg.loss_qfl.loss_weight)
-        self.loss_dfl = DistributionFocalLoss(loss_weight=self.loss_cfg.loss_dfl.loss_weight)
-        self.loss_bbox = GIoULoss(loss_weight=self.loss_cfg.loss_bbox.loss_weight)
-        '''
-        self.loss_qfl = QualityFocalLoss(use_sigmoid=self.use_sigmoid,
-                                         beta=self.loss_cfg["loss_qfl"]["beta"],
+
+        self.loss_qfl = QualityFocalLoss(beta=self.loss_cfg["loss_qfl"]["beta"],
                                          loss_weight=self.loss_cfg["loss_qfl"]["loss_weight"])
         self.loss_dfl = DistributionFocalLoss(loss_weight=self.loss_cfg["loss_dfl"]["loss_weight"])
         self.loss_bbox = GIoULoss(loss_weight=self.loss_cfg["loss_bbox"]["loss_weight"])
@@ -533,28 +498,6 @@ class GFLHead(nn.Module):
         cls_scores, bbox_preds = preds
         result_list = self.get_bboxes(cls_scores, bbox_preds, imgs)
         return result_list
-        '''
-        print('result_list', result_list)
-        preds = {}
-        warp_matrix = meta['warp_matrix'][0] if isinstance(meta['warp_matrix'], list) else meta['warp_matrix']
-        warp_matrix = warp_matrix.cpu().numpy() \
-            if isinstance(warp_matrix, torch.Tensor) else warp_matrix
-        img_height = meta['height'].cpu().numpy() \
-            if isinstance(meta['height'], torch.Tensor) else meta['height']
-        img_width = meta['width'].cpu().numpy() \
-            if isinstance(meta['width'], torch.Tensor) else meta['width']
-        for result in result_list:
-            det_bboxes, det_labels = result
-            det_bboxes = det_bboxes.cpu().numpy()
-            det_bboxes[:, :4] = warp_boxes(det_bboxes[:, :4], np.linalg.inv(warp_matrix), img_width, img_height)
-            classes = det_labels.cpu().numpy()
-            for i in range(self.num_classes):
-                inds = (classes == i)
-                preds[i] = np.concatenate([
-                    det_bboxes[inds, :4].astype(np.float32),
-                    det_bboxes[inds, 4:5].astype(np.float32)], axis=1).tolist()
-        return preds
-        '''
 
     def get_bboxes(self,
                    cls_scores,
@@ -693,4 +636,3 @@ class GFLHead(nn.Module):
         cells_cx = (grid_cells[:, 2] + grid_cells[:, 0]) / 2
         cells_cy = (grid_cells[:, 3] + grid_cells[:, 1]) / 2
         return torch.stack([cells_cx, cells_cy], dim=-1)
-
