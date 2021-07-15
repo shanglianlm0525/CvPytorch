@@ -57,15 +57,10 @@ class NanoDetHead(GFLHead):
             self.reg_convs.append(reg_convs)
 
         self.gfl_cls = nn.ModuleList([nn.Conv2d(self.feat_channels,
-                                                self.cls_out_channels +
-                                                4 * (self.reg_max + 1) if self.share_cls_reg else self.cls_out_channels,
-                                                1,
-                                                padding=0) for _ in self.strides])
+                                                self.cls_out_channels + 4 * (self.reg_max + 1) if self.share_cls_reg else self.cls_out_channels,
+                                                1,padding=0) for _ in self.strides])
         # TODO: if
-        self.gfl_reg = nn.ModuleList([nn.Conv2d(self.feat_channels,
-                                                4 * (self.reg_max + 1),
-                                                1,
-                                                padding=0) for _ in self.strides])
+        self.gfl_reg = nn.ModuleList([nn.Conv2d(self.feat_channels,4 * (self.reg_max + 1),1,padding=0) for _ in self.strides])
 
     def _buid_not_shared_head(self):
         cls_convs = nn.ModuleList()
