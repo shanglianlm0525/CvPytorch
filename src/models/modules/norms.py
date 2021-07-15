@@ -31,7 +31,7 @@ def norm_layer(cfg, num_features, postfix=''):
         name (str): abbreviation + postfix
         layer (nn.Module): created norm layer
     """
-    assert isinstance(cfg, dict) and 'type' in cfg
+    # assert isinstance(cfg, dict) or isinstance() and 'type' in cfg
     cfg_ = cfg.copy()
 
     layer_type = cfg_.pop('type')
