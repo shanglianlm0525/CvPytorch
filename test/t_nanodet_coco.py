@@ -10,7 +10,7 @@ import torchvision
 import os
 import sys
 import numpy as np
-
+import copy
 from src.evaluator.eval_coco import CocoEvaluator
 from tqdm import tqdm
 
@@ -80,7 +80,21 @@ for idx in tqdm(range(5000)):
         o_bboxes, o_labels = o
         o_bboxes = o_bboxes.cpu().numpy()
 
+
+        print(o_bboxes[:5, :4])
+        print(np.linalg.inv(warp_matrix))
+        o_bboxes_cp = copy.deepcopy(o_bboxes[:5, :4])
+
         o_bboxes[:, :4] = warp_boxes(o_bboxes[:, :4], np.linalg.inv(warp_matrix), width, height)
+
+        print(o_bboxes[:5, :4], width, height)
+        o_bboxes_cp[:, [0, 2]] *= (width/320)
+        o_bboxes_cp[:, [1, 3]] *= (height/320)
+        print(o_bboxes_cp)
+        print('---------')
+        if idx>0:
+            assert 1==2
+
         classes = o_labels.cpu().numpy()
         for i in range(80):
             inds = (classes == i)
@@ -92,6 +106,14 @@ for idx in tqdm(range(5000)):
 
     targets = {}
     targets["image_id"] = meta['img_info']['id']
+    '''
+    targets["height"] = meta['img_info']['height']
+    targets["width"] = meta['img_info']['width']
+    targets["file_name"] = meta['img_info']['file_name']
+    targets["gt_bboxes"] = meta['gt_bboxes']
+    targets["gt_labels"] = meta['gt_labels']
+    targets["image_id"] = meta['gt_bboxes']
+    '''
     cocoEvaluator.update([targets], outs)
 
 cocoEvaluator.evaluate()
