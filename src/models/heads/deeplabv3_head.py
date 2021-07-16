@@ -9,7 +9,7 @@ from src.models.modules.aspp import ASPP
 
 
 class Deeplabv3Head(nn.Module):
-    def __init__(self, in_channels, dilations, num_classes):
+    def __init__(self, num_classes, in_channels, dilations):
         super(Deeplabv3Head, self).__init__()
         mid_channels = 256
         self.aspp = ASPP(inplanes=in_channels, dilations = dilations)

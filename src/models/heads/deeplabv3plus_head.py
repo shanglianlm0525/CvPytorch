@@ -11,7 +11,7 @@ from src.models.modules.aspp import ASPP
 
 
 class Deeplabv3PlusHead(nn.Module):
-    def __init__(self, low_level_channels, in_channels, dilations, num_classes):
+    def __init__(self, num_classes, low_level_channels, in_channels, dilations):
         super(Deeplabv3PlusHead, self).__init__()
         project_channels = 48
         mid_channels = 256
