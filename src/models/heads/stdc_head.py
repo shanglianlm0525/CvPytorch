@@ -70,7 +70,7 @@ class FeatureFusionModule(nn.Module):
 
 
 class StdcHead(nn.Module):
-    def __init__(self, in_channels, num_classes, mid_channel = 128):
+    def __init__(self, num_classes, in_channels, mid_channel = 128):
         super(StdcHead, self).__init__()
         # 256, 512, 1024
 
