@@ -49,7 +49,11 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.stdc.STDC'
+USE_MODEL:
+  CLASS: 'src.models.stdc.STDC'
+  BACKBONE: { 'name': 'STDCNet', 'subtype': 'stdc1', 'out_stages': [3, 4, 5], 'output_stride': 32, 'pretrained': True, 'backbone_path': './weights/stdc/STDCNet813M_73.91.tar' }
+  HEAD: { 'name': 'StdcHead', 'in_channels': [256, 512, 1024] }
+
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'

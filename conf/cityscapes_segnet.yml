@@ -49,7 +49,9 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.segnet.SegNet'
+USE_MODEL:
+  CLASS: 'src.models.segnet.SegNet'
+
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'

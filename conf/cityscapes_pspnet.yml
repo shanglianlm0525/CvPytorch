@@ -50,7 +50,9 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.pspnet.PSPNet'
+USE_MODEL:
+  CLASS: 'src.models.pspnet.PSPNet'
+
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'

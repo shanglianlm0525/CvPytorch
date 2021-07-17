@@ -49,7 +49,10 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.enet.ENet'
+USE_MODEL:
+  CLASS: 'src.models.enet.ENet'
+
+
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'

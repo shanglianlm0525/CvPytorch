@@ -49,7 +49,12 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.deeplabv3_plus.Deeplabv3Plus'
+USE_MODEL:
+  CLASS: 'src.models.deeplabv3_plus.Deeplabv3Plus'
+  # BACKBONE: { 'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True }
+  BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [1, 4], 'output_stride': 16, 'pretrained': True }
+  HEAD: { 'name': 'Deeplabv3PlusHead', 'low_level_channels': 256, 'in_channels': 2048, 'dilations': [6, 12, 18] }
+
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'

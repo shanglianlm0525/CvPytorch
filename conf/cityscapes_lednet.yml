@@ -49,7 +49,9 @@ DATASET:
 #########################################
 # Model / Evaluator Configurations
 #########################################
-USE_MODEL: 'src.models.led_net.LEDNet'
+USE_MODEL:
+  CLASS: 'src.models.led_net.LEDNet'
+
 EVALUATOR:
   NAME: 'segmentation'
   EVAL_TYPE: 'mIoU'
