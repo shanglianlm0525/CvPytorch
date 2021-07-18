@@ -21,9 +21,10 @@ from src.losses.seg_loss import CrossEntropyLoss2d, FocalLoss, DetailAggregateLo
 
 
 class STDC(nn.Module):
-    def __init__(self, dictionary=None):
+    def __init__(self, dictionary=None, model_cfg=None):
         super().__init__()
         self.dictionary = dictionary
+        self.model_cfg = model_cfg
         self.input_size = [512, 1024]
         self.dummy_input = torch.zeros(1, 3, self.input_size[0], self.input_size[1])
 
@@ -31,6 +32,7 @@ class STDC(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
+        '''
         # backbone_cfg = {'name': 'STDCNet', 'subtype': 'stdc1', 'out_stages': [3, 4, 5], 'output_stride': 32,
         #                'pretrained': True, 'backbone_path': './weights/stdc/STDCNet813M_73.91.tar'}
         backbone_cfg = {'name': 'STDCNet', 'subtype': 'stdc2', 'out_stages': [3, 4, 5], 'output_stride': 32,
@@ -39,6 +41,10 @@ class STDC(nn.Module):
 
         head_cfg = {'name': 'StdcHead', 'in_channels': self.backbone.out_channels, 'num_classes': self.num_classes}
         self.head = build_head(head_cfg)
+        '''
+
+        self.backbone = build_backbone(self.model_cfg.BACKBONE)
+        self.head = build_head(self.num_classes, self.model_cfg.HEAD)
 
         self.ce_criterion = OhemCrossEntropyLoss2d(thresh=0.7).cuda()
         self.boundary_criterion = DetailAggregateLoss().cuda()

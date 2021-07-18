@@ -67,7 +67,6 @@ class DownConv(nn.Module):
 class UpConv(nn.Module):
     def __init__(self, in_channels, out_channels,bilinear=True):
         super().__init__()
-        self.reduce = Conv1x1BNReLU(in_channels, in_channels//2)
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
@@ -76,7 +75,7 @@ class UpConv(nn.Module):
         self.conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x1, x2):
-        x1 = self.up(self.reduce(x1))
+        x1 = self.up(x1)
         _, channel1, height1, width1 = x1.size()
         _, channel2, height2, width2 = x2.size()
 
@@ -93,7 +92,7 @@ class UNet(nn.Module):
     def __init__(self, dictionary=None):
         super(UNet, self).__init__()
         self.dictionary = dictionary
-        self.dummy_input = torch.zeros(1, 3, 800, 600)
+        self.dummy_input = torch.zeros(1, 3, 1024, 2048)
 
         self.num_classes = len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
@@ -103,10 +102,10 @@ class UNet(nn.Module):
         self.down1 = DownConv(64, 128)
         self.down2 = DownConv(128, 256)
         self.down3 = DownConv(256, 512)
-        self.down4 = DownConv(512, 1024)
-        self.up1 = UpConv(1024, 512)
-        self.up2 = UpConv(512, 256)
-        self.up3 = UpConv(256, 128)
+        self.down4 = DownConv(512, 512)
+        self.up1 = UpConv(1024, 256)
+        self.up2 = UpConv(512, 128)
+        self.up3 = UpConv(256, 64)
         self.up4 = UpConv(128, 64)
         self.outconv = nn.Conv2d(64, self.num_classes, kernel_size=1)
 
@@ -151,15 +150,16 @@ class UNet(nn.Module):
         else:
             losses = {}
             losses['ce_loss'] = self.ce_criterion(outputs, targets)
-            losses['focal_loss'] = self.focal_criterion(outputs, targets)
-            losses['lovasz_loss'] = self.lovasz_criterion(outputs, targets)
+            # losses['focal_loss'] = self.focal_criterion(outputs, targets)
+            # losses['lovasz_loss'] = self.lovasz_criterion(outputs, targets)
 
-            losses['bce_loss'] = self.bce_criterion(outputs, targets)
-            losses['dice_loss'] = self.dice_criterion(outputs, targets)
-            losses['ce_dice_loss'] = self.ce_dice_criterion(outputs, targets)
+            # losses['bce_loss'] = self.bce_criterion(outputs, targets)
+            # losses['dice_loss'] = self.dice_criterion(outputs, targets)
+            # losses['ce_dice_loss'] = self.ce_dice_criterion(outputs, targets)
             losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
-                return losses, torch.argmax(outputs, dim=1).unsqueeze(1)
+                # return losses, outputs.detach().max(dim=1)[1]  # torch.argmax(outputs, dim=1)
+                return losses, torch.argmax(outputs, dim=1) #
             else:
                 return losses
