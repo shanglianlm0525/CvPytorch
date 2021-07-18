@@ -9,7 +9,7 @@ import torch.nn as nn
 
 
 class YOLOv5Head(nn.Module):
-    def __init__(self, channels=[256, 512, 1024], anchors=[], num_classes=80):
+    def __init__(self, num_classes=80, channels=[256, 512, 1024], anchors=[]):
         super(YOLOv5Head, self).__init__()
 
         self.num_classes = num_classes  # number of classes
