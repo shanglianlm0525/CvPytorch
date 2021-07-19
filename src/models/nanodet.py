@@ -12,57 +12,40 @@ import numpy as np
 from .backbones import build_backbone
 from .necks import build_neck
 from .heads import build_head
+from ..losses.nanodet_loss import NanoDetLoss
 
 
 class NanoDet(nn.Module):
-    def __init__(self, dictionary=None):
+    def __init__(self, dictionary=None, model_cfg=None):
         super(NanoDet, self).__init__()
         self.dictionary = dictionary
+        self.model_cfg = model_cfg
         self.dummy_input = torch.zeros(1, 3, 320, 320)
 
         self.num_classes = len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
+        '''
         backbone_cfg = {'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x1.0', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
-
-        fpn_cfg = {
-            'name': 'PAN',
-            'in_channels': [116, 232, 464],
-            'out_channels': 96,
-        }
-        # self.fpn = PAN(**fpn_cfg)
-        self.fpn = build_neck(fpn_cfg)
-        head_cfg = {
-              'name': 'NanoDetHead',
-              'num_classes': self.num_classes,
-              'input_channel': 96,
-              'feat_channels': 96,
-              'stacked_convs': 2,
-              'share_cls_reg': True,
-              'octave_base_scale': 5,
-              'scales_per_octave': 1,
-              'strides': [8, 16, 32],
-              'reg_max': 7,
-              'norm_cfg':
-                  {'type': 'BN'},
-            'loss':{
-                'loss_qfl':
-                {'name': 'QualityFocalLoss',
-                'use_sigmoid': True,
-                'beta': 2.0,
-                'loss_weight': 1.0
-                 },
-                'loss_dfl':
-                {'name': 'DistributionFocalLoss',
-                'loss_weight': 0.25},
-                'loss_bbox':
-                {'name': 'GIoULoss',
-                'loss_weight': 2.0}
+        neck_cfg = {'name': 'PAN', 'in_channels': [116, 232, 464], 'out_channels': 96}
+        self.neck = build_neck(neck_cfg)
+        head_cfg = {'name': 'NanoDetHead', 'num_classes': self.num_classes, 'input_channel': 96, 'feat_channels': 96,
+                    'stacked_convs': 2, 'share_cls_reg': True, 'octave_base_scale': 5, 'scales_per_octave': 1,
+                    'strides': [8, 16, 32], 'reg_max': 7, 'norm_cfg': {'type': 'BN'},
+            'loss':{ 'loss_qfl': {'name': 'QualityFocalLoss', 'beta': 2.0,'loss_weight': 1.0},
+                'loss_dfl': {'name': 'DistributionFocalLoss', 'loss_weight': 0.25},
+                'loss_bbox': {'name': 'GIoULoss', 'loss_weight': 2.0}
                 }}
-        # self.head = NanoDetHead(**head_cfg)
         self.head = build_head(head_cfg)
+        '''
+        self.backbone = build_backbone(self.model_cfg.BACKBONE)
+        self.neck = build_neck(self.model_cfg.NECK)
+        self.head = build_head(self.num_classes, self.model_cfg.HEAD)
+
+        # self.model_cfg.LOSS.num_classes = self.num_classes
+        # self.loss = NanoDetLoss(self.model_cfg.LOSS)
 
 
     def init_params(self):
@@ -106,7 +89,7 @@ class NanoDet(nn.Module):
             losses = {}
             imgs, targets = self.trans_specific_format(imgs, targets)
 
-            preds = self.head(self.fpn(self.backbone(imgs)))
+            preds = self.head(self.neck(self.backbone(imgs)))
 
             loss, loss_states = self.head.loss(preds, targets)
 
