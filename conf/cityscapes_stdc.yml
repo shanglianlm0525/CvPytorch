@@ -52,6 +52,7 @@ DATASET:
 USE_MODEL:
   CLASS: 'src.models.stdc.STDC'
   BACKBONE: { 'name': 'STDCNet', 'subtype': 'stdc1', 'out_stages': [3, 4, 5], 'output_stride': 32, 'pretrained': True, 'backbone_path': './weights/stdc/STDCNet813M_73.91.tar' }
+  # BACKBONE: { 'name': 'STDCNet', 'subtype': 'stdc2', 'out_stages': [3, 4, 5], 'output_stride': 32, 'pretrained': True, 'backbone_path': './weights/stdc/STDCNet1446_76.47.tar' }
   HEAD: { 'name': 'StdcHead', 'in_channels': [256, 512, 1024] }
 
 EVALUATOR:
@@ -72,7 +73,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [2]
+GPU_IDS: [3]
 N_MAX_EPOCHS: 325
 
 INIT_LR: 0.01
