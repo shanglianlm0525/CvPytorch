@@ -27,10 +27,11 @@ def get_class_name(full_class_name):
     return full_class_name.split(".")[-1]
 
 
-def set_bn_momentum(model, momentum=0.1):
+def set_bn_momentum(model, momentum=0.1, eps=1e-5):
     for m in model.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.momentum = momentum
+            m.eps = eps
 
 
 def fix_bn(model):
