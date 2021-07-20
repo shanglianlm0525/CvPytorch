@@ -6,14 +6,13 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- [2021.07.20] Release **nanodet-416** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**23.30mAP**).
 - [2021.07.07] Release **STDC** models with stdc2 backbone on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.36mIoU**).
 - [2021.07.06] Release **STDC** models with stdc1 backbone on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.89mIoU**).
-- [2021.07.05] Release **nanodet** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**20.54mAP**).
+- [2021.07.05] Release **nanodet-320** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**20.54mAP**).
 - [2021.07.01] Release **deeplabv3plus** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.96mIoU**).
-
 - [2021.06.28] Release **Unet** models on [Cityscapes](https://www.cityscapes-dataset.com/) (**56.90mIoU**).
 - [2021.06.20] Release **PSPNet** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.59mIoU**).
-
 - [2021.06.15] Release **deeplabv3** models with mobilenet_v2, resnet50 and resnet101 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**68.06, 71.53 and 72.83mIoU**).
 
 
