@@ -52,9 +52,8 @@ class VGG(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.conv1 = nn.Sequential(*list(features.children())[:6])
-        self.conv1_pool = nn.Sequential(list(features.children())[6])
-        self.layer1 = nn.Sequential(*list(features.children())[6:13])
+        self.conv1 = nn.Sequential(*list(features.children())[:7])
+        self.layer1 = nn.Sequential(*list(features.children())[7:13])
         self.layer1_pool = nn.Sequential(list(features.children())[13])
         self.layer2 = nn.Sequential(*list(features.children())[14:23])
         self.layer2_pool = nn.Sequential(list(features.children())[23])
