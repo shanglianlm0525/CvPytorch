@@ -6,6 +6,10 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- [2021.07.23] Release **nanodet-repvgg** models with RepVGG backbone on [COCO](http://mscoco.org/) (**27.16mAP**).
+- [2021.07.23] Release **nanodet-g** models with cspnet backbone on [COCO](http://mscoco.org/) (**23.54mAP**).
+- [2021.07.23] Release **nanodet-efficientnet_lite** models with efficientnet_lite backbone on [COCO](http://mscoco.org/) (**25.65mAP**).
+- [2021.07.22] Release **nanodet-t** models with Transformer neck on [COCO](http://mscoco.org/) (**21.97mAP**).
 - [2021.07.20] Release **nanodet-416** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**23.30mAP**).
 - [2021.07.07] Release **STDC** models with stdc2 backbone on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.36mIoU**).
 - [2021.07.06] Release **STDC** models with stdc1 backbone on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.89mIoU**).
