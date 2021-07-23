@@ -5,6 +5,10 @@
 # @File : __init__.py
 
 from copy import deepcopy
+
+from .custom_cspnet import CustomCspNet
+from .efficientnet_lite import EfficientNetLite
+from .repvgg import RepVGG
 from .vgg import VGG
 from .resnet import ResNet
 from .resnext import ResNeXt
@@ -17,7 +21,8 @@ from .stdcnet import STDCNet
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
 
-__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'ShuffleNetV2', 'STDCNet']
+__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2',
+           'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
@@ -40,5 +45,11 @@ def build_backbone(cfg):
         return STDCNet(**backbone_cfg)
     elif name == 'YOLOv5Backbone':
         return YOLOv5Backbone(**backbone_cfg)
+    elif name == 'RepVGG':
+        return RepVGG(**backbone_cfg)
+    elif name == 'EfficientNetLite':
+        return EfficientNetLite(**backbone_cfg)
+    elif name == 'CustomCspNet':
+        return CustomCspNet(**backbone_cfg)
     else:
         raise NotImplementedError
