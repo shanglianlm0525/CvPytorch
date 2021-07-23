@@ -21,11 +21,11 @@ from PIL import Image, ImageOps, ImageFilter
 import collections
 from collections.abc import Sequence
 from torchvision.transforms.functional import InterpolationMode, _interpolation_modes_from_int
-from torchvision.transforms.transforms import _setup_angle, _check_sequence_input
+from torchvision.transforms.transforms import _setup_angle, _check_sequence_input, _setup_size
 
 __all__ = ['Compose', 'ToTensor', 'Normalize',
         'RandomHorizontalFlip', 'RandomVerticalFlip',
-        'Resize', 
+        'Resize',
         'RandomResizedCrop', 'RandomScaleCrop',
         'RandomCrop', 'CenterCrop',
         'RandomRotation', 'RandomPerspective',
@@ -40,28 +40,6 @@ _pil_interpolation_to_str = {
     InterpolationMode.BICUBIC: 'InterpolationMode.BICUBIC',
     InterpolationMode.LANCZOS: 'InterpolationMode.LANCZOS',
 }
-
-
-def _get_image_size(img):
-    if F._is_pil_image(img):
-        return img.size
-    elif isinstance(img, torch.Tensor) and img.dim() > 2:
-        return img.shape[-2:][::-1]
-    else:
-        raise TypeError("Unexpected type {}".format(type(img)))
-
-
-def _setup_size(size, error_msg):
-    if isinstance(size, numbers.Number):
-        return int(size), int(size)
-
-    if isinstance(size, Sequence) and len(size) == 1:
-        return size[0], size[0]
-
-    if len(size) != 2:
-        raise ValueError(error_msg)
-
-    return size
 
 
 class Compose(object):
@@ -399,38 +377,38 @@ class RandomScaleCrop(object):
         return format_string
 
 
-
 class RandomResizedCrop(object):
-    """Crop the given image to random size and aspect ratio.
-    The image can be a PIL Image or a Tensor, in which case it is expected
+    """Crop a random portion of image and resize it to a given size.
+
+    If the image is torch Tensor, it is expected
     to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
 
-    A crop of random size (default: of 0.08 to 1.0) of the original size and a random
-    aspect ratio (default: of 3/4 to 4/3) of the original aspect ratio is made. This crop
-    is finally resized to given size.
-    This is popularly used to train the Inception networks.
+    A crop of the original image is made: the crop has a random area (H * W)
+    and a random aspect ratio. This crop is finally resized to the given
+    size. This is popularly used to train the Inception networks.
 
     Args:
-        size (int or sequence): expected output size of each edge. If size is an
+        size (int or sequence): expected output size of the crop, for each edge. If size is an
             int instead of sequence like (h, w), a square output size ``(size, size)`` is
-            made. If provided a tuple or list of length 1, it will be interpreted as (size[0], size[0]).
-        scale (tuple of float): range of size of the origin size cropped
-        ratio (tuple of float): range of aspect ratio of the origin aspect ratio cropped.
-        interpolation (int): Desired interpolation enum defined by `filters`_.
-            Default is ``PIL.Image.BILINEAR``. If input is Tensor, only ``PIL.Image.NEAREST``, ``PIL.Image.BILINEAR``
-            and ``PIL.Image.BICUBIC`` are supported.
+            made. If provided a sequence of length 1, it will be interpreted as (size[0], size[0]).
+
+            .. note::
+                In torchscript mode size as single int is not supported, use a sequence of length 1: ``[size, ]``.
+        scale (tuple of float): Specifies the lower and upper bounds for the random area of the crop,
+            before resizing. The scale is defined with respect to the area of the original image.
+        ratio (tuple of float): lower and upper bounds for the random aspect ratio of the crop, before
+            resizing.
+        interpolation (InterpolationMode): Desired interpolation enum defined by
+            :class:`torchvision.transforms.InterpolationMode`. Default is ``InterpolationMode.BILINEAR``.
+            If input is Tensor, only ``InterpolationMode.NEAREST``, ``InterpolationMode.BILINEAR`` and
+            ``InterpolationMode.BICUBIC`` are supported.
+            For backward compatibility integer values (e.g. ``PIL.Image.NEAREST``) are still acceptable.
+
     """
 
     def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=InterpolationMode.BILINEAR):
         super().__init__()
-        if isinstance(size, numbers.Number):
-            self.size = (int(size), int(size))
-        elif isinstance(size, Sequence) and len(size) == 1:
-            self.size = (size[0], size[0])
-        else:
-            if len(size) != 2:
-                raise ValueError("Please provide only two dimensions (h, w) for size.")
-            self.size = size
+        self.size = _setup_size(size, error_msg="Please provide only two dimensions (h, w) for size.")
 
         if not isinstance(scale, Sequence):
             raise TypeError("Scale should be a sequence")
@@ -454,15 +432,17 @@ class RandomResizedCrop(object):
 
         Returns:
             tuple: params (i, j, h, w) to be passed to ``crop`` for a random
-                sized crop.
+            sized crop.
         """
         width, height = F._get_image_size(img)
         area = height * width
 
+        log_ratio = torch.log(torch.tensor(ratio))
         for _ in range(10):
             target_area = area * torch.empty(1).uniform_(scale[0], scale[1]).item()
-            log_ratio = torch.log(torch.tensor(ratio))
-            aspect_ratio = torch.exp(torch.empty(1).uniform_(log_ratio[0], log_ratio[1])).item()
+            aspect_ratio = torch.exp(
+                torch.empty(1).uniform_(log_ratio[0], log_ratio[1])
+            ).item()
 
             w = int(round(math.sqrt(target_area * aspect_ratio)))
             h = int(round(math.sqrt(target_area / aspect_ratio)))
@@ -487,6 +467,7 @@ class RandomResizedCrop(object):
         j = (width - w) // 2
         return i, j, h, w
 
+
     def __call__(self, sample):
         """
         Args:
@@ -496,9 +477,12 @@ class RandomResizedCrop(object):
             PIL Image or Tensor: Randomly cropped and resized image.
         """
         img, target = sample['image'], sample['target']
+        width, height = F._get_image_size(img)
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
-        return {'image': F.resized_crop(img, j, i, h, w, self.size, self.interpolation),
-                'target': F.resized_crop(target, j, i, h, w, self.size, InterpolationMode.NEAREST)}
+
+        return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation),
+                'target': F.resized_crop(target, i, j, h, w, self.size, InterpolationMode.NEAREST)}
+
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]

@@ -10,7 +10,7 @@ from glob2 import glob
 import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
-from ..utils.coco_utils import convert_to_coco_api
+from src.utils.coco_utils import convert_to_coco_api
 
 '''
     Penn-Fudan Database

@@ -10,7 +10,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
 import xml.etree.ElementTree as ET
-from ..utils import palette
+from src.utils import palette
 
 class VOCDetection(Dataset):
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):

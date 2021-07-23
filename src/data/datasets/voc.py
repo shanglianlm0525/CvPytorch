@@ -8,7 +8,7 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from ..utils import palette
+from src.utils import palette
 
 """
     Pascal Voc dataset
@@ -55,16 +55,17 @@ class VOCSegmentation(Dataset):
     def __getitem__(self, idx):
         if self.stage == 'infer':
             _img = Image.open(self._imgs[idx]).convert('RGB')
-            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
+            img_id = os.path.basename(os.path.basename(self._imgs[idx]))
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
             _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
-            _target = self.encode_map(_target)
+            _target = self.encode_target(_target)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_map(self, mask):
+
+    def encode_target(self, mask):
         # This is used to convert tags
         return mask
 

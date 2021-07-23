@@ -4,7 +4,7 @@ EXPERIMENT_NAME: 'Cityspaces_LEDnet'
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.cityscapes.CityscapesSegmentation'
+  CLASS: 'src.data.datasets.cityscapes.CityscapesSegmentation'
   DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
   DICTIONARY_NAME: 'SEG_CLASSES'
 

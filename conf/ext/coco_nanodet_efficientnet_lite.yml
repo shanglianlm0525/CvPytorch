@@ -4,7 +4,7 @@ EXPERIMENT_NAME: 'Coco_NanoDet_Efficientnet_Lite'
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.coco.CocoDetection'
+  CLASS: 'src.data.datasets.coco.CocoDetection'
   DICTIONARY: 'conf/dicts/coco_dict.yml'
   DICTIONARY_NAME: 'DET_CLASSES'
   BACKGROUND_AS_CATEGORY: False

@@ -65,12 +65,14 @@ class CocoDetection(Dataset):
 
         _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
         # _img = np.asarray(_img, dtype=np.float32)
-        _target = self.encode_map(ann, idx)
+        _target = self.encode_map(ann, img_id)
         sample = {'image': _img, 'target': _target}
-        return self.transform(sample)
+        if self.target_transform is not None:
+            return self.target_transform(self.transform(sample))
+        else:
+            return self.transform(sample)
 
-    def encode_map(self, ann, idx):
-        img_id = self.ids[idx]
+    def encode_map(self, ann, img_id):
         target = dict(image_id=img_id, annotations=ann)
         return target
 
@@ -87,7 +89,6 @@ class CocoDetection(Dataset):
             _target_list.append(bch['target'])
         sample = {'image': _img_list, 'target': _target_list}
         return sample
-        # return tuple(zip(*batch))
 
 
 class CocoSegmentation(Dataset):
@@ -107,7 +108,6 @@ class CocoSegmentation(Dataset):
 
         self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
-
 
     def _filter_invalid_annotation(self):
         # check annos, filtering invalid data

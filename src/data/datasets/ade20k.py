@@ -9,11 +9,11 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from ..utils import palette
+from src.utils import palette
 
 """
-    Cityscapes dataset
-    https://www.cityscapes-dataset.com/
+    ADE20K dataset
+    http://groups.csail.mit.edu/vision/datasets/ADE20K/
 """
 
 class ADE20KSegmentation(Dataset):

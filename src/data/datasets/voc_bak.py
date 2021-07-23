@@ -7,10 +7,7 @@
 
 import numpy as np
 import os
-
-import random
 import torch
-import torch.nn as nn
 from PIL import Image
 import cv2
 from glob2 import glob
@@ -18,11 +15,11 @@ from torch.utils.data import Dataset
 import xml.etree.ElementTree as ET
 
 from torchvision import transforms as tf
-from src.transforms import seg_transforms_old as ctf
+from src.data.transforms import seg_transforms_old as ctf
 
 from src.utils import palette
+from src.models.ext.ssd.augmentations import SSDAugmentation
 
-from ..models.ext.fcos_aug import FcosTransforms
 
 VOC_CLASSES = (  # always index 0
     'aeroplane', 'bicycle', 'bird', 'boat',
@@ -78,18 +75,6 @@ class VOCAnnotationTransform(object):
             # img_id = target.find('filename').text[:-4]
         return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
-
-
-def flip(img, boxes):
-    img = img.transpose(Image.FLIP_LEFT_RIGHT)
-    w = img.width
-    if boxes.shape[0] != 0:
-        xmin = w - boxes[:,2]
-        xmax = w - boxes[:,0]
-        boxes[:, 2] = xmax
-        boxes[:, 0] = xmin
-    return img, boxes
-
 class VOCDetection(Dataset):
     """
     Pascal Voc dataset
@@ -100,7 +85,7 @@ class VOCDetection(Dataset):
         super(VOCDetection, self).__init__()
         self.data_cfg = data_cfg
         self.dictionary = dictionary
-        self.transform = FcosTransforms()
+        self.transform = SSDAugmentation()
         self.target_transform = VOCAnnotationTransform()
         self.stage = stage
 
@@ -139,121 +124,47 @@ class VOCDetection(Dataset):
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
         else:
-            img = Image.open(self._imgs[idx])
-            anno = ET.parse(self._labels[idx]).getroot()
-            width, height  = img.size
+            img = cv2.imread(self._imgs[idx])
+            target = ET.parse(self._labels[idx]).getroot()
 
-            boxes, classes = self._parser_xml(anno)
+            height, width, channels = img.shape
 
-            boxes = np.array(boxes, dtype=np.float32)
+            if self.target_transform is not None:
+                target = self.target_transform(target, width, height)
 
-            if random.random() < 0.5:
-                img, boxes = flip(img, boxes)
             if self.transform is not None:
-                img, boxes = self.transform(img, boxes)
-            img = np.array(img)
-            img, boxes = self.preprocess_img_boxes(img, boxes, [800,1333])
+                target = np.array(target)
+                img, boxes, labels = self.transform(img, target[:, :4], target[:, 4])
+                # to rgb
+                img = img[:, :, (2, 1, 0)]
+                # img = img.transpose(2, 0, 1)
+                target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
 
-            img = tf.ToTensor()(img)
-            boxes = torch.from_numpy(boxes)
-            classes = torch.LongTensor(classes)
+            sample = {'image': torch.from_numpy(img).permute(2, 0, 1), 'target': target}
+            return sample
 
-            return img, boxes, classes
-
-    def _parser_xml(self,anno):
-        boxes = []
-        classes = []
-        for obj in anno.iter("object"):
-            difficult = int(obj.find("difficult").text) == 1
-            if difficult:
-                continue
-            _box = obj.find("bndbox")
-            # Make pixel indexes 0-based
-            # Refer to "https://github.com/rbgirshick/py-faster-rcnn/blob/master/lib/datasets/pascal_voc.py#L208-L211"
-            box = [
-                _box.find("xmin").text,
-                _box.find("ymin").text,
-                _box.find("xmax").text,
-                _box.find("ymax").text,
-            ]
-            TO_REMOVE = 1
-            box = tuple(
-                map(lambda x: x - TO_REMOVE, list(map(float, box)))
-            )
-            boxes.append(box)
-
-            name = obj.find("name").text.lower().strip()
-            classes.append(self.name2id[name])
-
-        return boxes, classes
-
-    def preprocess_img_boxes(self,image,boxes,input_ksize):
-        '''
-        resize image and bboxes
-        Returns
-        image_paded: input_ksize
-        bboxes: [None,4]
-        '''
-        min_side, max_side    = input_ksize
-        h,  w, _  = image.shape
-
-        smallest_side = min(w,h)
-        largest_side=max(w,h)
-        scale=min_side/smallest_side
-        if largest_side*scale>max_side:
-            scale=max_side/largest_side
-        nw, nh  = int(scale * w), int(scale * h)
-        image_resized = cv2.resize(image, (nw, nh))
-
-        pad_w=32-nw%32
-        pad_h=32-nh%32
-
-        image_paded = np.zeros(shape=[nh+pad_h, nw+pad_w, 3],dtype=np.uint8)
-        image_paded[:nh, :nw, :] = image_resized
-
-        if boxes is None:
-            return image_paded
-        else:
-            boxes[:, [0, 2]] = boxes[:, [0, 2]] * scale
-            boxes[:, [1, 3]] = boxes[:, [1, 3]] * scale
-            return image_paded, boxes
 
     def __len__(self):
         return len(self._imgs)
 
     @staticmethod
-    def collate_fn(data):
-        imgs_list,boxes_list,classes_list=zip(*data)
-        assert len(imgs_list)==len(boxes_list)==len(classes_list)
-        batch_size=len(boxes_list)
-        pad_imgs_list=[]
-        pad_boxes_list=[]
-        pad_classes_list=[]
-
-        h_list = [int(s.shape[1]) for s in imgs_list]
-        w_list = [int(s.shape[2]) for s in imgs_list]
-        max_h = np.array(h_list).max()
-        max_w = np.array(w_list).max()
-        for i in range(batch_size):
-            img=imgs_list[i]
-            pad_imgs_list.append(tf.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225],inplace=True)(nn.functional.pad(img,(0,int(max_w-img.shape[2]),0,int(max_h-img.shape[1])),value=0.)))
-
-        max_num=0
-        for i in range(batch_size):
-            n=boxes_list[i].shape[0]
-            if n>max_num:max_num=n
-        for i in range(batch_size):
-            pad_boxes_list.append(torch.nn.functional.pad(boxes_list[i],(0,0,0,max_num-boxes_list[i].shape[0]),value=-1))
-            pad_classes_list.append(torch.nn.functional.pad(classes_list[i],(0,max_num-classes_list[i].shape[0]),value=-1))
-
-        batch_boxes=torch.stack(pad_boxes_list)
-        batch_classes=torch.stack(pad_classes_list)
-        batch_imgs=torch.stack(pad_imgs_list)
-
-        target = torch.cat([batch_boxes, batch_classes.unsqueeze(2)], 2)
-        sample = {'image': batch_imgs, 'target': target}
-        return sample
-        # return batch_imgs,batch_boxes,batch_classes
+    def collate(batch):
+        """Custom collate fn for dealing with batches of images that have a different
+        number of associated object annotations (bounding boxes).
+        Arguments:
+            batch: (tuple) A tuple of tensor images and lists of annotations
+        Return:
+            A tuple containing:
+                1) (tensor) batch of images stacked on their 0 dim
+                2) (list of tensors) annotations for a given image are stacked on
+                                     0 dim
+        """
+        targets = []
+        imgs = []
+        for sample in batch:
+            imgs.append(sample[0])
+            targets.append(torch.FloatTensor(sample[1]))
+        return torch.stack(imgs, 0), targets
 
 
 data_transforms = {

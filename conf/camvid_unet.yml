@@ -4,7 +4,7 @@ EXPERIMENT_NAME: 'Camvid_UNet'
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.camvid.CamvidSegmentation'
+  CLASS: 'src.data.datasets.camvid.CamvidSegmentation'
   DICTIONARY: 'conf/dicts/camvid_dict.yml'
   DICTIONARY_NAME: 'SEG_CLASSES'
 

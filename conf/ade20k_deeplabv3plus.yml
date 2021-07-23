@@ -4,7 +4,7 @@ EXPERIMENT_NAME: 'ADE_Deeplabv3Plus'
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.datasets.ade20k.ADE20KSegmentation'
+  CLASS: 'src.data.datasets.ade20k.ADE20KSegmentation'
   DICTIONARY: 'conf/dicts/ade20k_dict.yml'
   DICTIONARY_NAME: 'SEG_CLASSES'
 
