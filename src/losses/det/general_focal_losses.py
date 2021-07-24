@@ -85,22 +85,14 @@ class QualityFocalLoss(nn.Module):
     Detection <https://arxiv.org/abs/2006.04388>`_.
 
     Args:
-        use_sigmoid (bool): Whether sigmoid operation is conducted in QFL.
-            Defaults to True.
         beta (float): The beta parameter for calculating the modulating factor.
             Defaults to 2.0.
         reduction (str): Options are "none", "mean" and "sum".
         loss_weight (float): Loss weight of current loss.
     """
 
-    def __init__(self,
-                 use_sigmoid=True,
-                 beta=2.0,
-                 reduction='mean',
-                 loss_weight=1.0):
+    def __init__(self, beta=2.0,reduction='mean',loss_weight=1.0):
         super(QualityFocalLoss, self).__init__()
-        assert use_sigmoid is True, 'Only sigmoid in QFL supported now.'
-        self.use_sigmoid = use_sigmoid
         self.beta = beta
         self.reduction = reduction
         self.loss_weight = loss_weight
@@ -130,16 +122,14 @@ class QualityFocalLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        if self.use_sigmoid:
-            loss_cls = self.loss_weight * quality_focal_loss(
-                pred,
-                target,
-                weight,
-                beta=self.beta,
-                reduction=reduction,
-                avg_factor=avg_factor)
-        else:
-            raise NotImplementedError
+
+        loss_cls = self.loss_weight * quality_focal_loss(
+            pred,
+            target,
+            weight,
+            beta=self.beta,
+            reduction=reduction,
+            avg_factor=avg_factor)
         return loss_cls
 
 
