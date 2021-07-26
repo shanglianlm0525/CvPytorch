@@ -94,7 +94,7 @@ class PSPNet(nn.Module):
 
         if mode == 'infer':
 
-            return outputs
+            return torch.argmax(outputs, dim=1)
         else:
             losses = {}
             losses['loss'] = 0
@@ -102,7 +102,7 @@ class PSPNet(nn.Module):
             losses['loss'] = losses['ce_loss']
 
             if mode == 'val':
-                return losses, torch.argmax(outputs, dim=1) # outputs.detach().max(dim=1)[1]
+                return losses, torch.argmax(outputs, dim=1)
             else:
                 aux = self.aux(aux_x)
                 aux = F.interpolate(aux, size=imgs.size()[2:], mode='bilinear', align_corners=True)
