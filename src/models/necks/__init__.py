@@ -10,11 +10,13 @@ from .pan import PAN
 from .tan import TAN
 from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
+from .yolox_fpn import YOLOXNeck
 
 __all__ = [
     'FPN',
     'PAN',
     'TAN',
+    'YOLOXNeck',
     'YOLOv3Neck',
     'YOLOv5Neck'
 ]
@@ -28,6 +30,8 @@ def build_neck(cfg):
         return PAN(**neck_cfg)
     elif name == 'TAN':
         return TAN(**neck_cfg)
+    elif name == 'YOLOXNeck':
+        return YOLOXNeck(**neck_cfg)
     elif name == 'YOLOv3Neck':
         return YOLOv3Neck(**neck_cfg)
     elif name == 'YOLOv5Neck':
