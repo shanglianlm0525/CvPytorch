@@ -27,6 +27,7 @@ __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
         'RandomResizedCrop', 'RandomCrop',
         'RandomRotate', 'RandomAffine',
         'ColorJitter', 'GaussianBlur',
+           '', 'ToPercentCoords',
         'Normalize', 'ToTensor',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
@@ -243,6 +244,34 @@ class ToPercentCoords(object):
         boxes[:, 0::2] /= width
         boxes[:, 1::2] /= height
         target["boxes"] = boxes
+        return {'image': img, 'target': target}
+
+
+class ToXYWH(object):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        boxes_cp = boxes.clone()
+        boxes_cp[:, 0] = (boxes[:, 0] + boxes[:, 2]) / 2  # x center
+        boxes_cp[:, 1] = (boxes[:, 1] + boxes[:, 3]) / 2  # y center
+        boxes_cp[:, 2] = boxes[:, 2] - boxes[:, 0]  # width
+        boxes_cp[:, 3] = boxes[:, 3] - boxes[:, 1]  # height
+        target["boxes"] = boxes_cp
+        return {'image': img, 'target': target}
+
+
+class ToXYXY(object):
+    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        boxes_cp = boxes.clone()
+        boxes_cp[:, 0] = boxes[:, 0] - boxes[:, 2] / 2  # top left x
+        boxes_cp[:, 1] = boxes[:, 1] - boxes[:, 3] / 2  # top left y
+        boxes_cp[:, 2] = boxes[:, 0] + boxes[:, 2] / 2  # bottom right x
+        boxes_cp[:, 3] = boxes[:, 1] + boxes[:, 3] / 2  # bottom right y
+        target["boxes"] = boxes_cp
         return {'image': img, 'target': target}
 
 
