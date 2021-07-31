@@ -10,7 +10,7 @@ from ..modules.yolov5_modules import Focus, Conv, C3, SPP
 
 
 class YOLOv5Backbone(nn.Module):
-    def __init__(self, subtype='yolov5s', out_stages=[2,3,4], output_stride = 32, depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='yolov5s', out_stages=[2,3,4], output_stride = 32, layers=[3, 9, 9], depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
         super(YOLOv5Backbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
@@ -21,9 +21,8 @@ class YOLOv5Backbone(nn.Module):
         self.pretrained = pretrained
 
         self.out_channels = [64, 128, 256, 512, 1024]
-        self.block_nums = [3, 9, 9]
         self.out_channels = in_places = list(map(lambda x: int(x * self.width_mul), self.out_channels))
-        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), self.block_nums))
+        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), layers))
 
         self.conv1 = Focus(3, in_places[0], 3)
         self.layer1 = nn.Sequential(Conv(in_places[0], in_places[1], 3, 2),
