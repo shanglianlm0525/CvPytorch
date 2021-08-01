@@ -11,7 +11,7 @@ from ..modules.yolov5_modules import C3, Conv
 
 
 class YOLOv5Neck(nn.Module):
-    def __init__(self, in_channels, out_channels, depth_mul=1.0, width_mul=1.0):
+    def __init__(self, in_channels, out_channels, layers=[3, 3, 3], depth_mul=1.0, width_mul=1.0):
         super(YOLOv5Neck, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
@@ -21,7 +21,7 @@ class YOLOv5Neck(nn.Module):
         self.num_ins = len(in_channels)
 
         self.block_nums = [3, 3, 3]
-        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), self.block_nums))
+        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), layers))
 
         self.up_convs = nn.ModuleList()
         for i in range(self.num_ins-1, 0, -1):
