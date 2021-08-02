@@ -9,7 +9,7 @@ import torch.nn as nn
 
 
 class YOLOv5Head(nn.Module):
-    def __init__(self, num_classes=80, channels=[256, 512, 1024], anchors=[]):
+    def __init__(self, num_classes=80, channels=[256, 512, 1024], depth_mul=1.0, width_mul=1.0, anchors=[[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]]):
         super(YOLOv5Head, self).__init__()
 
         self.num_classes = num_classes  # number of classes
@@ -25,12 +25,11 @@ class YOLOv5Head(nn.Module):
     def train(self, mode=True):
         super().train(mode=True)
         self.mode = 'train'
-        print('self.mode = {self.mode}')
 
     def eval(self):
         super().train(mode=False)
         self.mode = 'val'
-        print('self.mode = {self.mode}')
+
 
     def forword(self, x):
         # x = x.copy()  # for profiling
