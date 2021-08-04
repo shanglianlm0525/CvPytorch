@@ -40,9 +40,11 @@ class NanoDet(nn.Module):
                 }}
         self.head = build_head(head_cfg)
         '''
+        self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
+
         self.backbone = build_backbone(self.model_cfg.BACKBONE)
         self.neck = build_neck(self.model_cfg.NECK)
-        self.head = build_head(self.num_classes, self.model_cfg.HEAD)
+        self.head = build_head(self.model_cfg.HEAD)
 
         # self.model_cfg.LOSS.num_classes = self.num_classes
         # self.loss = NanoDetLoss(self.model_cfg.LOSS)
