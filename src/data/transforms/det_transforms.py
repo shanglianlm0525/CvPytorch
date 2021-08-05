@@ -205,7 +205,7 @@ class RandomCrop(object):
               For example, padding [1, 2, 3, 4] with 2 elements on both sides in symmetric mode
               will result in [2, 1, 1, 2, 3, 4, 4, 3]
     """
-    def __init__(self, size, padding=None, pad_if_needed=False, fill=0):
+    def __init__(self, size, padding=None, pad_if_needed=False, fill=[128, 128, 128]):
         super().__init__()
         self.size = size
         self.padding = padding
@@ -250,26 +250,29 @@ class RandomCrop(object):
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
         if self.padding is not None:
-            img = F.pad(img, self.padding, self.fill, self.padding_mode)
+            top, bottom, left, right = self.padding
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)
+            boxes += np.array([left, top, left, top])
 
         height, width, _ = img.shape
         # pad the width if needed
-        if self.pad_if_needed and width < self.size[1]:
-            padding = [self.size[1] - width, 0]
-            img = F.pad(img, padding, self.fill, self.padding_mode)
-        # pad the height if needed
-        if self.pad_if_needed and height < self.size[0]:
-            padding = [0, self.size[0] - height]
-            img = F.pad(img, padding, self.fill, self.padding_mode)
+        if self.pad_if_needed and (height < self.size[0] or width < self.size[1]):
+            padh = self.size[0] - height
+            pwdw = self.size[1] - width
+            padh2, pwdw2 = padh // 2, pwdw // 2
+            left, top, right, bottom = padh2, pwdw2, pwdw - padh2, padh - pwdw2
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
+            boxes += np.array([left, top, left, top])
 
         i, j, h, w = self.get_params(img, self.size)
+        img = img[i:(i + h), j:(j + w), :]
         boxes -= np.array([j, i, j, i])
 
-        boxes[:, 1::2].clamp_(min=0, max=h - 1)
-        boxes[:, 0::2].clamp_(min=0, max=w - 1)
+        boxes[:, 1::2] = boxes[:, 1::2].clip(min=0, max=h-1)
+        boxes[:, 0::2] = boxes[:, 0::2].clip(min=0, max=w-1)
 
         target["boxes"] = boxes
-        return {'image': F.crop(img, i, j, h, w), 'target': target}
+        return {'image': img, 'target': target}
 
 
 class RandomResizedCrop(object):
@@ -844,7 +847,7 @@ if __name__ == '__main__':
     # trf = ColorHSV(p=1, hue=0.5, saturation=0.5, brightness=0.5)
     # trf = RandomAffine(degrees=[5, 5], translate=0.1, scale=0.5, shear=[0., 0.], perspective=[0., 0.], border=[0, 0])
     # trf = RandomResizedCrop(size=[320, 320], scale=[0.6, 1.4], ratio=[0.5, 2.0], keep_ratio=True)
-    # trf = RandomCrop(size=[320, 320], scale=[0.6, 1.4], ratio=[0.5, 2.0], keep_ratio=True)
+    trf = RandomCrop(size=[320, 320])
 
     sample = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/sample1.pth')
     # print(sample)
