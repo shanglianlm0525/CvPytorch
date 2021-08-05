@@ -1,34 +1,31 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2021/3/17 9:50
+# @Time : 2021/8/2 16:15
 # @Author : liumin
 # @File : det_transforms.py
-
-import torch
 import copy
+import math
 import random
 import warnings
-from collections import Sequence
-from torch import Tensor
-import cv2
-import numbers
 
-import math
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
 from PIL import Image
 from torchvision import transforms as T
-from torchvision.transforms import functional as F, InterpolationMode
+from torchvision.transforms import functional as F
 from pycocotools import mask as coco_mask
-import numpy as np
 
-from src.data.transforms.seg_transforms import _setup_size
 
 __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
         'Resize',
         'RandomResizedCrop', 'RandomCrop',
-        'RandomRotate', 'RandomAffine',
-        'ColorJitter', 'GaussianBlur',
-           '', 'ToPercentCoords',
-        'Normalize', 'ToTensor',
+        'RandomAffine', 'RandomGrayscale',
+        'ColorHSV', 'ColorJitter', 'RandomEqualize', 'GaussianBlur', 'MedianBlur',
+        'ToXYXY', 'ToXYWH', 'ToPercentCoords',
+        'Cutout',
+        'Normalize', 'ToTensor', 'ToArrayImage',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
 
@@ -49,13 +46,19 @@ class ToTensor(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        if self.normalize:
-            return {'image': F.to_tensor(img), 'target': target}
-        else:
-            return {'image': torch.from_numpy( np.array(img, dtype=np.float32).transpose(2, 0, 1) ), 'target': target }
+        img = img.transpose((2, 0, 1))[::-1] # HWC to CHW, BGR to RGB
+        img = np.ascontiguousarray(img)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '()'
+        target["boxes"] = torch.from_numpy(target["boxes"])
+        if target.__contains__("masks"):
+            mask = target["masks"]
+            mask = mask.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+            mask = np.ascontiguousarray(mask)
+            target["masks"] = torch.from_numpy(mask)
+        if self.normalize:
+            return {'image': torch.from_numpy(img.astype(np.float32)).div_(255.0), 'target': target}
+        else:
+            return {'image': torch.from_numpy(img.astype(np.float32)), 'target': target }
 
 
 class Normalize(object):
@@ -68,61 +71,10 @@ class Normalize(object):
         return {'image': F.normalize(img, self.mean, self.std),'target': target}
 
 
-class Resize(object):
-    """Resize the input PIL Image to the given size.
-    Args:
-        size (sequence or int): Desired output size. If size is a sequence like
-            (h, w), output size will be matched to this. If size is an int,
-            smaller edge of the image will be matched to this number.
-            i.e, if height > width, then image will be rescaled to
-            (size * height / width, size)
-        interpolation (int, optional): Desired interpolation. Default is
-            ``PIL.Image.BILINEAR``
-    """
-
-    def __init__(self, size, keep_ratio=True, fill=0, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
-        # assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
-        if isinstance(size, numbers.Number):
-            self.size = (size, size)
-        else:
-            self.size = size
-
-        self.keep_ratio = keep_ratio
-        self.interpolation = interpolation
-        self.fill = fill
-        self.padding_mode = padding_mode
-
+class ToArrayImage(object):
     def __call__(self, sample):
-        """
-        Args:
-            img (PIL Image): Image to be scaled.
-        Returns:
-            PIL Image: Rescaled image.
-        """
         img, target = sample['image'], sample['target']
-        w, h = img.size
-        boxes = target["boxes"]
-
-        if self.keep_ratio:
-            scale = min(self.size[0] / h, self.size[1] / w)
-            ow = int(w * scale)
-            oh = int(h * scale)
-            img = F.resize(img, [oh, ow], self.interpolation)
-            # left, top, right and bottom
-            img = F.pad(img, [0, 0, self.size[1] - ow, self.size[0] - oh], self.fill, self.padding_mode)
-            boxes[:, :4] = boxes[:, :4] * scale
-
-            target["boxes"] = boxes
-            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
-            return {'image': img, 'target': target}
-        else:
-            scale_h, scale_w = self.size[0] / h, self.size[1] / w
-            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
-            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
-
-            target["boxes"] = boxes
-            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
-            return {'image': F.resize(img, self.size, self.interpolation), 'target': target}
+        return {'image': np.asarray(img, dtype=np.uint8), 'target': target}
 
 
 class RandomHorizontalFlip(object):
@@ -132,15 +84,15 @@ class RandomHorizontalFlip(object):
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            w, h = img.size
+            height, width, _ = img.shape
             boxes = target["boxes"]
             if boxes.shape[0] != 0:
-                xmin = w-1 - boxes[:, 2]
-                xmax = w-1 - boxes[:, 0]
+                xmin = width - 1 - boxes[:, 2]
+                xmax = width - 1 - boxes[:, 0]
                 boxes[:, 2] = xmax
                 boxes[:, 0] = xmin
             target["boxes"] = boxes
-            return {'image': F.hflip(img),'target': target}
+            return {'image': cv2.flip(img, 1),'target': target}
         return {'image': img,'target': target}
 
 
@@ -151,284 +103,63 @@ class RandomVerticalFlip(object):
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            w, h = img.size
+            height, width, _ = img.shape
             boxes = target["boxes"]
             if boxes.shape[0] != 0:
-                ymin = h-1 - boxes[:, 3]
-                ymax = h-1 - boxes[:, 1]
+                ymin = height -1 - boxes[:, 3]
+                ymax = height -1 - boxes[:, 1]
                 boxes[:, 3] = ymax
                 boxes[:, 1] = ymin
             target["boxes"] = boxes
-            return {'image': F.vflip(img), 'target': target}
+            return {'image': cv2.flip(img, 0), 'target': target}
         return {'image': img, 'target': target}
 
 
-class ColorJitter(object):
-    def __init__(self, p=0.3, brightness=0, contrast=0, saturation=0, hue=0):
-        self.p = p
-        self.brightness = brightness
-        self.contrast = contrast
-        self.saturation = saturation
-        self.hue = hue
 
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        if random.random() < self.p:
-            return {'image': T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)(img), 'target': target}
-        return {'image': img, 'target': target}
+class Resize(object):
+    """Resize the input img to the given size."""
 
-
-class RandomRotate(object):
-    def __init__(self, p=0.5, degrees=0):
-        self.p = p
-        if isinstance(degrees, numbers.Number):
-            if degrees < 0:
-                raise ValueError("If degrees is a single number, it must be positive.")
-            self.degrees = (-degrees, degrees)
-        else:
-            if len(degrees) != 2:
-                raise ValueError("If degrees is a sequence, it must be of len 2.")
-            self.degrees = degrees
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        if random.random() < self.p:
-            boxes = target["boxes"]
-            angle = random.uniform(self.degrees[0], self.degrees[1])
-            w, h = img.size
-            rx0, ry0 = w / 2.0, h / 2.0
-            img = img.rotate(angle)
-            a = -angle / 180.0 * math.pi
-            # boxes = torch.from_numpy(boxes)
-            new_boxes = torch.zeros_like(boxes)
-            new_boxes[:, 0] = boxes[:, 1]
-            new_boxes[:, 1] = boxes[:, 0]
-            new_boxes[:, 2] = boxes[:, 3]
-            new_boxes[:, 3] = boxes[:, 2]
-
-            for i in range(boxes.shape[0]):
-                ymin, xmin, ymax, xmax = new_boxes[i, :]
-                xmin, ymin, xmax, ymax = float(xmin), float(ymin), float(xmax), float(ymax)
-                x0, y0 = xmin, ymin
-                x1, y1 = xmin, ymax
-                x2, y2 = xmax, ymin
-                x3, y3 = xmax, ymax
-                z = torch.FloatTensor([[y0, x0], [y1, x1], [y2, x2], [y3, x3]])
-                tp = torch.zeros_like(z)
-                tp[:, 1] = (z[:, 1] - rx0) * math.cos(a) - (z[:, 0] - ry0) * math.sin(a) + rx0
-                tp[:, 0] = (z[:, 1] - rx0) * math.sin(a) + (z[:, 0] - ry0) * math.cos(a) + ry0
-                ymax, xmax = torch.max(tp, dim=0)[0]
-                ymin, xmin = torch.min(tp, dim=0)[0]
-                new_boxes[i] = torch.stack([ymin, xmin, ymax, xmax])
-            new_boxes[:, 1::2].clamp_(min=0, max=w - 1)
-            new_boxes[:, 0::2].clamp_(min=0, max=h - 1)
-            boxes[:, 0] = new_boxes[:, 1]
-            boxes[:, 1] = new_boxes[:, 0]
-            boxes[:, 2] = new_boxes[:, 3]
-            boxes[:, 3] = new_boxes[:, 2]
-            target["boxes"] = boxes # boxes.numpy()
-        return {'image': img, 'target': target}
-
-
-class ToArrayImage(object):
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        return {'image': np.asarray(img, dtype=np.float32), 'target': target}
-
-
-class ToPercentCoords(object):
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        boxes = target["boxes"]
-        width, height = img.size
-        boxes[:, 0::2] /= width
-        boxes[:, 1::2] /= height
-        target["boxes"] = boxes
-        return {'image': img, 'target': target}
-
-
-class ToXYWH(object):
-    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        boxes = target["boxes"]
-        boxes_cp = boxes.clone()
-        boxes_cp[:, 0] = (boxes[:, 0] + boxes[:, 2]) / 2  # x center
-        boxes_cp[:, 1] = (boxes[:, 1] + boxes[:, 3]) / 2  # y center
-        boxes_cp[:, 2] = boxes[:, 2] - boxes[:, 0]  # width
-        boxes_cp[:, 3] = boxes[:, 3] - boxes[:, 1]  # height
-        target["boxes"] = boxes_cp
-        return {'image': img, 'target': target}
-
-
-class ToXYXY(object):
-    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        boxes = target["boxes"]
-        boxes_cp = boxes.clone()
-        boxes_cp[:, 0] = boxes[:, 0] - boxes[:, 2] / 2  # top left x
-        boxes_cp[:, 1] = boxes[:, 1] - boxes[:, 3] / 2  # top left y
-        boxes_cp[:, 2] = boxes[:, 0] + boxes[:, 2] / 2  # bottom right x
-        boxes_cp[:, 3] = boxes[:, 1] + boxes[:, 3] / 2  # bottom right y
-        target["boxes"] = boxes_cp
-        return {'image': img, 'target': target}
-
-
-class RandomAffine(object):
-    """Random affine transformation of the image keeping center invariant.
-    If the image is torch Tensor, it is expected
-    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions.
-
-    Args:
-        degrees (sequence or number): Range of degrees to select from.
-            If degrees is a number instead of sequence like (min, max), the range of degrees
-            will be (-degrees, +degrees). Set to 0 to deactivate rotations.
-        translate (tuple, optional): tuple of maximum absolute fraction for horizontal
-            and vertical translations. For example translate=(a, b), then horizontal shift
-            is randomly sampled in the range -img_width * a < dx < img_width * a and vertical shift is
-            randomly sampled in the range -img_height * b < dy < img_height * b. Will not translate by default.
-        scale (tuple, optional): scaling factor interval, e.g (a, b), then scale is
-            randomly sampled from the range a <= scale <= b. Will keep original scale by default.
-        shear (sequence or number, optional): Range of degrees to select from.
-            If shear is a number, a shear parallel to the x axis in the range (-shear, +shear)
-            will be applied. Else if shear is a sequence of 2 values a shear parallel to the x axis in the
-            range (shear[0], shear[1]) will be applied. Else if shear is a sequence of 4 values,
-            a x-axis shear in (shear[0], shear[1]) and y-axis shear in (shear[2], shear[3]) will be applied.
-            Will not apply shear by default.
-        interpolation (InterpolationMode): Desired interpolation enum defined by
-            :class:`torchvision.transforms.InterpolationMode`. Default is ``InterpolationMode.NEAREST``.
-            If input is Tensor, only ``InterpolationMode.NEAREST``, ``InterpolationMode.BILINEAR`` are supported.
-            For backward compatibility integer values (e.g. ``PIL.Image.NEAREST``) are still acceptable.
-        fill (sequence or number): Pixel fill value for the area outside the transformed
-            image. Default is ``0``. If given a number, the value is used for all bands respectively.
-        fillcolor (sequence or number, optional): deprecated argument and will be removed since v0.10.0.
-            Please use the ``fill`` parameter instead.
-        resample (int, optional): deprecated argument and will be removed since v0.10.0.
-            Please use the ``interpolation`` parameter instead.
-
-    .. _filters: https://pillow.readthedocs.io/en/latest/handbook/concepts.html#filters
-
-    """
-
-    def __init__(
-        self, p=0.5, degrees=(0, 0), translate=None, scale=None, shear=None, interpolation=InterpolationMode.NEAREST, fill=0):
-        super().__init__()
-        self.p = p
-        self.degrees = degrees
-        self.translate = translate
-        self.scale = scale
-        self.shear = shear
-        self.interpolation = interpolation
+    def __init__(self, size, keep_ratio=True, fill=[128, 128, 128]):
+        self.size = size if isinstance(size, list) else [size, size]
+        self.keep_ratio = keep_ratio
         self.fill = fill
 
-    @staticmethod
-    def get_params(degrees, translate, scale_ranges, shears, img_size):
-        """Get parameters for affine transformation
-
-        Returns:
-            params to be passed to the affine transformation
-        """
-        angle = float(torch.empty(1).uniform_(float(degrees[0]), float(degrees[1])).item())
-        if translate is not None:
-            max_dx = float(translate[0] * img_size[0])
-            max_dy = float(translate[1] * img_size[1])
-            tx = int(round(torch.empty(1).uniform_(-max_dx, max_dx).item()))
-            ty = int(round(torch.empty(1).uniform_(-max_dy, max_dy).item()))
-            translations = (tx, ty)
-        else:
-            translations = (0, 0)
-
-        if scale_ranges is not None:
-            scale = float(torch.empty(1).uniform_(scale_ranges[0], scale_ranges[1]).item())
-        else:
-            scale = 1.0
-
-        shear_x = shear_y = 0.0
-        if shears is not None:
-            shear_x = float(torch.empty(1).uniform_(shears[0], shears[1]).item())
-            if len(shears) == 4:
-                shear_y = float(torch.empty(1).uniform_(shears[2], shears[3]).item())
-
-        shear = (shear_x, shear_y)
-
-        return angle, translations, scale, shear
-
-
     def __call__(self, sample):
-        """
-            img (PIL Image or Tensor): Image to be transformed.
-
-        Returns:
-            PIL Image or Tensor: Affine transformed image.
-        """
         img, target = sample['image'], sample['target']
+        height, width, _ = img.shape
         boxes = target["boxes"]
 
-        if random.random() < self.p:
-            fill = self.fill
-            if isinstance(img, Tensor):
-                if isinstance(fill, (int, float)):
-                    fill = [float(fill)] * F._get_image_num_channels(img)
-                else:
-                    fill = [float(f) for f in fill]
+        if self.keep_ratio:
+            scale = min(self.size[0] / height, self.size[1] / width)
+            oh, ow = int(round(height * scale)), int(round(width * scale))
+            padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
+            padh /= 2
+            padw /= 2  # divide padding into 2 sides
 
-            img_size = F._get_image_size(img)
-            width, height = img_size
+            if (height != oh) or (width != ow):
+                img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
-            ret = self.get_params(self.degrees, self.translate, self.scale, self.shear, img_size)
-            # print(ret)
-            angle, (translation_x, translation_y), scale, (shear_x, shear_y) = ret
-            # angle
-            rx0, ry0 = width / 2.0, height / 2.0
-            img = img.rotate(angle)
-            a = -angle / 180.0 * math.pi
-            # boxes = torch.from_numpy(boxes)
-            new_boxes = torch.zeros_like(boxes)
-            new_boxes[:, 0] = boxes[:, 1]
-            new_boxes[:, 1] = boxes[:, 0]
-            new_boxes[:, 2] = boxes[:, 3]
-            new_boxes[:, 3] = boxes[:, 2]
+            top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
+            left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
 
-            for i in range(boxes.shape[0]):
-                ymin, xmin, ymax, xmax = new_boxes[i, :]
-                xmin, ymin, xmax, ymax = float(xmin), float(ymin), float(xmax), float(ymax)
-                x0, y0 = xmin, ymin
-                x1, y1 = xmin, ymax
-                x2, y2 = xmax, ymin
-                x3, y3 = xmax, ymax
-                z = torch.FloatTensor([[y0, x0], [y1, x1], [y2, x2], [y3, x3]])
-                tp = torch.zeros_like(z)
-                tp[:, 1] = (z[:, 1] - rx0) * math.cos(a) - (z[:, 0] - ry0) * math.sin(a) + rx0
-                tp[:, 0] = (z[:, 1] - rx0) * math.sin(a) + (z[:, 0] - ry0) * math.cos(a) + ry0
-                ymax, xmax = torch.max(tp, dim=0)[0]
-                ymin, xmin = torch.min(tp, dim=0)[0]
-                new_boxes[i] = torch.stack([ymin, xmin, ymax, xmax])
-            new_boxes[:, 1::2].clamp_(min=0, max=width - 1)
-            new_boxes[:, 0::2].clamp_(min=0, max=height - 1)
-            boxes[:, 0] = new_boxes[:, 1]
-            boxes[:, 1] = new_boxes[:, 0]
-            boxes[:, 2] = new_boxes[:, 3]
-            boxes[:, 3] = new_boxes[:, 2]
+            boxes[:, 1::2] = boxes[:, 1::2] * scale + top
+            boxes[:, 0::2] = boxes[:, 0::2] * scale + left
 
-            # translations
-            boxes += torch.Tensor([translation_x, translation_y, translation_x, translation_y])
-            # scale
-            boxes *= scale
-            boxes += torch.Tensor([int(width * 0.5 * (1-scale)), int(height* 0.5 * (1-scale)),
-                                   int(width * 0.5 * (1-scale)), int(height* 0.5 * (1-scale))])
-            # shear
+            target["boxes"] = boxes
+            target["pads"] = torch.tensor([top, left], dtype=torch.float)
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+            return {'image': img, 'target': target}
+        else:
+            scale_h, scale_w = self.size[0] / height, self.size[1] / width
+            img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
+            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
 
-            # clamp
-            boxes[:, 1::2].clamp_(min=max(translation_y, 0), max=min(height+translation_y-1, height-1))
-            boxes[:, 0::2].clamp_(min=max(translation_x, 0), max=min(width+translation_x-1, width-1))
-            # return F.affine(img, *ret, interpolation=self.interpolation, fill=fill)
-            target["boxes"] = boxes # 0.3, 0.7
-            return {'image': F.affine(img, *ret, interpolation=self.interpolation, fill=fill),
-                    'target': target}
-
-        return {'image': img, 'target': target}
-
+            target["boxes"] = boxes
+            target["pads"] = torch.tensor([0, 0], dtype=torch.float)
+            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
+            return {'image': img, 'target': target}
 
 
 class RandomCrop(object):
@@ -474,6 +205,12 @@ class RandomCrop(object):
               For example, padding [1, 2, 3, 4] with 2 elements on both sides in symmetric mode
               will result in [2, 1, 1, 2, 3, 4, 4, 3]
     """
+    def __init__(self, size, padding=None, pad_if_needed=False, fill=0):
+        super().__init__()
+        self.size = size
+        self.padding = padding
+        self.pad_if_needed = pad_if_needed
+        self.fill = fill
 
     @staticmethod
     def get_params(img, output_size):
@@ -486,7 +223,7 @@ class RandomCrop(object):
         Returns:
             tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
         """
-        w, h = F._get_image_size(img)
+        h, w, _ = img.shape
         th, tw = output_size
 
         if h + 1 < th or w + 1 < tw:
@@ -497,22 +234,10 @@ class RandomCrop(object):
         if w == tw and h == th:
             return 0, 0, h, w
 
-        i = torch.randint(0, h - th + 1, size=(1, )).item()
-        j = torch.randint(0, w - tw + 1, size=(1, )).item()
+        i = torch.randint(0, h - th + 1, size=(1,)).item()
+        j = torch.randint(0, w - tw + 1, size=(1,)).item()
         return i, j, th, tw
 
-
-    def __init__(self, size, padding=None, pad_if_needed=False, fill=0, padding_mode="constant"):
-        super().__init__()
-
-        self.size = tuple(_setup_size(
-            size, error_msg="Please provide only two dimensions (h, w) for size."
-        ))
-
-        self.padding = padding
-        self.pad_if_needed = pad_if_needed
-        self.fill = fill
-        self.padding_mode = padding_mode
 
     def __call__(self, sample):
         """
@@ -527,7 +252,7 @@ class RandomCrop(object):
         if self.padding is not None:
             img = F.pad(img, self.padding, self.fill, self.padding_mode)
 
-        width, height = F._get_image_size(img)
+        height, width, _ = img.shape
         # pad the width if needed
         if self.pad_if_needed and width < self.size[1]:
             padding = [self.size[1] - width, 0]
@@ -538,7 +263,7 @@ class RandomCrop(object):
             img = F.pad(img, padding, self.fill, self.padding_mode)
 
         i, j, h, w = self.get_params(img, self.size)
-        boxes -= torch.Tensor([j, i, j, i])
+        boxes -= np.array([j, i, j, i])
 
         boxes[:, 1::2].clamp_(min=0, max=h - 1)
         boxes[:, 0::2].clamp_(min=0, max=w - 1)
@@ -576,21 +301,16 @@ class RandomResizedCrop(object):
 
     """
 
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, fill=[128, 128, 128]):
         super().__init__()
-        self.size = _setup_size(size, error_msg="Please provide only two dimensions (h, w) for size.")
-
-        if not isinstance(scale, Sequence):
-            raise TypeError("Scale should be a sequence")
-        if not isinstance(ratio, Sequence):
-            raise TypeError("Ratio should be a sequence")
+        self.size = size
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
             warnings.warn("Scale and ratio should be of kind (min, max)")
 
-        self.interpolation = interpolation
         self.scale = scale
         self.ratio = ratio
         self.keep_ratio = keep_ratio
+        self.fill = fill
 
     @staticmethod
     def get_params(img, scale, ratio):
@@ -605,7 +325,7 @@ class RandomResizedCrop(object):
             tuple: params (i, j, h, w) to be passed to ``crop`` for a random
             sized crop.
         """
-        width, height = F._get_image_size(img)
+        height, width, _ = img.shape
         area = height * width
 
         log_ratio = torch.log(torch.tensor(ratio))
@@ -649,161 +369,363 @@ class RandomResizedCrop(object):
         """
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
-        width, height = F._get_image_size(img)
+        height, width, _ = img.shape
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
         if self.keep_ratio:
-            # crop
-            img = F.crop(img, i, j, h, w)
-            boxes -= torch.Tensor([j, i, j, i])
+            # crop (top, left, height, width)
+            img = img[i:(i + h), j:(j + w), :]
+            boxes -= np.array([j, i, j, i])
+            boxes[:, 0::2] = boxes[:, 0::2].clip(0, w)
+            boxes[:, 1::2] = boxes[:, 1::2].clip(0, h)
+
             # resize
             scale = min(self.size[0] / h, self.size[1] / w)
             ow = int(w * scale)
             oh = int(h * scale)
-            img = F.resize(img, [oh, ow], self.interpolation)
-            boxes[:, :4] = boxes[:, :4] * scale
+            img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
             # pad,  left, top, right and bottom
-            img = F.pad(img, [0, 0, self.size[1] - ow, self.size[0] - oh], 0, 'constant')
+            padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
+            padh /= 2
+            padw /= 2  # divide padding into 2 sides
+            top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
+            left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
+            boxes[:, 1::2] = boxes[:, 1::2] * scale + top
+            boxes[:, 0::2] = boxes[:, 0::2] * scale + left
 
-            # clamp
-            boxes[:, 1::2].clamp_(min=0, max=oh - 1)
-            boxes[:, 0::2].clamp_(min=0, max=ow - 1)
-
-            target["boxes"] = boxes  # boxes.numpy()
+            target["boxes"] = boxes.astype(np.float32)  # boxes.numpy()
             return {'image': img, 'target': target}
         else:
             # crop
-            boxes -= torch.Tensor([j, i, j, i])
+            img = img[i:(i + h), j:(j + w), :]
+            boxes -= [j, i, j, i]
             # resize
+            img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
             scale_h, scale_w = self.size[0] / h, self.size[1] / w
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
-            # clamp
-            boxes[:, 1::2].clamp_(min=0, max=self.size[0] - 1)
-            boxes[:, 0::2].clamp_(min=0, max=self.size[1] - 1)
 
-            target["boxes"] = boxes  # boxes.numpy()
-            return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation), 'target': target}
-
-'''
-keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
-if torch.nonzero(keep).size(0) < 1:
-    return 
-'''
+            target["boxes"] = boxes.astype(np.float32)  # boxes.numpy()
+            return {'image': img, 'target': target}
 
 
-
-class GaussianBlur(object):
-    """Blurs image with randomly chosen Gaussian blur.
-    If the image is torch Tensor, it is expected
-    to have [..., C, H, W] shape, where ... means an arbitrary number of leading dimensions.
-
-    Args:
-        kernel_size (int or sequence): Size of the Gaussian kernel.
-        sigma (float or tuple of float (min, max)): Standard deviation to be used for
-            creating kernel to perform blurring. If float, sigma is fixed. If it is tuple
-            of float (min, max), sigma is chosen uniformly at random to lie in the
-            given range.
-
-    Returns:
-        PIL Image or Tensor: Gaussian blurred version of the input image.
-
-    """
-
-    def __init__(self, p=0.5, kernel_size=5, sigma=(0.1, 2.0)):
-        super().__init__()
-        self.kernel_size = _setup_size(kernel_size, "Kernel size should be a tuple/list of two integers")
-        for ks in self.kernel_size:
-            if ks <= 0 or ks % 2 == 0:
-                raise ValueError("Kernel size value should be an odd and positive number.")
-
-        if isinstance(sigma, numbers.Number):
-            if sigma <= 0:
-                raise ValueError("If sigma is a single number, it must be positive.")
-            sigma = (sigma, sigma)
-        elif isinstance(sigma, Sequence) and len(sigma) == 2:
-            if not 0. < sigma[0] <= sigma[1]:
-                raise ValueError("sigma values should be positive and of the form (min, max).")
-        else:
-            raise ValueError("sigma should be a single number or a list/tuple with length 2.")
-
-        self.sigma = sigma
-
-    @staticmethod
-    def get_params(sigma_min: float, sigma_max: float) -> float:
-        """Choose sigma for random gaussian blurring.
-
-        Args:
-            sigma_min (float): Minimum standard deviation that can be chosen for blurring kernel.
-            sigma_max (float): Maximum standard deviation that can be chosen for blurring kernel.
-
-        Returns:
-            float: Standard deviation to be passed to calculate kernel for gaussian blurring.
-        """
-        return torch.empty(1).uniform_(sigma_min, sigma_max).item()
-
+class ColorJitter(object):
+    def __init__(self, p=0.3, brightness=0, contrast=0, saturation=0, hue=0):
+        self.p = p
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
 
     def __call__(self, sample):
-        """
-        Args:
-            img (PIL Image or Tensor): image to be blurred.
-
-        Returns:
-            PIL Image or Tensor: Gaussian blurred image
-        """
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            sigma = self.get_params(self.sigma[0], self.sigma[1])
-            return {'image': F.gaussian_blur(img, self.kernel_size, [sigma, sigma]), 'target': target}
+            image = Image.fromarray(img.astype(np.uint8))
+            image = T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)(image)
+            return {'image': np.asarray(image), 'target': target}
         return {'image': img, 'target': target}
 
 
-def _box_inter(box1, box2):
-    tl = torch.max(box1[:,None,:2], box2[:,:2])  # [n,m,2]
-    br = torch.min(box1[:,None,2:], box2[:,2:])  # [n,m,2]
-    hw = (br-tl).clamp(min=0)  # [n,m,2]
-    inter = hw[:,:,0] * hw[:,:,1]  # [n,m]
-    return inter
+
+def random_contrast(img, alpha_low, alpha_up):
+    img *= random.uniform(alpha_low, alpha_up)
+    return img
 
 
-class FcosPreprocess(object):
-    def __init__(self, p=0.5, size=[800,1333], scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), crop=False):
+class ColorHSV(object):
+    def __init__(self, p=0.5, hue=0, saturation=0, brightness=0):
         self.p = p
-        self.size = size
-        self.scale = scale
-        self.ratio = ratio
-        self.crop = crop
+        self.hue = hue
+        self.saturation = saturation
+        self.brightness = brightness
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            r = np.random.uniform(-1, 1, 3) * [self.hue, self.saturation, self.brightness] + 1  # random gains
+            hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
+            dtype = img.dtype  # uint8
+
+            x = np.arange(0, 256, dtype=r.dtype)
+            lut_hue = ((x * r[0]) % 180).astype(dtype)
+            lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
+            lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+
+            im_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val)))
+            return {'image': cv2.cvtColor(im_hsv, cv2.COLOR_HSV2BGR, dst=img), 'target': target}
+        return {'image': img, 'target': target}
+
+
+
+class RandomEqualize(object):
+    def __init__(self, p=0.5, clahe=True):
+        self.p = p
+        self.clahe = clahe
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+            if self.clahe:
+                c = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                yuv[:, :, 0] = c.apply(yuv[:, :, 0])
+            else:
+                yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])  # equalize Y channel histogram
+            img = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+        return {'image': img, 'target': target}
+
+
+class ToPercentCoords(object):
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        height, width, _ = img.shape
+        boxes[:, 0::2] /= width
+        boxes[:, 1::2] /= height
+        target["boxes"] = boxes
+        return {'image': img, 'target': target}
+
+
+class ToXYWH(object):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    def __init__(self, normalize=False):
+        self.normalize = normalize
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
+        boxes_cp = copy.deepcopy(boxes)
+        boxes_cp[:, 0] = (boxes[:, 0] + boxes[:, 2]) * 0.5  # x center
+        boxes_cp[:, 1] = (boxes[:, 1] + boxes[:, 3]) * 0.5  # y center
+        boxes_cp[:, 2] = (boxes[:, 2] - boxes[:, 0])  # width
+        boxes_cp[:, 3] = (boxes[:, 3] - boxes[:, 1])  # height
 
-        if self.crop and random.random() < self.p:
-            img, boxes = random_crop_resize(img, boxes)
+        if self.normalize:
+            height, width, _ = img.shape
+            boxes_cp[:, 0::2] /= width
+            boxes_cp[:, 1::2] /= height
 
-        img = np.array(img)
+        target["boxes"] = boxes_cp
+        return {'image': img, 'target': target}
 
-        min_side, max_side = self.size
-        h, w, _ = img.shape
 
-        smallest_side = min(w, h)
-        largest_side = max(w, h)
-        scale = min_side / smallest_side
-        if largest_side * scale > max_side:
-            scale = max_side / largest_side
-        nw, nh = int(scale * w), int(scale * h)
-        image_resized = cv2.resize(img, (nw, nh))
-        pad_w = 32 - nw % 32
-        pad_h = 32 - nh % 32
-        image_paded = np.zeros(shape=[nh + pad_h, nw + pad_w, 3], dtype=np.uint8)
-        image_paded[:nh, :nw, :] = image_resized
+class ToXYXY(object):
+    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    def __init__(self, normalize=False):
+        self.normalize = normalize
 
-        boxes[:, [0, 2]] = boxes[:, [0, 2]] * scale
-        boxes[:, [1, 3]] = boxes[:, [1, 3]] * scale
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        boxes_cp = copy.deepcopy(boxes)
 
-        target["scales"] = torch.tensor(scale, dtype=torch.float)
-        target["boxes"] = boxes
-        return {'image': Image.fromarray(image_paded), 'target': target}
+        boxes_cp[:, 0] = boxes[:, 0] - boxes[:, 2] * 0.5  # top left x
+        boxes_cp[:, 1] = boxes[:, 1] - boxes[:, 3] * 0.5  # top left y
+        boxes_cp[:, 2] = boxes[:, 0] + boxes[:, 2] * 0.5  # bottom right x
+        boxes_cp[:, 3] = boxes[:, 1] + boxes[:, 3] * 0.5  # bottom right y
+
+        if self.normalize:
+            height, width, _ = img.shape
+            boxes_cp[:, 0::2] /= width
+            boxes_cp[:, 1::2] /= height
+
+        target["boxes"] = boxes_cp
+        return {'image': img, 'target': target}
+
+
+def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  # box1(4,n), box2(4,n)
+    # Compute candidate boxes: box1 before augment, box2 after augment, wh_thr (pixels), aspect_ratio_thr, area_ratio
+    w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
+    w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
+    ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
+    return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
+
+
+class RandomAffine(object):
+    '''torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))'''
+    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=0.1, shear=[0., 0.], perspective=[0., 0.], border=[0, 0]):
+        self.p = p
+        self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
+        self.translate = translate
+        self.scale = scale
+        self.shear = shear if isinstance(shear, list) else (-shear, shear)
+        self.perspective = perspective if isinstance(perspective, list) else (-perspective, perspective)
+        self.border = border if isinstance(border, list) else (border, border)
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            boxes = target["boxes"]
+            labels = target["labels"]
+
+            height = img.shape[0] + self.border[0] * 2  # shape(h,w,c)
+            width = img.shape[1] + self.border[1] * 2
+
+            # Center
+            C = np.eye(3)
+            C[0, 2] = -img.shape[1] / 2  # x translation (pixels)
+            C[1, 2] = -img.shape[0] / 2  # y translation (pixels)
+
+            # Perspective
+            P = np.eye(3)
+            P[2, 0] = random.uniform(self.perspective[0], self.perspective[1])  # x perspective (about y)
+            P[2, 1] = random.uniform(self.perspective[0], self.perspective[1])  # y perspective (about x)
+
+            # Rotation and Scale
+            R = np.eye(3)
+            a = random.uniform(self.degrees[0], self.degrees[1])
+            # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
+            s = random.uniform(1 - self.scale, 1 + self.scale)
+            # s = 2 ** random.uniform(-scale, scale)
+            R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
+
+            # Shear
+            S = np.eye(3)
+            S[0, 1] = math.tan(random.uniform(self.shear[0], self.shear[1]) * math.pi / 180)  # x shear (deg)
+            S[1, 0] = math.tan(random.uniform(self.shear[0], self.shear[1]) * math.pi / 180)  # y shear (deg)
+
+            # Translation
+            T = np.eye(3)
+            T[0, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * width  # x translation (pixels)
+            T[1, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * height  # y translation (pixels)
+
+            # Combined rotation matrix
+            M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
+            if (self.border[0] != 0) or (self.border[1] != 0) or (M != np.eye(3)).any():  # image changed
+                if self.perspective:
+                    img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
+                else:  # affine
+                    img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+
+            # Transform label coordinates
+            n = len(boxes)
+            if n:
+                new = np.zeros((n, 4))
+                # warp boxes
+                xy = np.ones((n * 4, 3))
+                xy[:, :2] = boxes[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+                xy = xy @ M.T  # transform
+                xy = (xy[:, :2] / xy[:, 2:3] if self.perspective else xy[:, :2]).reshape(n, 8)  # perspective rescale or affine
+
+                # create new boxes
+                x = xy[:, [0, 2, 4, 6]]
+                y = xy[:, [1, 3, 5, 7]]
+                new = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
+
+                # clip
+                new[:, [0, 2]] = new[:, [0, 2]].clip(0, width)
+                new[:, [1, 3]] = new[:, [1, 3]].clip(0, height)
+
+                # filter candidates
+                i = box_candidates(box1=boxes.T * s, box2=new.T, area_thr=0.10)
+                boxes = new[i]
+                labels = labels[i]
+
+            target["boxes"] = boxes.astype(np.float32)
+            target["labels"] = labels
+        return {'image': img ,'target': target}
+
+
+class RandomGrayscale(object):
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            img = cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+        return {'image': img, 'target': target}
+
+
+class GaussianBlur(object):
+    def __init__(self, p=0.1, ksize=(3, 3)):
+        self.p = p
+        self.ksize = ksize
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            img = cv2.GaussianBlur(img, self.ksize, 0)
+        return {'image': img, 'target': target}
+
+
+class MedianBlur(object):
+    def __init__(self, p=0.1, ksize=(3, 3)):
+        self.p = p
+        self.ksize = ksize
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            img = cv2.medianBlur(img, self.ksize)
+        return {'image': img, 'target': target}
+
+
+def bbox_ioa(box1, box2, eps=1E-7):
+    """ Returns the intersection over box2 area given box1, box2. Boxes are x1y1x2y2
+    box1:       np.array of shape(4)
+    box2:       np.array of shape(nx4)
+    returns:    np.array of shape(n)
+    """
+
+    box2 = box2.transpose()
+
+    # Get the coordinates of bounding boxes
+    b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
+    b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
+
+    # Intersection area
+    inter_area = (np.minimum(b1_x2, b2_x2) - np.maximum(b1_x1, b2_x1)).clip(0) * \
+                 (np.minimum(b1_y2, b2_y2) - np.maximum(b1_y1, b2_y1)).clip(0)
+
+    # box2 area
+    box2_area = (b2_x2 - b2_x1) * (b2_y2 - b2_y1) + eps
+
+    # Intersection over box2 area
+    return inter_area / box2_area
+
+
+class Cutout(object):
+    '''
+        Improved Regularization of Convolutional Neural Networks with Cutout
+        https://arxiv.org/abs/1708.04552
+    '''
+    def __init__(self, p=0.5, alpha=32, beta=32):
+        self.p = p
+        self.alpha = alpha
+        self.beta = beta
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            boxes = target["boxes"]
+            labels = target["labels"]
+            height, width, _ = img.shape
+            scales = [0.5] * 1 + [0.25] * 2 + [0.125] * 4 + [0.0625] * 8 + [0.03125] * 16  # image size fraction
+            for s in scales:
+                mask_h = random.randint(1, int(height * s))  # create random masks
+                mask_w = random.randint(1, int(width * s))
+
+                # box
+                xmin = max(0, random.randint(0, width) - mask_w // 2)
+                ymin = max(0, random.randint(0, height) - mask_h // 2)
+                xmax = min(width, xmin + mask_w)
+                ymax = min(height, ymin + mask_h)
+
+                # apply random color mask
+                img[ymin:ymax, xmin:xmax] = [random.randint(64, 191) for _ in range(3)]
+
+                # return unobscured labels
+                if len(boxes) and s > 0.03:
+                    box = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
+                    ioa = bbox_ioa(box, boxes)  # intersection over area
+                    boxes = boxes[ioa < 0.60]  # remove >60% obscured labels
+                    labels = labels[ioa < 0.60]
+
+            target["boxes"] = boxes
+            target["labels"] = labels
+        return {'image': img, 'target': target}
 
 
 class FilterAndRemapCocoCategories(object):
@@ -832,40 +754,49 @@ def convert_coco_poly_to_mask(segmentations, height, width):
         mask = coco_mask.decode(rles)
         if len(mask.shape) < 3:
             mask = mask[..., None]
-        mask = torch.as_tensor(mask, dtype=torch.uint8)
-        mask = mask.any(dim=2)
+        # mask = torch.as_tensor(mask, dtype=torch.uint8)
+        # mask = mask.any(dim=2)
+        mask = np.any(mask, 2)
         masks.append(mask)
     if masks:
-        masks = torch.stack(masks, dim=0)
+        # masks = torch.stack(masks, dim=0)
+        masks = np.stack(masks, 0)
     else:
-        masks = torch.zeros((0, height, width), dtype=torch.uint8)
+        # masks = torch.zeros((0, height, width), dtype=torch.uint8)
+        masks = np.zeros((0, height, width), dtype=np.uint8)
     return masks
 
 
 class ConvertCocoPolysToMask(object):
+    def __init__(self, use_mask=False):
+        self.use_mask = use_mask
+
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        w, h = img.size
+        h, w, _ = img.shape
 
         image_id = target["image_id"]
-        image_id = torch.tensor([image_id])
-
         anno = target["annotations"]
 
         anno = [obj for obj in anno if obj['iscrowd'] == 0]
 
         boxes = [obj["bbox"] for obj in anno]
         # guard against no boxes via resizing
+        '''
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
         boxes[:, 2:] += boxes[:, :2]
         boxes[:, 0::2].clamp_(min=0, max=w)
         boxes[:, 1::2].clamp_(min=0, max=h)
+        '''
+        boxes = np.array(boxes, dtype=np.float32).reshape(-1, 4)
+        boxes[:, 2:] += boxes[:, :2]  # xywh ==> xyxy
+        boxes[:, 0::2].clip(min=0, max=w)
+        boxes[:, 1::2].clip(min=0, max=h)
 
-        classes = [obj["category_id"] for obj in anno]
-        classes = torch.tensor(classes, dtype=torch.int64)
+        labels = [obj["category_id"] for obj in anno]
+        labels = torch.tensor(labels, dtype=torch.int64)
 
         segmentations = [obj["segmentation"] for obj in anno]
-        masks = convert_coco_poly_to_mask(segmentations, h, w)
 
         keypoints = None
         if anno and "keypoints" in anno[0]:
@@ -877,8 +808,7 @@ class ConvertCocoPolysToMask(object):
 
         keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
         boxes = boxes[keep]
-        classes = classes[keep]
-        masks = masks[keep]
+        labels = labels[keep]
         if keypoints is not None:
             keypoints = keypoints[keep]
 
@@ -886,61 +816,83 @@ class ConvertCocoPolysToMask(object):
         target["height"] = torch.tensor(h)
         target["width"] = torch.tensor(w)
         target["boxes"] = boxes
-        target["labels"] = classes
-        target["masks"] = masks
-        target["image_id"] = image_id
+        target["labels"] = labels
+        if self.use_mask:
+            masks = convert_coco_poly_to_mask(segmentations, h, w)
+            target["masks"] = masks[keep]
+        target["image_id"] = torch.tensor([image_id])
         if keypoints is not None:
             target["keypoints"] = keypoints
 
         # for conversion to coco api
         area = torch.tensor([obj["area"] for obj in anno])
         iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
+
         target["area"] = area
         target["iscrowd"] = iscrowd
-
         return {'image': img, 'target': target}
 
 
 if __name__ == '__main__':
     import torch
-    from PIL import ImageDraw
 
-    # trf = Resize(size=[300, 300], keep_ratio=False)
-    # trf = RandomScaleCrop(size=[300, 300], scale=(0.5, 1.0), keep_ratio=False)
-    # trf = RandomResizedCrop(size=[300, 300], scale=(0.6, 1.0), ratio=(0.5, 2.0), keep_ratio=True)
-    # trf = RandomAffine(p=1, degrees=[0.5, 2.0], keep_ratio=False)
-    trf = RandomCrop(size=[300, 300])
+    # trf = Resize(size=[640, 640], keep_ratio=True)
+    # trf = Cutout(p=1)
+    # trf = RandomGrayscale(p=1)
+    # trf = RandomHorizontalFlip(p=1)
+    # trf = RandomVerticalFlip(p=1)
+    # trf = ColorHSV(p=1, hue=0.5, saturation=0.5, brightness=0.5)
+    # trf = RandomAffine(degrees=[5, 5], translate=0.1, scale=0.5, shear=[0., 0.], perspective=[0., 0.], border=[0, 0])
+    # trf = RandomResizedCrop(size=[320, 320], scale=[0.6, 1.4], ratio=[0.5, 2.0], keep_ratio=True)
+    # trf = RandomCrop(size=[320, 320], scale=[0.6, 1.4], ratio=[0.5, 2.0], keep_ratio=True)
 
-    data = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/sample.pth')
-    target = {}
-    anno = data['target']["annotations"]
-    boxes = [obj["bbox"] for obj in anno]
-    # guard against no boxes via resizing
-    boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
-    boxes[:, 2:] += boxes[:, :2]
-    target["boxes"] = boxes
+    sample = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/sample1.pth')
+    # print(sample)
 
-    classes = [obj["category_id"] for obj in anno]
-    classes = torch.tensor(classes, dtype=torch.int64)
-    target["labels"] = classes
-    sample = {'image': data['image'], 'target': target}
-    im = copy.deepcopy(data['image'])
-    draw = ImageDraw.Draw(im)
-    # p = sample['target']['boxes'][0, :]
-    for p in sample['target']['boxes']:
-        draw.line([(p[0], p[1]), (p[2], p[1]), (p[2], p[3]), (p[0], p[3]), (p[0], p[1])], width=1, fill='blue')
-    im.save('img.png')
-    print(sample['image'].size)
-    print(sample['target']['boxes'][:6,:])
+    '''
+    img, target = sample['image'], sample['target']
+    boxes = target["boxes"]
+    for box in boxes:
+        cv2.rectangle(img, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (255,0,0), 1, 0)
+    cv2.imwrite('img.jpg', img)
+    '''
 
-    sample = trf(sample)
-    print(sample['image'].size)
-    sample['image'].save('img1.png')
-    im1 = copy.deepcopy(sample['image'])
-    draw1 = ImageDraw.Draw(im1)
-    # p1 = sample['target']['boxes'][0, :]
-    for p1 in sample['target']['boxes']:
-        draw1.line([(p1[0], p1[1]), (p1[2], p1[1]), (p1[2], p1[3]), (p1[0], p1[3]), (p1[0], p1[1])], width=1, fill='red')
-    im1.save('img2.png')
-    print(sample['target']['boxes'][:5,:])
-    # print(sample['target']['scales'])
+    sample1 = trf(sample)
+    img1, target1 = sample1['image'], sample1['target']
+    boxes1 = target1["boxes"]
+    for box in boxes1:
+        cv2.rectangle(img1, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0,0,255), 1, 0)
+    cv2.imwrite('img2.jpg', img1)
+
+    import cv2
+    import numpy as np
+    import copy
+
+    # torch.save(imgs, '/home/lmin/pythonCode/scripts/weights/ssd/imgs.pth')
+    # torch.save(targets, '/home/lmin/pythonCode/scripts/weights/ssd/targets.pth')
+
+    imgs = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/imgs.pth')
+    targets = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/targets.pth')
+
+    for i, (img, target) in enumerate(zip(imgs, targets)):
+        img = img.cpu().numpy().transpose((1, 2, 0))
+        img = np.ascontiguousarray(img)
+        height = target['height'].cpu().numpy()
+        width = target['width'].cpu().numpy()
+        for bb in target['boxes']:
+            bb = bb.cpu().numpy()
+            '''
+            bb_cp = copy.deepcopy(bb)
+            bb_cp[0] = bb[0] - bb[2] * 0.5  # top left x
+            bb_cp[1] = bb[1] - bb[3] * 0.5  # top left y
+            bb_cp[2] = bb[0] + bb[2] * 0.5  # bottom right x
+            bb_cp[3] = bb[1] + bb[3] * 0.5  # bottom right y
+            bb_cp[0::2] *= width
+            bb_cp[1::2] *= height
+            img = img.astype(np.uint8)
+            cv2.rectangle(img, (int(bb_cp[0]), int(bb_cp[1])), (int(bb_cp[2]), int(bb_cp[3])), (0, 0, 255), 1, 0)
+            '''
+            img = img.astype(np.uint8)
+            cv2.rectangle(img, (int(bb[0]), int(bb[1])), (int(bb[2]), int(bb[3])), (0, 0, 255), 1, 0)
+        # cv2.imwrite('aaa_' + str(i) + '.jpg', img)
+        assert 1 == 2
