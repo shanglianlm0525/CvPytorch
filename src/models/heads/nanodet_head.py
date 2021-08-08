@@ -100,7 +100,6 @@ class NanoDetHead(GFLHead):
         for i in range(len(self.strides)):
             normal_init(self.gfl_cls[i], std=0.01, bias=bias_cls)
             normal_init(self.gfl_reg[i], std=0.01)
-        print('Finish initialize Lite GFL Head.')
 
     def forward(self, feats):
         return multi_apply(self.forward_single,

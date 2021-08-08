@@ -444,9 +444,7 @@ class GFLHead(nn.Module):
         # gt_bboxes = torch.from_numpy(gt_bboxes).to(device)
         # gt_labels = torch.from_numpy(gt_labels).to(device)
 
-        assign_result = self.assigner.assign(grid_cells, num_level_cells,
-                                             gt_bboxes, gt_bboxes_ignore,
-                                             gt_labels)
+        assign_result = self.assigner.assign(grid_cells, num_level_cells, gt_bboxes, gt_bboxes_ignore, gt_labels)
 
         pos_inds, neg_inds, pos_gt_bboxes, pos_assigned_gt_inds = \
             self.sample(assign_result, gt_bboxes)
