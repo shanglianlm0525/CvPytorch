@@ -24,7 +24,7 @@ __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
         'RandomAffine', 'RandomGrayscale',
         'ColorHSV', 'ColorJitter', 'RandomEqualize', 'GaussianBlur', 'MedianBlur',
         'ToXYXY', 'ToXYWH', 'ToPercentCoords',
-        'Cutout',
+        'Cutout', 'Mosaic', 'CopyPaste',
         'Normalize', 'ToTensor', 'ToArrayImage',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
@@ -73,8 +73,13 @@ class Normalize(object):
 
 class ToArrayImage(object):
     def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        return {'image': np.asarray(img, dtype=np.uint8), 'target': target}
+        if isinstance(sample, list):
+            for i, s in enumerate(sample):
+                sample[i] = self(sample[i])
+            return sample
+        else:
+            img, target = sample['image'], sample['target']
+            return {'image': np.asarray(img, dtype=np.uint8), 'target': target}
 
 
 class RandomHorizontalFlip(object):
@@ -731,23 +736,130 @@ class Cutout(object):
         return {'image': img, 'target': target}
 
 
+class Mixup(object):
+    def __init__(self, p):
+        self.p = p
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+
+        return {'image': img, 'target': target}
+
+
+class CopyPaste(object):
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            h, w, _ = img.shape  # height, width, channels
+            im_new = np.zeros(img.shape, np.uint8)
+
+
+
+        return {'image': img, 'target': target}
+
+
+
+def drawImg(img, boxes, name):
+    img1 = copy.deepcopy(img)
+    for box in boxes:
+        cv2.rectangle(img1, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 0, 255), 1, 0)
+    cv2.imwrite('0_'+name+'.jpg', img1)
+
+
+class Mosaic(object):
+    def __init__(self, p, size, fill=114):
+        self.p = p
+        self.size = size # h, w
+        self.fill = fill
+
+    def __call__(self, sample):
+        assert len(sample) == 4, 'the number of input must eq. 4'
+        labels4 = []
+        boxes4 = []
+        yc, xc = [int(random.uniform((x // 2), (x * 3 // 2))) for x in self.size]
+        for i, sp in enumerate(sample):
+            img_t, target_t = sp['image'], sp['target']
+            boxes_t = target_t["boxes"]
+            h0, w0, c = img_t.shape
+
+            scale = min(self.size[0] / h0, self.size[1] / w0)
+            h, w = int(round(h0 * scale)), int(round(w0 * scale))
+            if (h0 != h) or (w0 != w):
+                img_t = cv2.resize(img_t, (w, h), interpolation=cv2.INTER_LINEAR)
+            boxes_t *= scale
+
+            # place img in img4
+            if i == 0:  # top left
+                img4 = np.full((self.size[0] * 2, self.size[1] * 2, c), 114, dtype=np.uint8)  # base image with 4 tiles
+                x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
+                x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
+            elif i == 1:  # top right
+                x1a, y1a, x2a, y2a = xc, max(yc - h, 0), min(xc + w, self.size[0] * 2), yc
+                x1b, y1b, x2b, y2b = 0, h - (y2a - y1a), min(w, x2a - x1a), h
+            elif i == 2:  # bottom left
+                x1a, y1a, x2a, y2a = max(xc - w, 0), yc, xc, min(self.size[0] * 2, yc + h)
+                x1b, y1b, x2b, y2b = w - (x2a - x1a), 0, w, min(y2a - y1a, h)
+            elif i == 3:  # bottom right
+                x1a, y1a, x2a, y2a = xc, yc, min(xc + w, self.size[1] * 2), min(self.size[0] * 2, yc + h)
+                x1b, y1b, x2b, y2b = 0, 0, min(w, x2a - x1a), min(y2a - y1a, h)
+
+            img4[y1a:y2a, x1a:x2a] = img_t[y1b:y2b, x1b:x2b]  # img4[ymin:ymax, xmin:xmax]
+            padw = x1a - x1b
+            padh = y1a - y1b
+
+            boxes_t[:, 0::2] += padw
+            boxes_t[:, 1::2] += padh
+
+            # Labels
+            boxes4.append(boxes_t)
+            labels4.append(target_t["labels"])
+        # Concat/clip labels
+        boxes4 = np.concatenate(boxes4, 0)
+        labels4 = np.concatenate(labels4, 0)
+
+        # center_crop
+        h2, w2 = self.size[0] // 2, self.size[1]//2
+        img4 = img4[h2:(h2+self.size[0]), w2:(w2+self.size[1]), :]
+        boxes4[:, 0::2] -= w2
+        boxes4[:, 1::2] -= h2
+
+        # clip when using random_perspective()
+        boxes4[:, 0::2].clip(min=0, max=self.size[1])
+        boxes4[:, 1::2].clip(min=0, max=self.size[0])
+
+        target = {}
+        target["height"] = torch.tensor(self.size[0])
+        target["width"] = torch.tensor(self.size[1])
+        target["boxes"] = boxes4
+        target["labels"] = torch.tensor(labels4)
+        return {'image': img4, 'target': target}
+
+
 class FilterAndRemapCocoCategories(object):
     def __init__(self, categories, remap=True):
         self.categories = categories
         self.remap = remap
 
     def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        anno = target["annotations"]
-        anno = [obj for obj in anno if obj["category_id"] in self.categories]
-        if not self.remap:
+        if isinstance(sample, list):
+            for i, s in enumerate(sample):
+                sample[i] = self(sample[i])
+            return sample
+        else:
+            img, target = sample['image'], sample['target']
+            anno = target["annotations"]
+            anno = [obj for obj in anno if obj["category_id"] in self.categories]
+            if not self.remap:
+                target["annotations"] = anno
+                return {'image': img, 'target': target}
+            anno = copy.deepcopy(anno)
+            for obj in anno:
+                obj["category_id"] = self.categories.index(obj["category_id"])
             target["annotations"] = anno
             return {'image': img, 'target': target}
-        anno = copy.deepcopy(anno)
-        for obj in anno:
-            obj["category_id"] = self.categories.index(obj["category_id"])
-        target["annotations"] = anno
-        return {'image': img, 'target': target}
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
@@ -775,65 +887,64 @@ class ConvertCocoPolysToMask(object):
         self.use_mask = use_mask
 
     def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        h, w, _ = img.shape
+        if isinstance(sample, list):
+            for i, s in enumerate(sample):
+                sample[i] = self(sample[i])
+            return sample
+        else:
+            img, target = sample['image'], sample['target']
+            h, w, _ = img.shape
 
-        image_id = target["image_id"]
-        anno = target["annotations"]
+            image_id = target["image_id"]
+            anno = target["annotations"]
 
-        anno = [obj for obj in anno if obj['iscrowd'] == 0]
+            anno = [obj for obj in anno if obj['iscrowd'] == 0]
 
-        boxes = [obj["bbox"] for obj in anno]
-        # guard against no boxes via resizing
-        '''
-        boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
-        boxes[:, 2:] += boxes[:, :2]
-        boxes[:, 0::2].clamp_(min=0, max=w)
-        boxes[:, 1::2].clamp_(min=0, max=h)
-        '''
-        boxes = np.array(boxes, dtype=np.float32).reshape(-1, 4)
-        boxes[:, 2:] += boxes[:, :2]  # xywh ==> xyxy
-        boxes[:, 0::2].clip(min=0, max=w)
-        boxes[:, 1::2].clip(min=0, max=h)
+            boxes = [obj["bbox"] for obj in anno]
+            # guard against no boxes via resizing
+            boxes = np.array(boxes, dtype=np.float32).reshape(-1, 4)
+            boxes[:, 2:] += boxes[:, :2]  # xywh ==> xyxy
+            boxes[:, 0::2].clip(min=0, max=w)
+            boxes[:, 1::2].clip(min=0, max=h)
 
-        labels = [obj["category_id"] for obj in anno]
-        labels = torch.tensor(labels, dtype=torch.int64)
+            labels = [obj["category_id"] for obj in anno]
+            labels = torch.tensor(labels, dtype=torch.int64)
 
-        segmentations = [obj["segmentation"] for obj in anno]
+            segmentations = [obj["segmentation"] for obj in anno]
 
-        keypoints = None
-        if anno and "keypoints" in anno[0]:
-            keypoints = [obj["keypoints"] for obj in anno]
-            keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
-            num_keypoints = keypoints.shape[0]
-            if num_keypoints:
-                keypoints = keypoints.view(num_keypoints, -1, 3)
+            keypoints = None
+            if anno and "keypoints" in anno[0]:
+                keypoints = [obj["keypoints"] for obj in anno]
+                keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
+                num_keypoints = keypoints.shape[0]
+                if num_keypoints:
+                    keypoints = keypoints.view(num_keypoints, -1, 3)
 
-        keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
-        boxes = boxes[keep]
-        labels = labels[keep]
-        if keypoints is not None:
-            keypoints = keypoints[keep]
+            keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
+            boxes = boxes[keep]
+            labels = labels[keep]
+            if keypoints is not None:
+                keypoints = keypoints[keep]
 
-        target = {}
-        target["height"] = torch.tensor(h)
-        target["width"] = torch.tensor(w)
-        target["boxes"] = boxes
-        target["labels"] = labels
-        if self.use_mask:
-            masks = convert_coco_poly_to_mask(segmentations, h, w)
-            target["masks"] = masks[keep]
-        target["image_id"] = torch.tensor([image_id])
-        if keypoints is not None:
-            target["keypoints"] = keypoints
+            target = {}
+            target["height"] = torch.tensor(h)
+            target["width"] = torch.tensor(w)
+            target["boxes"] = boxes
+            target["labels"] = labels
+            if self.use_mask:
+                masks = convert_coco_poly_to_mask(segmentations, h, w)
+                target["masks"] = masks[keep]
+            target["image_id"] = torch.tensor([image_id])
+            if keypoints is not None:
+                target["keypoints"] = keypoints
 
-        # for conversion to coco api
-        area = torch.tensor([obj["area"] for obj in anno])
-        iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
+            # for conversion to coco api
+            area = torch.tensor([obj["area"] for obj in anno])
+            iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
 
-        target["area"] = area
-        target["iscrowd"] = iscrowd
-        return {'image': img, 'target': target}
+            target["area"] = area
+            target["iscrowd"] = iscrowd
+            return {'image': img, 'target': target}
 
 
 if __name__ == '__main__':
