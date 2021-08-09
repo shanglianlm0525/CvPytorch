@@ -86,6 +86,25 @@ class scSEBlock(nn.Module):
         return self.cSE(x) + self.sSE(x)
 
 
+class SimAM(nn.Module):
+    '''
+        SimAM: A Simple, Parameter-Free Attention Module for Convolutional Neural Networks
+        http://proceedings.mlr.press/v139/yang21o.html
+    '''
+    def __init__(self, e_lambda=1e-4):
+        super(SimAM, self).__init__()
+        self.activaton = nn.Sigmoid()
+        self.e_lambda = e_lambda
+
+    def forward(self, x):
+        b, c, h, w = x.size()
+        n = w * h - 1
+        x_minus_mu_square = (x - x.mean(dim=[2, 3], keepdim=True)).pow(2)
+        y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2, 3], keepdim=True) / n + self.e_lambda)) + 0.5
+        return x * self.activaton(y)
+
+
+
 class NonLocalBlock(nn.Module):
     """
         Non-local Neural Networks
@@ -330,76 +349,6 @@ class SplitAttention(nn.Module):
     def forward(self, x):
         pass
 
-
-class SplAtConv2d(Module):
-    """Split-Attention Conv2d
-    """
-    def __init__(self, in_channels, channels, kernel_size, stride=(1, 1), padding=(0, 0),
-                 dilation=(1, 1), groups=1, bias=True,
-                 radix=2, reduction_factor=4,
-                 rectify=False, rectify_avg=False, norm_layer=None,
-                 dropblock_prob=0.0, **kwargs):
-        super(SplAtConv2d, self).__init__()
-        padding = _pair(padding)
-        self.rectify = rectify and (padding[0] > 0 or padding[1] > 0)
-        self.rectify_avg = rectify_avg
-        inter_channels = max(in_channels*radix//reduction_factor, 32)
-        self.radix = radix
-        self.cardinality = groups
-        self.channels = channels
-        self.dropblock_prob = dropblock_prob
-        if self.rectify:
-            from rfconv import RFConv2d
-            self.conv = RFConv2d(in_channels, channels*radix, kernel_size, stride, padding, dilation,
-                                 groups=groups*radix, bias=bias, average_mode=rectify_avg, **kwargs)
-        else:
-            self.conv = Conv2d(in_channels, channels*radix, kernel_size, stride, padding, dilation,
-                               groups=groups*radix, bias=bias, **kwargs)
-        self.use_bn = norm_layer is not None
-        if self.use_bn:
-            self.bn0 = norm_layer(channels*radix)
-        self.relu = ReLU(inplace=True)
-        self.fc1 = Conv2d(channels, inter_channels, 1, groups=self.cardinality)
-        if self.use_bn:
-            self.bn1 = norm_layer(inter_channels)
-        self.fc2 = Conv2d(inter_channels, channels*radix, 1, groups=self.cardinality)
-        if dropblock_prob > 0.0:
-            self.dropblock = DropBlock2D(dropblock_prob, 3)
-        self.rsoftmax = rSoftMax(radix, groups)
-
-    def forward(self, x):
-        x = self.conv(x)
-        if self.use_bn:
-            x = self.bn0(x)
-        if self.dropblock_prob > 0.0:
-            x = self.dropblock(x)
-        x = self.relu(x)
-
-        batch, rchannel = x.shape[:2]
-        if self.radix > 1:
-            if torch.__version__ < '1.5':
-                splited = torch.split(x, int(rchannel//self.radix), dim=1)
-            else:
-                splited = torch.split(x, rchannel//self.radix, dim=1)
-            gap = sum(splited)
-        else:
-            gap = x
-        gap = F.adaptive_avg_pool2d(gap, 1)
-        gap = self.fc1(gap)
-
-        if self.use_bn:
-            gap = self.bn1(gap)
-        gap = self.relu(gap)
-
-        atten = self.fc2(gap)
-        atten = self.rsoftmax(atten).view(batch, -1, 1, 1)
-
-        if self.radix > 1:
-            attens = torch.split(atten, rchannel//self.radix, dim=1)
-            out = sum([att*split for (att, split) in zip(attens, splited)])
-        else:
-            out = atten * x
-        return out.contiguous()
 
 
 class FCABlock(nn.Module):
