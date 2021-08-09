@@ -23,10 +23,47 @@ __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
         'RandomResizedCrop', 'RandomCrop',
         'RandomAffine', 'RandomGrayscale',
         'ColorHSV', 'ColorJitter', 'RandomEqualize', 'GaussianBlur', 'MedianBlur',
-        'ToXYXY', 'ToXYWH', 'ToPercentCoords',
+        'ToXYXY', 'ToCXCYWH', 'ToPercentCoords',
         'Cutout', 'Mosaic', 'CopyPaste',
         'Normalize', 'ToTensor', 'ToArrayImage',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
+
+
+def remove_small_boxes(boxes, min_size):
+    """
+       Remove boxes which contains at least one side smaller than min_size.
+
+       Args:
+           boxes (Tensor[N, 4]): boxes in ``(x1, y1, x2, y2)`` format
+               with ``0 <= x1 < x2`` and ``0 <= y1 < y2``.
+           min_size (float): minimum size
+
+       Returns:
+           Tensor[K]: indices of the boxes that have both sides
+           larger than min_size
+       """
+    ws, hs = boxes[:, 2] - boxes[:, 0], boxes[:, 3] - boxes[:, 1]
+    keep = (ws >= min_size) & (hs >= min_size)
+    keep = np.where(keep)[0]
+    return keep
+
+
+def clip_boxes_to_image(boxes, size):
+    """
+    Clip boxes so that they lie inside an image of size `size`.
+
+    Args:
+        boxes (array[N, 4]): boxes in ``(x1, y1, x2, y2)`` format
+            with ``0 <= x1 < x2`` and ``0 <= y1 < y2``.
+        size (Tuple or List[height, width]): size of the image
+
+    Returns:
+        array[N, 4]: clipped boxes
+    """
+    height, width = size
+    boxes[..., 0::2] = boxes[..., 0::2].clip(min=0, max=width)
+    boxes[..., 1::2] = boxes[..., 1::2].clip(min=0, max=height)
+    return boxes
 
 
 class Compose(object):
@@ -273,8 +310,9 @@ class RandomCrop(object):
         img = img[i:(i + h), j:(j + w), :]
         boxes -= np.array([j, i, j, i])
 
-        boxes[:, 1::2] = boxes[:, 1::2].clip(min=0, max=h-1)
-        boxes[:, 0::2] = boxes[:, 0::2].clip(min=0, max=w-1)
+        # clip
+        boxes = clip_boxes_to_image(boxes, [h, w])
+        boxes = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
 
         target["boxes"] = boxes
         return {'image': img, 'target': target}
@@ -384,8 +422,7 @@ class RandomResizedCrop(object):
             # crop (top, left, height, width)
             img = img[i:(i + h), j:(j + w), :]
             boxes -= np.array([j, i, j, i])
-            boxes[:, 0::2] = boxes[:, 0::2].clip(0, w)
-            boxes[:, 1::2] = boxes[:, 1::2].clip(0, h)
+            boxes = clip_boxes_to_image(boxes, [h, w])
 
             # resize
             scale = min(self.size[0] / h, self.size[1] / w)
@@ -401,6 +438,7 @@ class RandomResizedCrop(object):
             img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
             boxes[:, 1::2] = boxes[:, 1::2] * scale + top
             boxes[:, 0::2] = boxes[:, 0::2] * scale + left
+            boxes = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
 
             target["boxes"] = boxes.astype(np.float32)  # boxes.numpy()
             return {'image': img, 'target': target}
@@ -413,6 +451,7 @@ class RandomResizedCrop(object):
             scale_h, scale_w = self.size[0] / h, self.size[1] / w
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            boxes = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
 
             target["boxes"] = boxes.astype(np.float32)  # boxes.numpy()
             return {'image': img, 'target': target}
@@ -495,7 +534,7 @@ class ToPercentCoords(object):
         return {'image': img, 'target': target}
 
 
-class ToXYWH(object):
+class ToCXCYWH(object):
     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
     def __init__(self, normalize=False):
         self.normalize = normalize
@@ -622,8 +661,7 @@ class RandomAffine(object):
                 new = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
 
                 # clip
-                new[:, [0, 2]] = new[:, [0, 2]].clip(0, width)
-                new[:, [1, 3]] = new[:, [1, 3]].clip(0, height)
+                new = clip_boxes_to_image(new, [height, width])
 
                 # filter candidates
                 i = box_candidates(box1=boxes.T * s, box2=new.T, area_thr=0.10)
@@ -812,7 +850,6 @@ class Mosaic(object):
 
             boxes_t[:, 0::2] += padw
             boxes_t[:, 1::2] += padh
-
             # Labels
             boxes4.append(boxes_t)
             labels4.append(target_t["labels"])
@@ -827,14 +864,14 @@ class Mosaic(object):
         boxes4[:, 1::2] -= h2
 
         # clip when using random_perspective()
-        boxes4[:, 0::2].clip(min=0, max=self.size[1])
-        boxes4[:, 1::2].clip(min=0, max=self.size[0])
+        boxes4 = clip_boxes_to_image(boxes4, self.size)
+        keep4 = remove_small_boxes(boxes4, 3) # remove boxes that less than 3 pixes
 
         target = {}
         target["height"] = torch.tensor(self.size[0])
         target["width"] = torch.tensor(self.size[1])
-        target["boxes"] = boxes4
-        target["labels"] = torch.tensor(labels4)
+        target["boxes"] = boxes4[keep4]
+        target["labels"] = torch.tensor(labels4[keep4])
         return {'image': img4, 'target': target}
 
 
@@ -904,8 +941,7 @@ class ConvertCocoPolysToMask(object):
             # guard against no boxes via resizing
             boxes = np.array(boxes, dtype=np.float32).reshape(-1, 4)
             boxes[:, 2:] += boxes[:, :2]  # xywh ==> xyxy
-            boxes[:, 0::2].clip(min=0, max=w)
-            boxes[:, 1::2].clip(min=0, max=h)
+            boxes = clip_boxes_to_image(boxes, [h, w])
 
             labels = [obj["category_id"] for obj in anno]
             labels = torch.tensor(labels, dtype=torch.int64)
