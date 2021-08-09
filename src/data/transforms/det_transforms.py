@@ -19,9 +19,8 @@ from pycocotools import mask as coco_mask
 
 
 __all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
-        'Resize',
-        'RandomResizedCrop', 'RandomCrop',
-        'RandomAffine', 'RandomGrayscale',
+        'Resize', 'RandomResizedCrop', 'RandomCrop',
+        'RandomAffine', 'RandomGrayscale', 'RandomRotation',
         'ColorHSV', 'ColorJitter', 'RandomEqualize', 'GaussianBlur', 'MedianBlur',
         'ToXYXY', 'ToCXCYWH', 'ToPercentCoords',
         'Cutout', 'Mosaic', 'CopyPaste',
@@ -474,23 +473,17 @@ class ColorJitter(object):
         return {'image': img, 'target': target}
 
 
-
-def random_contrast(img, alpha_low, alpha_up):
-    img *= random.uniform(alpha_low, alpha_up)
-    return img
-
-
 class ColorHSV(object):
-    def __init__(self, p=0.5, hue=0, saturation=0, brightness=0):
+    def __init__(self, p=0.5, hue=0, saturation=0, value=0):
         self.p = p
         self.hue = hue
         self.saturation = saturation
-        self.brightness = brightness
+        self.value = value
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            r = np.random.uniform(-1, 1, 3) * [self.hue, self.saturation, self.brightness] + 1  # random gains
+            r = np.random.uniform(-1, 1, 3) * [self.hue, self.saturation, self.value] + 1  # random gains
             hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
             dtype = img.dtype  # uint8
 
@@ -587,6 +580,52 @@ def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  #
     w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
     ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
     return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
+
+
+class RandomRotation(object):
+    def __init__(self, p=0.5, degrees=0):
+        super(RandomRotation, self).__init__()
+        self.p = p
+        self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            boxes = target["boxes"]
+            angle = random.uniform(self.degrees[0], self.degrees[1])
+            h, w, _ = img.shape
+            rx0, ry0 = w / 2.0, h / 2.0
+            M = cv2.getRotationMatrix2D((rx0, ry0), angle, 1)
+            img = cv2.warpAffine(img, M, (h, w))
+
+            a = -angle / 180.0 * math.pi
+            new_boxes = np.zeros_like(boxes)
+            new_boxes[:, 0] = boxes[:, 1]
+            new_boxes[:, 1] = boxes[:, 0]
+            new_boxes[:, 2] = boxes[:, 3]
+            new_boxes[:, 3] = boxes[:, 2]
+
+            for i in range(boxes.shape[0]):
+                ymin, xmin, ymax, xmax = new_boxes[i, :]
+                xmin, ymin, xmax, ymax = float(xmin), float(ymin), float(xmax), float(ymax)
+                x0, y0 = xmin, ymin
+                x1, y1 = xmin, ymax
+                x2, y2 = xmax, ymin
+                x3, y3 = xmax, ymax
+                z = np.array([[y0, x0], [y1, x1], [y2, x2], [y3, x3]])
+                tp = np.zeros_like(z)
+                tp[:, 1] = (z[:, 1] - rx0) * math.cos(a) - (z[:, 0] - ry0) * math.sin(a) + rx0
+                tp[:, 0] = (z[:, 1] - rx0) * math.sin(a) + (z[:, 0] - ry0) * math.cos(a) + ry0
+                ymax, xmax = np.max(tp, 0)
+                ymin, xmin = np.min(tp, 0)
+                new_boxes[i] = np.stack([ymin, xmin, ymax, xmax])
+            new_boxes = clip_boxes_to_image(new_boxes, (h, w))
+            boxes[:, 0] = new_boxes[:, 1]
+            boxes[:, 1] = new_boxes[:, 0]
+            boxes[:, 2] = new_boxes[:, 3]
+            boxes[:, 3] = new_boxes[:, 2]
+            target["boxes"] = boxes
+        return {'image': img, 'target': target}
 
 
 class RandomAffine(object):
