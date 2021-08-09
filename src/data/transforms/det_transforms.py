@@ -775,36 +775,40 @@ class Cutout(object):
 
 
 class Mixup(object):
+    '''
+        mixup: BEYOND EMPIRICAL RISK MINIMIZATIONmixup: BEYOND EMPIRICAL RISK MINIMIZATION
+        https://arxiv.org/pdf/1710.09412.pdf
+    '''
     def __init__(self, p):
         self.p = p
 
     def __call__(self, sample):
-        img, target = sample['image'], sample['target']
+        assert len(sample) == 2, 'the number of input must eq. 2'
+        img0, target0 = sample[0]['image'], sample[0]['target']
+        img1, target1 = sample[1]['image'], sample[1]['target']
 
+        r = np.random.beta(32.0, 32.0)  # mixup ratio, alpha=beta=32.0
+        img = (img0 * r + img1 * (1 - r)).astype(np.uint8)
+
+        target = {}
+        target["height"] = target0["height"]
+        target["width"] = target0["width"]
+        target["boxes"] = np.concatenate((target0["boxes"], target1["boxes"]), 0)
+        target["labels"] = torch.tensor(np.concatenate((target0["labels"], target1["labels"]), 0))
         return {'image': img, 'target': target}
 
 
 class CopyPaste(object):
+    '''
+        Simple Copy-Paste is a Strong Data Augmentation Method for Instance Segmentation
+        https://arxiv.org/abs/2012.07177
+    '''
     def __init__(self, p=0.5):
         self.p = p
 
     def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        if random.random() < self.p:
-            h, w, _ = img.shape  # height, width, channels
-            im_new = np.zeros(img.shape, np.uint8)
-
-
 
         return {'image': img, 'target': target}
-
-
-
-def drawImg(img, boxes, name):
-    img1 = copy.deepcopy(img)
-    for box in boxes:
-        cv2.rectangle(img1, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 0, 255), 1, 0)
-    cv2.imwrite('0_'+name+'.jpg', img1)
 
 
 class Mosaic(object):
@@ -850,6 +854,7 @@ class Mosaic(object):
 
             boxes_t[:, 0::2] += padw
             boxes_t[:, 1::2] += padh
+
             # Labels
             boxes4.append(boxes_t)
             labels4.append(target_t["labels"])
