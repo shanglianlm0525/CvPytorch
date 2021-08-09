@@ -51,6 +51,7 @@ class NanoDet(nn.Module):
         new_boxes = []
         new_labels = []
         new_scales = []
+        new_pads = []
         new_heights = []
         new_widths = []
         for target in targets:
@@ -58,6 +59,8 @@ class NanoDet(nn.Module):
             new_labels.append(target['labels'])
             if target.__contains__('scales'):
                 new_scales.append(target['scales'])
+            if target.__contains__('pads'):
+                new_pads.append(target['pads'])
             new_heights.append(target['height'])
             new_widths.append(target['width'])
 
@@ -65,6 +68,7 @@ class NanoDet(nn.Module):
         t_targets["boxes"] = new_boxes
         t_targets["labels"] = new_labels
         t_targets["scales"] = new_scales if len(new_scales) > 0 else []
+        t_targets["pads"] = new_pads if len(new_pads) > 0 else []
         t_targets["height"] = new_heights
         t_targets["width"] = new_widths
         return torch.stack(imgs), t_targets
@@ -90,18 +94,22 @@ class NanoDet(nn.Module):
             if mode == 'val':
                 outputs = []
                 dets = self.head.post_process(preds, imgs)
-                for width, height, scale, det in zip(targets['width'], targets['height'], targets['scales'],dets):
-                    det_bboxes, det_labels = det
-                    det_bboxes_np = det_bboxes[:, :4].cpu().numpy()
+                for width, height, scale, pad, det in zip(targets['width'], targets['height'], targets['scales'], targets['pads'],dets):
+                    bboxes, labels = det
+                    bboxes_np = bboxes[:, :4].cpu().numpy()
                     width = width.cpu().numpy()
                     height = height.cpu().numpy()
                     scale = scale.cpu().numpy()
-                    det_bboxes_np[:, [0, 2]] /= scale[1]
-                    det_bboxes_np[:, [1, 3]] /= scale[0]
+                    pad = pad.cpu().numpy()
+                    bboxes_np[:, [0, 2]] -= pad[1]  # x padding
+                    bboxes_np[:, [1, 3]] -= pad[0]
+                    bboxes_np[:, [0, 2]] /= scale[1]
+                    bboxes_np[:, [1, 3]] /= scale[0]
+
                     # clip boxes
-                    det_bboxes_np[:, [0, 2]] = det_bboxes_np[:, [0, 2]].clip(0, width)
-                    det_bboxes_np[:, [1, 3]] = det_bboxes_np[:, [1, 3]].clip(0, height)
-                    outputs.append({"boxes": torch.tensor(det_bboxes_np), "labels": det_labels, "scores": det_bboxes[:, 4]})
+                    bboxes_np[:, [0, 2]] = bboxes_np[:, [0, 2]].clip(0, width)
+                    bboxes_np[:, [1, 3]] = bboxes_np[:, [1, 3]].clip(0, height)
+                    outputs.append({"boxes": torch.tensor(bboxes_np), "labels": labels, "scores": bboxes[:, 4]})
                 return losses, outputs
             else:
                 return losses
