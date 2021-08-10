@@ -290,6 +290,7 @@ class RandomCrop(object):
         """
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
+        labels = target["labels"]
         if self.padding is not None:
             top, bottom, left, right = self.padding
             img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)
@@ -311,9 +312,10 @@ class RandomCrop(object):
 
         # clip
         boxes = clip_boxes_to_image(boxes, [h, w])
-        boxes = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
+        keep = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
 
-        target["boxes"] = boxes
+        target["labels"] = labels[keep]
+        target["boxes"] = boxes[keep]
         return {'image': img, 'target': target}
 
 
@@ -414,6 +416,7 @@ class RandomResizedCrop(object):
         """
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
+        labels = target["labels"]
         height, width, _ = img.shape
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
@@ -437,9 +440,10 @@ class RandomResizedCrop(object):
             img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
             boxes[:, 1::2] = boxes[:, 1::2] * scale + top
             boxes[:, 0::2] = boxes[:, 0::2] * scale + left
-            boxes = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
+            keep = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
 
-            target["boxes"] = boxes.astype(np.float32)  # boxes.numpy()
+            target["labels"] = labels[keep]
+            target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
             return {'image': img, 'target': target}
         else:
             # crop
@@ -450,9 +454,10 @@ class RandomResizedCrop(object):
             scale_h, scale_w = self.size[0] / h, self.size[1] / w
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
-            boxes = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
+            keep = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
 
-            target["boxes"] = boxes.astype(np.float32)  # boxes.numpy()
+            target["labels"] = labels[keep]
+            target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
             return {'image': img, 'target': target}
 
 
@@ -736,7 +741,7 @@ class GaussianBlur(object):
 
 
 class MedianBlur(object):
-    def __init__(self, p=0.1, ksize=(3, 3)):
+    def __init__(self, p=0.1, ksize=3):
         self.p = p
         self.ksize = ksize
 
