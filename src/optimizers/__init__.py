@@ -8,8 +8,9 @@ from copy import deepcopy
 from torch.optim import SGD, Adam, AdamW, RMSprop, Adadelta
 from .RAdam import RAdam
 from .Ranger import Ranger
+from .AdaBelief import AdaBelief
 
-__all__ = ['SGD','Adam', 'AdamW','Adadelta','RMSprop', 'RAdam', 'Ranger']
+__all__ = ['SGD','Adam', 'AdamW','Adadelta','RMSprop', 'RAdam', 'Ranger', 'AdaBelief']
 
 
 def get_current_lr(optimizer):
@@ -51,6 +52,8 @@ def build_optimizer(cfg, model):
     elif opt_type == 'ranger':
         '''optimizer = Ranger(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01, betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)'''
         optimizer = Ranger(_params)
+    elif opt_type == 'adabelief':
+        optimizer = AdaBelief(_params)
     else:
         raise ValueError("Unsupported optimizer type: {}, Expected optimizer method in {} ".format(cfg.OPTIMIZER.TYPE, __all__))
     return optimizer
