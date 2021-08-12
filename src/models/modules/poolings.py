@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-__all__  = ['SoftPool1D', 'SoftPool2D', 'SoftPool3D']
+__all__  = ['SoftPool1D', 'SoftPool2D', 'SoftPool3D', 'GlobalAvgPool2d', 'ConcatDownsample2d', 'SPP', 'BlurPool']
 
 
 class SoftPool1D(torch.nn.Module):
@@ -52,11 +52,86 @@ class SoftPool3D(torch.nn.Module):
         return x/x_exp_pool
 
 
-"""
-    Making Convolutional Networks Shift-Invariant Again
-    https://arxiv.org/abs/1904.11486
-"""
+class GlobalAvgPool2d(nn.Module):
+    """ Fast implementation of global average pooling from
+        TResNet: High Performance GPU-Dedicated Architecture
+        https://arxiv.org/pdf/2003.13630.pdf
+    Args:
+        flatten (bool, optional): whether spatial dimensions should be squeezed
+    """
+    def __init__(self, flatten: bool = False) -> None:
+        super().__init__()
+        self.flatten = flatten
+
+    def forward(self, x):
+        if self.flatten:
+            in_size = x.size()
+            return x.view((in_size[0], in_size[1], -1)).mean(dim=2)
+        else:
+            return x.view(x.size(0), x.size(1), -1).mean(-1).view(x.size(0), x.size(1), 1, 1)
+
+
+class ConcatDownsample2d(nn.Module):
+    '''
+        Implements a loss-less downsampling operation by stacking adjacent information on the channel dimension.
+        YOLO9000: Better, Faster, Stronger
+        https://pjreddie.com/media/files/papers/YOLO9000.pdf
+
+        Args:
+            x (torch.Tensor[N, C, H, W]): input tensor
+            scale_factor (int): spatial scaling factor
+
+        Returns:
+            torch.Tensor[N, scale_factor ** 2 * C, H / scale_factor, W / scale_factor]: downsampled tensor
+    '''
+    def __init__(self, scale_factor):
+        super(ConcatDownsample2d, self).__init__()
+        self.scale_factor = scale_factor
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+
+        if (h % self.scale_factor != 0) or (w % self.scale_factor != 0):
+            raise AssertionError("Spatial size of input tensor must be multiples of `scale_factor`")
+
+        # N * C * H * W --> N * C * (H/scale_factor) * scale_factor * (W/scale_factor) * scale_factor
+        x = x.view(b, c, h // self.scale_factor, self.scale_factor, w // self.scale_factor, self.scale_factor)
+        x = x.permute(0, 3, 5, 1, 2, 4).contiguous()
+        x = x.view(b, int(c * self.scale_factor ** 2), h // self.scale_factor, w // self.scale_factor)
+        return x
+
+
+class SPP(nn.Module):
+    """
+        Spatial Pyramid Pooling in Deep Convolutional Networks for Visual Recognition
+        https://arxiv.org/pdf/1406.4729.pdf
+    """
+    def __init__(self, kernel_sizes):
+        super().__init__()
+        self.pools = [nn.MaxPool2d(k_size, stride=1, padding=k_size // 2) for k_size in kernel_sizes]
+
+    def forward(self, x):
+        feats = [x] + [pool(x) for pool in self.pools]
+        return torch.cat(feats, dim=1)
+
+
+def get_pad_layer(pad_type):
+    if(pad_type in ['refl','reflect']):
+        PadLayer = nn.ReflectionPad2d
+    elif(pad_type in ['repl','replicate']):
+        PadLayer = nn.ReplicationPad2d
+    elif(pad_type=='zero'):
+        PadLayer = nn.ZeroPad2d
+    else:
+        print('Pad type [%s] not recognized'%pad_type)
+    return PadLayer
+
+
 class BlurPool(nn.Module):
+    """
+        Making Convolutional Networks Shift-Invariant Again
+        https://arxiv.org/abs/1904.11486
+    """
     def __init__(self, channels, pad_type='reflect', filt_size=4, stride=2, pad_off=0):
         super(BlurPool, self).__init__()
         self.filt_size = filt_size
@@ -66,7 +141,7 @@ class BlurPool(nn.Module):
         self.stride = stride
         self.off = int((self.stride-1)/2.)
         self.channels = channels
-        # 定义一系列的高斯核
+
         if(self.filt_size==1):
             a = np.array([1.,])
         elif(self.filt_size==2):
@@ -83,9 +158,9 @@ class BlurPool(nn.Module):
             a = np.array([1., 6., 15., 20., 15., 6., 1.])
 
         filt = torch.Tensor(a[:,None]*a[None,:])
-        filt = filt/torch.sum(filt) # 归一化操作，保证特征经过blur后信息总量不变
-        # 非grad操作的参数利用buffer存储
+        filt = filt/torch.sum(filt)
         self.register_buffer('filt', filt[None,None,:,:].repeat((self.channels,1,1,1)))
+
         self.pad = get_pad_layer(pad_type)(self.pad_sizes)
 
     def forward(self, inp):
@@ -95,5 +170,4 @@ class BlurPool(nn.Module):
             else:
                 return self.pad(inp)[:,:,::self.stride,::self.stride]
         else:
-            # 利用固定参数的conv2d+stride实现blurpool
             return F.conv2d(self.pad(inp), self.filt, stride=self.stride, groups=inp.shape[1])
