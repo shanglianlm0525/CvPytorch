@@ -3,12 +3,13 @@
 # @Time : 2021/2/5 14:16
 # @Author : liumin
 # @File : __init__.py
-
+import torch
+import torch.nn as nn
 from copy import deepcopy
 from torch.optim import SGD, Adam, AdamW, RMSprop, Adadelta
-from .RAdam import RAdam
-from .Ranger import Ranger
-from .AdaBelief import AdaBelief
+from .radam import RAdam
+from .ranger import Ranger
+from .adabelief import AdaBelief
 
 __all__ = ['SGD','Adam', 'AdamW','Adadelta','RMSprop', 'RAdam', 'Ranger', 'AdaBelief']
 
@@ -18,10 +19,27 @@ def get_current_lr(optimizer):
 
 
 def build_optimizer(cfg, model):
+    '''
+        g0, g1, g2 = [], [], []  # optimizer parameter groups
+        for v in model_ft.modules():
+            if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):  # bias
+                g2.append(v.bias)
+            if isinstance(v, nn.BatchNorm2d):  # weight with decay
+                g0.append(v.weight)
+            elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):  # weight without decay
+                g1.append(v.weight)
+
+        optimizer_ft = torch.optim.SGD(g0, lr=0.01, momentum=0.937, nesterov=True)
+        optimizer_ft.add_param_group({'params': g1, 'weight_decay': 0.0005})  # add g1 with weight_decay
+        optimizer_ft.add_param_group({'params': g2})  # add g2 (biases)
+        del g0, g1, g2
+    '''
+
     # params = [p for p in model.parameters() if p.requires_grad]
     _params = []
     # filter(lambda p: p.requires_grad, model.parameters())
     for n, p in dict(model.named_parameters()).items():
+        print(n)
         if p.requires_grad:
             _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS if "bias" in n else cfg.OPTIMIZER.WEIGHT_PARAMS)
             _args.pop("data")
@@ -56,4 +74,5 @@ def build_optimizer(cfg, model):
         optimizer = AdaBelief(_params)
     else:
         raise ValueError("Unsupported optimizer type: {}, Expected optimizer method in {} ".format(cfg.OPTIMIZER.TYPE, __all__))
+
     return optimizer
