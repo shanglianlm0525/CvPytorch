@@ -241,7 +241,7 @@ class YOLOv5(nn.Module):
         t_targets["pads"] = new_pads if len(new_pads) > 0 else []
         t_targets["height"] = new_heights
         t_targets["width"] = new_widths
-        return torch.stack(imgs), t_targets
+        return imgs, t_targets
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
 
