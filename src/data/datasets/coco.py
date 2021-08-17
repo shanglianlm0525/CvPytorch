@@ -5,7 +5,9 @@
 # @File : coco.py
 
 import os
+import random
 
+import cv2
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -24,6 +26,7 @@ class CocoDetection(Dataset):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
         self.stage = stage
+        self.load_num = data_cfg.LOAD_NUM if data_cfg.__contains__('LOAD_NUM') and self.stage=='train' else 1
         self.transform = transform
         self.target_transform = target_transform
 
@@ -33,7 +36,10 @@ class CocoDetection(Dataset):
 
         self._filter_invalid_annotation()
 
-        self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
+        if self.num_classes > 80: # BACKGROUND_AS_CATEGORY
+            self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
+        else:
+            self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
 
     def _filter_invalid_annotation(self):
@@ -55,22 +61,40 @@ class CocoDetection(Dataset):
         return True
 
     def __getitem__(self, idx):
-        img_id = self.ids[idx]
-        ann_ids = self.coco.getAnnIds(imgIds=img_id)
-        ann = self.coco.loadAnns(ann_ids)
+        if self.load_num > 1:
+            img_ids = [self.ids[idx]] + random.choices(self.ids, k=self.load_num - 1)
+            sample = []
+            for img_id in img_ids:
+                ann_ids = self.coco.getAnnIds(imgIds=img_id)
+                ann = self.coco.loadAnns(ann_ids)
 
-        path = self.coco.loadImgs(img_id)[0]['file_name']
-        assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
-            os.path.join(self.data_cfg.IMG_DIR, path))
+                path = self.coco.loadImgs(img_id)[0]['file_name']
+                assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
+                    os.path.join(self.data_cfg.IMG_DIR, path))
 
-        _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
-        # _img = np.asarray(_img, dtype=np.float32)
-        _target = self.encode_map(ann, img_id)
-        sample = {'image': _img, 'target': _target}
-        if self.target_transform is not None:
-            return self.target_transform(self.transform(sample))
+                _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
+                _target = self.encode_map(ann, img_id)
+                s = {'image': _img, 'target': _target}
+                sample.append(s)
         else:
-            return self.transform(sample)
+            img_id = self.ids[idx]
+            ann_ids = self.coco.getAnnIds(imgIds=img_id)
+            ann = self.coco.loadAnns(ann_ids)
+
+            path = self.coco.loadImgs(img_id)[0]['file_name']
+            assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
+                os.path.join(self.data_cfg.IMG_DIR, path))
+
+            _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
+            _target = self.encode_map(ann, img_id)
+            sample = {'image': _img, 'target': _target}
+
+        sample = self.transform(sample)
+
+        if self.target_transform is not None:
+            return self.target_transform(sample)
+        else:
+            return sample
 
     def encode_map(self, ann, img_id):
         target = dict(image_id=img_id, annotations=ann)
@@ -87,7 +111,8 @@ class CocoDetection(Dataset):
         for bch in batch:
             _img_list.append(bch['image'])
             _target_list.append(bch['target'])
-        sample = {'image': _img_list, 'target': _target_list}
+
+        sample = {'image': torch.stack(_img_list, 0), 'target': _target_list}
         return sample
 
 
@@ -97,6 +122,7 @@ class CocoSegmentation(Dataset):
         self.data_cfg = data_cfg
         self.dictionary = dictionary
         self.stage = stage
+        self.load_num = data_cfg.LOAD_NUM if data_cfg.__contains__('LOAD_NUM') and self.stage=='train' else 1
         self.transform = transform
         self.target_transform = target_transform
 
@@ -106,6 +132,7 @@ class CocoSegmentation(Dataset):
 
         self._filter_invalid_annotation()
 
+        ## need to process
         self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
 
