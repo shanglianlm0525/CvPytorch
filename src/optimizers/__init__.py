@@ -39,7 +39,6 @@ def build_optimizer(cfg, model):
     _params = []
     # filter(lambda p: p.requires_grad, model.parameters())
     for n, p in dict(model.named_parameters()).items():
-        print(n)
         if p.requires_grad:
             _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS if "bias" in n else cfg.OPTIMIZER.WEIGHT_PARAMS)
             _args.pop("data")
