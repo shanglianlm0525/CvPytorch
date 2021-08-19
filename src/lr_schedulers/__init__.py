@@ -45,11 +45,12 @@ def build_lr_scheduler(cfg, iters_per_epoch, optimizer):
         # copy from https://github.com/ultralytics/yolov5/blob/master/train.py
         # Scheduler https://arxiv.org/pdf/1812.01187.pdf
         # https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#OneCycleLR
-        '''
-        lf = lambda x: (((1 + math.cos(x * math.pi / cfg.N_MAX_EPOCHS)) / 2) ** 1.0) * 0.8 + 0.2  # cosine
+
+        lf = lambda x: ((1 - math.cos(x * math.pi / cfg.N_MAX_EPOCHS)) / 2) * (cfg.LR_SCHEDULER.MIN_LR-1) + 1  # cosine
         lr_scheduler_ft = LambdaLR(optimizer, lr_lambda=lf)
         '''
         lr_scheduler_ft = CosineAnnealingLR(optimizer, T_max=cfg.N_MAX_EPOCHS, eta_min=cfg.LR_SCHEDULER.MIN_LR)
+        '''
     elif cfg.LR_SCHEDULER.TYPE == "CosineAnnealingWarmRestarts":
         lr_scheduler_ft = CosineAnnealingWarmRestarts(optimizer, T_0=cfg.N_MAX_EPOCHS, T_mult=1, eta_min=cfg.LR_SCHEDULER.MIN_LR)
         # torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0, T_mult=1, eta_min=0.02, last_epoch=-1)
