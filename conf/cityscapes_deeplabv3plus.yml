@@ -7,6 +7,7 @@ DATASET:
   CLASS: 'src.data.datasets.cityscapes.CityscapesSegmentation'
   DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
   DICTIONARY_NAME: 'SEG_CLASSES'
+  BACKGROUND_AS_CATEGORY: False
 
   TRAIN:
     IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
@@ -15,6 +16,7 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 24
     NUM_WORKER: 8
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
@@ -35,6 +37,7 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 8
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
@@ -74,7 +77,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 400
 
 INIT_LR: 0.2

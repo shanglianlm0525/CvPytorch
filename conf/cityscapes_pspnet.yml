@@ -15,6 +15,7 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 16
     NUM_WORKER: 8
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
@@ -36,6 +37,7 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 8
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
