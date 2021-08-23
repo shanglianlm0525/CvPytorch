@@ -1,5 +1,5 @@
 SEG_CLASSES:
-  # - background: 1
+  - background: 1
   - road: 1.4705521
   - sidewalk: 9.505282
   - building: 10.492059
