@@ -246,12 +246,13 @@ class RandomCrop(object):
               For example, padding [1, 2, 3, 4] with 2 elements on both sides in symmetric mode
               will result in [2, 1, 1, 2, 3, 4, 4, 3]
     """
-    def __init__(self, size, padding=None, pad_if_needed=False, fill=[128, 128, 128]):
+    def __init__(self, size, padding=None, pad_if_needed=False, fill=[128, 128, 128], min_size=3):
         super().__init__()
         self.size = size
         self.padding = padding
         self.pad_if_needed = pad_if_needed
         self.fill = fill
+        self.min_size = min_size
 
     @staticmethod
     def get_params(img, output_size):
@@ -312,7 +313,16 @@ class RandomCrop(object):
 
         # clip
         boxes = clip_boxes_to_image(boxes, [h, w])
-        keep = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
+        keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
+        if keep.shape[0] < 1:
+            img, target = sample['image'], sample['target']
+            boxes = target["boxes"]
+            img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
+            scale_h, scale_w = self.size[0] / h, self.size[1] / w
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            target["boxes"] = boxes
+            return {'image': img, 'target': target}
 
         target["labels"] = labels[keep]
         target["boxes"] = boxes[keep]
@@ -348,7 +358,7 @@ class RandomResizedCrop(object):
 
     """
 
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, fill=[128, 128, 128]):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, fill=[128, 128, 128], min_size = 3):
         super().__init__()
         self.size = size
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
@@ -358,6 +368,7 @@ class RandomResizedCrop(object):
         self.ratio = ratio
         self.keep_ratio = keep_ratio
         self.fill = fill
+        self.min_size = min_size
 
     @staticmethod
     def get_params(img, scale, ratio):
@@ -440,7 +451,24 @@ class RandomResizedCrop(object):
             img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
             boxes[:, 1::2] = boxes[:, 1::2] * scale + top
             boxes[:, 0::2] = boxes[:, 0::2] * scale + left
-            keep = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
+            keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
+            if keep.shape[0] < 1:
+                img, target = sample['image'], sample['target']
+                boxes = target["boxes"]
+                scale = min(self.size[0] / h, self.size[1] / w)
+                ow = int(w * scale)
+                oh = int(h * scale)
+                img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+                padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
+                padh /= 2
+                padw /= 2  # divide padding into 2 sides
+                top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
+                left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
+                img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)
+                boxes[:, 1::2] = boxes[:, 1::2] * scale + top
+                boxes[:, 0::2] = boxes[:, 0::2] * scale + left
+                target["boxes"] = boxes
+                return {'image': img, 'target': target}
 
             target["labels"] = labels[keep]
             target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
@@ -454,7 +482,16 @@ class RandomResizedCrop(object):
             scale_h, scale_w = self.size[0] / h, self.size[1] / w
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
-            keep = remove_small_boxes(boxes, 3)  # remove boxes that less than 3 pixes
+            keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
+            if keep.shape[0] < 1:
+                img, target = sample['image'], sample['target']
+                boxes = target["boxes"]
+                img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
+                scale_h, scale_w = self.size[0] / h, self.size[1] / w
+                boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+                boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+                target["boxes"] = boxes
+                return {'image': img, 'target': target}
 
             target["labels"] = labels[keep]
             target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
@@ -587,6 +624,35 @@ def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  #
     return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
 
 
+class RandomMotionBlur(object):
+    def __init__(self, p=0.5, degrees=[2,3]):
+        super(RandomMotionBlur, self).__init__()
+        self.p = p
+        self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            boxes = target["boxes"]
+
+            degree = random.randint(self.degrees[0], self.degrees[1])
+            angle = random.uniform(-360, 360)
+
+            # 这里生成任意角度的运动模糊kernel的矩阵， degree越大，模糊程度越高
+            M = cv2.getRotationMatrix2D((degree / 2, degree / 2), angle, 1)
+            motion_blur_kernel = np.diag(np.ones(degree))
+            motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, M, (degree, degree))
+
+            motion_blur_kernel = motion_blur_kernel / degree
+            blurred = cv2.filter2D(img, -1, motion_blur_kernel)
+
+            # convert to uint8
+            cv2.normalize(blurred, blurred, 0, 255, cv2.NORM_MINMAX)
+            img = np.array(blurred, dtype=np.uint8)
+            target["boxes"] = boxes
+        return {'image': img, 'target': target}
+
+
 class RandomRotation(object):
     def __init__(self, p=0.5, degrees=0):
         super(RandomRotation, self).__init__()
@@ -635,11 +701,11 @@ class RandomRotation(object):
 
 class RandomAffine(object):
     '''torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))'''
-    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=0.1, shear=[0., 0.], perspective=[0., 0.], border=[0, 0]):
+    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0]):
         self.p = p
         self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
         self.translate = translate
-        self.scale = scale
+        self.scale = scale if isinstance(scale, list) else (-scale, scale)
         self.shear = shear if isinstance(shear, list) else (-shear, shear)
         self.perspective = perspective if isinstance(perspective, list) else (-perspective, perspective)
         self.border = border if isinstance(border, list) else (border, border)
@@ -667,7 +733,7 @@ class RandomAffine(object):
             R = np.eye(3)
             a = random.uniform(self.degrees[0], self.degrees[1])
             # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
-            s = random.uniform(1 - self.scale, 1 + self.scale)
+            s = random.uniform(self.scale[0], self.scale[1])
             # s = 2 ** random.uniform(-scale, scale)
             R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
 
@@ -856,16 +922,17 @@ class CopyPaste(object):
 
 
 class Mosaic(object):
-    def __init__(self, p, size, fill=114):
+    def __init__(self, p, size, fill=114, min_size=3):
         self.p = p
         self.size = size # h, w
         self.fill = fill
+        self.min_size = min_size
 
     def __call__(self, sample):
         assert len(sample) == 4, 'the number of input must eq. 4'
         labels4 = []
         boxes4 = []
-        yc, xc = [int(random.uniform((x // 2), (x * 3 // 2))) for x in self.size]
+        yc, xc = [int(random.uniform(x * 0.5, x * 1.5)) for x in self.size]
         for i, sp in enumerate(sample):
             img_t, target_t = sp['image'], sp['target']
             boxes_t = target_t["boxes"]
@@ -906,19 +973,28 @@ class Mosaic(object):
         boxes4 = np.concatenate(boxes4, 0)
         labels4 = np.concatenate(labels4, 0)
 
+        '''
         # center_crop
         h2, w2 = self.size[0] // 2, self.size[1]//2
         img4 = img4[h2:(h2+self.size[0]), w2:(w2+self.size[1]), :]
         boxes4[:, 0::2] -= w2
         boxes4[:, 1::2] -= h2
+        '''
+        '''
+        # center_crop 2
+        h2, w2 = self.size[0] // 2, self.size[1] // 2
+        img4 = img4[(yc - h2):(yc + h2), (xc - w2):(xc + w2), :]
+        boxes4[:, 0::2] -= (xc - w2)
+        boxes4[:, 1::2] -= (yc - h2)
+        '''
 
         # clip when using random_perspective()
-        boxes4 = clip_boxes_to_image(boxes4, self.size)
-        keep4 = remove_small_boxes(boxes4, 3) # remove boxes that less than 3 pixes
+        # boxes4 = clip_boxes_to_image(boxes4, self.size)
+        keep4 = remove_small_boxes(boxes4, self.min_size) # remove boxes that less than 3 pixes
 
         target = {}
-        target["height"] = torch.tensor(self.size[0])
-        target["width"] = torch.tensor(self.size[1])
+        target["height"] = torch.tensor(self.size[0]*2)
+        target["width"] = torch.tensor(self.size[1]*2)
         target["boxes"] = boxes4[keep4]
         target["labels"] = torch.tensor(labels4[keep4])
         return {'image': img4, 'target': target}
@@ -1027,8 +1103,8 @@ class ConvertCocoPolysToMask(object):
             area = torch.tensor([obj["area"] for obj in anno])
             iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
 
-            target["area"] = area
-            target["iscrowd"] = iscrowd
+            # target["area"] = area
+            # target["iscrowd"] = iscrowd
             return {'image': img, 'target': target}
 
 
@@ -1041,9 +1117,9 @@ if __name__ == '__main__':
     # trf = RandomHorizontalFlip(p=1)
     # trf = RandomVerticalFlip(p=1)
     # trf = ColorHSV(p=1, hue=0.5, saturation=0.5, brightness=0.5)
-    # trf = RandomAffine(degrees=[5, 5], translate=0.1, scale=0.5, shear=[0., 0.], perspective=[0., 0.], border=[0, 0])
+    trf = RandomAffine(degrees=[5, 5], translate=0.1, scale=[1.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0])
     # trf = RandomResizedCrop(size=[320, 320], scale=[0.6, 1.4], ratio=[0.5, 2.0], keep_ratio=True)
-    trf = RandomCrop(size=[320, 320])
+    # trf = RandomCrop(size=[320, 320])
 
     sample = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/sample1.pth')
     # print(sample)
