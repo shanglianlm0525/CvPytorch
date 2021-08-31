@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2021/8/23 14:13
 # @Author : liumin
-# @File : light_fpn.py
+# @File : yolofastestv2_fpn.py
 
 import torch
 import torch.nn as nn
@@ -36,9 +36,9 @@ class DWConvblock(nn.Module):
         return x
 
 
-class LightFPN(nn.Module):
-    def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2, conv_cfg=None, norm_cfg=None,activation=None):
-        super(LightFPN, self).__init__()
+class YoloFastestv2FPN(nn.Module):
+    def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2, conv_cfg=None, norm_cfg=dict(type='BN'),activation='ReLU'):
+        super(YoloFastestv2FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -52,7 +52,7 @@ class LightFPN(nn.Module):
 
         for i in range(self.num_ins):
             l_conv = ConvModule(in_channels[i], out_channels, kernel_size=1, stride=1,
-                                padding=0, dilation=1, groups=1, bias=False, norm_cfg=norm_cfg, activation=activation)
+                                padding=0, bias=False, norm_cfg=norm_cfg, activation=activation)
             cls_conv = DWConvblock(out_channels, out_channels)
             reg_conv = DWConvblock(out_channels, out_channels)
             self.lateral_convs.append(l_conv)
@@ -70,27 +70,16 @@ class LightFPN(nn.Module):
 
     def forward(self, x):
         assert len(x) == len(self.in_channels)
+        x = list(x)
+        x[0] = torch.cat((x[0], F.interpolate(x[1], scale_factor=2)), 1)
 
-        # build laterals
-        laterals = [
-            lateral_conv(x[i])
-            for i, lateral_conv in enumerate(self.lateral_convs)
-        ]
+        levels = len(self.in_channels)
+        reg_outs, cls_outs = [], []
+        for i, (lateral_conv, reg_conv, cls_conv) in enumerate(zip(self.lateral_convs, self.reg_convs, self.cls_convs)):
+            lateral = lateral_conv(x[i])
+            reg_outs.append(reg_conv(lateral))
+            cls_outs.append(cls_conv(lateral))
 
-        # build top-down path
-        used_backbone_levels = len(laterals)
-        for i in range(used_backbone_levels - 1, 0, -1):
-            prev_shape = laterals[i - 1].shape[2:]
-            laterals[i - 1] += F.interpolate(
-                laterals[i], size=prev_shape, mode='bilinear', align_corners=False)
-
-        # build outputs
-        reg_outs = [
-            self.reg_convs[i](laterals[i]) for i in range(used_backbone_levels)
-        ]
-        cls_outs = [
-            self.cls_convs[i](laterals[i]) for i in range(used_backbone_levels)
-        ]
         return reg_outs, cls_outs, cls_outs # reg, obj, cls
 
 
@@ -101,7 +90,7 @@ if __name__ == '__main__':
     inputs = [torch.rand(1, c, s, s) for c, s in zip(in_channels, scales)]
     for i in range(len(inputs)):
         print(f'inputs[{i}].shape = {inputs[i].shape}')
-    self = LightFPN(in_channels, 11, False).eval()
+    self = YoloFastestv2FPN(in_channels, 11, False).eval()
     outputs = self.forward(inputs)
     for i in range(len(outputs)):
         print(f'outputs[{i}].shape = {outputs[i].shape}')
