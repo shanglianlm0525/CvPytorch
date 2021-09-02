@@ -73,7 +73,6 @@ class YoloFastestv2FPN(nn.Module):
         x = list(x)
         x[0] = torch.cat((x[0], F.interpolate(x[1], scale_factor=2)), 1)
 
-        levels = len(self.in_channels)
         reg_outs, cls_outs = [], []
         for i, (lateral_conv, reg_conv, cls_conv) in enumerate(zip(self.lateral_convs, self.reg_convs, self.cls_convs)):
             lateral = lateral_conv(x[i])
@@ -82,15 +81,3 @@ class YoloFastestv2FPN(nn.Module):
 
         return reg_outs, cls_outs, cls_outs # reg, obj, cls
 
-
-if __name__ == '__main__':
-    import torch
-    in_channels = [2, 3, 5]
-    scales = [340, 170, 84]
-    inputs = [torch.rand(1, c, s, s) for c, s in zip(in_channels, scales)]
-    for i in range(len(inputs)):
-        print(f'inputs[{i}].shape = {inputs[i].shape}')
-    self = YoloFastestv2FPN(in_channels, 11, False).eval()
-    outputs = self.forward(inputs)
-    for i in range(len(outputs)):
-        print(f'outputs[{i}].shape = {outputs[i].shape}')
