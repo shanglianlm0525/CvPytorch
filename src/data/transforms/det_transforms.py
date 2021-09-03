@@ -701,7 +701,7 @@ class RandomRotation(object):
 
 class RandomAffine(object):
     '''torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))'''
-    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0]):
+    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0], fill= [128, 128, 128]):
         self.p = p
         self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
         self.translate = translate
@@ -709,6 +709,7 @@ class RandomAffine(object):
         self.shear = shear if isinstance(shear, list) else (-shear, shear)
         self.perspective = perspective if isinstance(perspective, list) else (-perspective, perspective)
         self.border = border if isinstance(border, list) else (border, border)
+        self.fill = fill
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
@@ -751,9 +752,9 @@ class RandomAffine(object):
             M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
             if (self.border[0] != 0) or (self.border[1] != 0) or (M != np.eye(3)).any():  # image changed
                 if self.perspective:
-                    img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
+                    img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=self.fill)
                 else:  # affine
-                    img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+                    img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=self.fill)
 
             # Transform label coordinates
             n = len(boxes)
@@ -795,26 +796,26 @@ class RandomGrayscale(object):
 
 
 class GaussianBlur(object):
-    def __init__(self, p=0.1, ksize=(3, 3)):
+    def __init__(self, p=0.1, ksize=[(3, 3), (5, 5), (7, 7)]):
         self.p = p
         self.ksize = ksize
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            img = cv2.GaussianBlur(img, self.ksize, 0)
+            img = cv2.GaussianBlur(img, random.choice(self.ksize), 0)
         return {'image': img, 'target': target}
 
 
 class MedianBlur(object):
-    def __init__(self, p=0.1, ksize=3):
+    def __init__(self, p=0.1, ksize=[3, 5, 7]):
         self.p = p
         self.ksize = ksize
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            img = cv2.medianBlur(img, self.ksize)
+            img = cv2.medianBlur(img, int(random.choice(self.ksize)))
         return {'image': img, 'target': target}
 
 
@@ -922,7 +923,7 @@ class CopyPaste(object):
 
 
 class Mosaic(object):
-    def __init__(self, p, size, fill=114, min_size=3):
+    def __init__(self, p, size, fill=128, min_size=3):
         self.p = p
         self.size = size # h, w
         self.fill = fill
@@ -946,7 +947,7 @@ class Mosaic(object):
 
             # place img in img4
             if i == 0:  # top left
-                img4 = np.full((self.size[0] * 2, self.size[1] * 2, c), 114, dtype=np.uint8)  # base image with 4 tiles
+                img4 = np.full((self.size[0] * 2, self.size[1] * 2, c), self.fill, dtype=np.uint8)  # base image with 4 tiles
                 x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
                 x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
             elif i == 1:  # top right
@@ -1045,8 +1046,9 @@ def convert_coco_poly_to_mask(segmentations, height, width):
 
 
 class ConvertCocoPolysToMask(object):
-    def __init__(self, use_mask=False):
+    def __init__(self, use_mask=False, use_keypoints=False):
         self.use_mask = use_mask
+        self.use_keypoints = use_keypoints
 
     def __call__(self, sample):
         if isinstance(sample, list):
@@ -1071,37 +1073,35 @@ class ConvertCocoPolysToMask(object):
             labels = [obj["category_id"] for obj in anno]
             labels = torch.tensor(labels, dtype=torch.int64)
 
-            segmentations = [obj["segmentation"] for obj in anno]
-
-            keypoints = None
-            if anno and "keypoints" in anno[0]:
-                keypoints = [obj["keypoints"] for obj in anno]
-                keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
-                num_keypoints = keypoints.shape[0]
-                if num_keypoints:
-                    keypoints = keypoints.view(num_keypoints, -1, 3)
-
             keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
             boxes = boxes[keep]
             labels = labels[keep]
-            if keypoints is not None:
-                keypoints = keypoints[keep]
 
             target = {}
+            target["image_id"] = torch.tensor([image_id])
             target["height"] = torch.tensor(h)
             target["width"] = torch.tensor(w)
             target["boxes"] = boxes
             target["labels"] = labels
             if self.use_mask:
+                segmentations = [obj["segmentation"] for obj in anno]
                 masks = convert_coco_poly_to_mask(segmentations, h, w)
                 target["masks"] = masks[keep]
-            target["image_id"] = torch.tensor([image_id])
-            if keypoints is not None:
-                target["keypoints"] = keypoints
+            if self.use_keypoints:
+                keypoints = None
+                if anno and "keypoints" in anno[0]:
+                    keypoints = [obj["keypoints"] for obj in anno]
+                    keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
+                    num_keypoints = keypoints.shape[0]
+                    if num_keypoints:
+                        keypoints = keypoints.view(num_keypoints, -1, 3)
+                if keypoints is not None:
+                    keypoints = keypoints[keep]
+                    target["keypoints"] = keypoints
 
             # for conversion to coco api
-            area = torch.tensor([obj["area"] for obj in anno])
-            iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
+            # area = torch.tensor([obj["area"] for obj in anno])
+            # iscrowd = torch.tensor([obj["iscrowd"] for obj in anno])
 
             # target["area"] = area
             # target["iscrowd"] = iscrowd
