@@ -92,6 +92,7 @@ def assign_priors(gt_boxes, gt_labels, corner_form_priors,
         labels (num_priros): labels for priors.
     """
     # size: num_priors x num_targets
+
     ious = iou_of(gt_boxes.unsqueeze(0), corner_form_priors.unsqueeze(1))
     # size: num_priors
     best_target_per_prior, best_target_per_prior_index = ious.max(1)
