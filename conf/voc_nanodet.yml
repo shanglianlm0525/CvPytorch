@@ -1,0 +1,133 @@
+EXPERIMENT_NAME: 'VOC_Nanodet'
+
+#########################################
+# Dataset / Transforms Configurations
+#########################################
+DATASET:
+  CLASS: 'src.data.datasets.voc.VOCDetection'
+  DICTIONARY: 'conf/dicts/voc_dict.yml'
+  DICTIONARY_NAME: 'DET_CLASSES'
+  BACKGROUND_AS_CATEGORY: False
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/VOCdevkit'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/VOCdevkit/train.txt'
+    SHUFFLE: True
+    BATCH_SIZE: 64
+    NUM_WORKER: 16
+    LOAD_NUM: 1
+    LABELS:
+      DET_DIR: '/home/lmin/data/VOCdevkit'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/VOCdevkit'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      RandomResizedCrop: { size: [640, 640], scale: [0.6, 1.4], ratio: [0.5, 2.0], keep_ratio: True }
+      RandomAffine: { p: 0.5, translate: 0.3 }
+      RandomHorizontalFlip: { p: 0.5 }
+      ColorJitter: { p: 0.5, brightness: 0.2, contrast: [0.8, 1.2], saturation: [0.8, 1.2], hue: 0 }
+      ToTensor:
+      Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/VOCdevkit'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/VOCdevkit/val.txt'
+    SHUFFLE: False
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
+    LOAD_NUM: 1
+    LABELS:
+      DET_DIR: '/home/lmin/data/VOCdevkit'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/VOCdevkit'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      Resize: { size: [640, 640], keep_ratio: True }
+      ToTensor:
+      Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
+
+
+#########################################
+# Model / Evaluator Configurations
+#########################################
+USE_MODEL:
+  CLASS: 'src.models.nanodet.NanoDet'
+  BACKBONE: { 'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x1.0', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True }
+  NECK: { 'name': 'PAN', 'in_channels': [116, 232, 464], 'out_channels': 96 }
+  HEAD: { 'name': 'NanoDetHead', 'input_channel': 96, 'feat_channels': 96,
+          'stacked_convs': 2, 'share_cls_reg': True,
+          'strides': [8, 16, 32], 'octave_base_scale': 5, 'reg_max': 7, 'norm_cfg': {'type': 'BN'},
+        'loss': { 'loss_qfl': {'name': 'QualityFocalLoss', 'beta': 2.0,'loss_weight': 1.0},
+         'loss_dfl': {'name': 'DistributionFocalLoss', 'loss_weight': 0.25},
+         'loss_bbox': {'name': 'GIoULoss', 'loss_weight': 2.0} }}
+
+EVALUATOR:
+  NAME: 'voc_detection'
+  EVAL_TYPE: 'mAP'
+  EVAL_INTERVALS: 10
+
+
+#########################################
+# Checkpoints / Resume Configurations
+#########################################
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 10
+# PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+RESUME: False
+
+
+#########################################
+# Devices / Optimizer / Lr_scheduler / Warmup Configurations
+#########################################
+GPU_IDS: [2]
+N_MAX_EPOCHS: 200
+
+INIT_LR: 0.001
+BACKBONE_LR: 0.001
+SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
+
+OPTIMIZER:
+  TYPE: 'SGD' # Adam, RMSprop
+  BIAS_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0001
+  WEIGHT_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0001
+  BIAS_LR_MULTIPLIER: 1
+
+LR_SCHEDULER:
+  TYPE: 'CosineAnnealingLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [130, 160, 175, 185]
+  MIN_LR: 0.00000001
+  GAMMA: 0.1
+  POWER: 0.9
+  STEP: 10
+
+WARMUP:
+  NAME: 'linear'
+  ITERS: 300
+  FACTOR: 0.1
+
+
+#########################################
+# GRAD_CLIP Configurations
+#########################################
+GRAD_CLIP:
+  TYPE: 'norm'
+  VALUE: 0
+
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 50
+
+## TENSORBOARD
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: False
+TENSORBOARD_WEIGHT: False
+TENSORBOARD_IMAGE: False
