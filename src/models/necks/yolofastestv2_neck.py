@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2021/8/23 14:13
 # @Author : liumin
-# @File : yolofastestv2_fpn.py
+# @File : yolofastestv2_neck.py
 
 import torch
 import torch.nn as nn
@@ -36,9 +36,9 @@ class DWConvblock(nn.Module):
         return x
 
 
-class YoloFastestv2FPN(nn.Module):
+class YoloFastestv2Neck(nn.Module):
     def __init__(self, in_channels,out_channels, add_extra_levels=False, extra_levels=2, conv_cfg=None, norm_cfg=dict(type='BN'),activation='ReLU'):
-        super(YoloFastestv2FPN, self).__init__()
+        super(YoloFastestv2Neck, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
         self.out_channels = out_channels

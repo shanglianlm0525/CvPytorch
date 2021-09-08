@@ -6,9 +6,10 @@
 
 from copy import deepcopy
 from .fpn import FPN
-from .yolofastestv2_fpn import YoloFastestv2FPN
+from .yolofastestv2_neck import YoloFastestv2Neck
 from .pan import PAN
 from .tan import TAN
+from .yolop_neck import YOLOPNeck
 from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
 from .yolox_fpn import YOLOXNeck
@@ -17,10 +18,11 @@ __all__ = [
     'FPN',
     'PAN',
     'TAN',
-    'YoloFastestv2FPN',
+    'YoloFastestv2Neck',
     'YOLOXNeck',
     'YOLOv3Neck',
-    'YOLOv5Neck'
+    'YOLOv5Neck',
+    'YOLOPNeck'
 ]
 
 def build_neck(cfg):
@@ -32,13 +34,15 @@ def build_neck(cfg):
         return PAN(**neck_cfg)
     elif name == 'TAN':
         return TAN(**neck_cfg)
-    elif name == 'YoloFastestv2FPN':
-        return YoloFastestv2FPN(**neck_cfg)
+    elif name == 'YoloFastestv2Neck':
+        return YoloFastestv2Neck(**neck_cfg)
     elif name == 'YOLOXNeck':
         return YOLOXNeck(**neck_cfg)
     elif name == 'YOLOv3Neck':
         return YOLOv3Neck(**neck_cfg)
     elif name == 'YOLOv5Neck':
         return YOLOv5Neck(**neck_cfg)
+    elif name == 'YOLOPNeck':
+        return YOLOPNeck(**neck_cfg)
     else:
         raise NotImplementedError
