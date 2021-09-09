@@ -7,8 +7,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from ..modules.yolov5_modules import C3, Conv
-from src.models.modules.yolov5_modules import Conv, C3
+from ..modules.yolov5_modules import C3, Conv
 
 
 class YOLOv5Neck(nn.Module):
@@ -79,7 +78,7 @@ class YOLOv5Neck(nn.Module):
             else:
                 outs[i] = self.down_convs1[i](outs[i])
 
-        return tuple(outs)
+        return outs
 
 
 if __name__ == "__main__":

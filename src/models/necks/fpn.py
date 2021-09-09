@@ -89,7 +89,7 @@ class FPN(nn.Module):
                 for i in range(self.extra_levels):
                     outs.append(F.max_pool2d(outs[-1], 1, stride=2))
 
-        return tuple(outs)
+        return outs
 
 
 if __name__ == '__main__':

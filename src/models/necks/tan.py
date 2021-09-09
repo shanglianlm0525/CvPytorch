@@ -85,4 +85,4 @@ class TAN(nn.Module):
             laterals[1]+mid_lvl,
             laterals[2]+F.interpolate(mid_lvl, size=laterals[2].shape[2:], mode='bilinear')
         ]
-        return tuple(outs)
+        return outs

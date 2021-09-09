@@ -54,4 +54,4 @@ class PAN(FPN):
             inter_outs[i] for i in range(1, used_backbone_levels)
         ])
 
-        return tuple(outs)
+        return outs
