@@ -99,7 +99,7 @@ class ResNet(nn.Module):
             if i in self.out_stages:
                 output.append(x)
 
-        return tuple(output) if len(self.out_stages) > 1 else output[0]
+        return output if len(self.out_stages) > 1 else output[0]
 
     def freeze_bn(self):
         for layer in self.modules():

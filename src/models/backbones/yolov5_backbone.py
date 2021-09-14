@@ -58,7 +58,7 @@ class YOLOv5Backbone(nn.Module):
             x = res_layer(x)
             if i in self.out_stages:
                 output.append(x)
-        return tuple(output)
+        return output
 
 
 if __name__ == "__main__":
