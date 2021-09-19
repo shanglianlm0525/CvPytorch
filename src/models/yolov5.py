@@ -206,7 +206,7 @@ class YOLOv5(nn.Module):
         self.loss = YOLOv5Loss(self.num_classes)
 
         self.conf_thres = 0.001  # confidence threshold
-        self.iou_thres = 0.6  # NMS IoU threshold
+        self.iou_thres = 0.7  # NMS IoU threshold
 
     def setup_extra_params(self):
         self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
