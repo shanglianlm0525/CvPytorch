@@ -7,7 +7,7 @@
 import torch
 import torch.nn as nn
 from torch.utils import model_zoo
-from torchvision.models.vgg import vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn, vgg16, vgg19
+from torchvision.models.vgg import vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn, vgg11, vgg13, vgg16, vgg19
 
 """
     Very Deep Convolutional Networks for Large-Scale Image Recognition
@@ -36,15 +36,27 @@ class VGG(nn.Module):
         self.pretrained = pretrained
 
         if self.subtype == 'vgg11':
-            features = vgg11_bn(self.pretrained).features
+            features = vgg11(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg13':
-            features = vgg13_bn(self.pretrained).features
+            features = vgg13(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg16':
-            features = vgg16_bn(self.pretrained).features
+            features = vgg16(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg19':
+            features = vgg19(self.pretrained).features
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg11_bn':
+            features = vgg11_bn(self.pretrained).features
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg13_bn':
+            features = vgg13_bn(self.pretrained).features
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg16_bn':
+            features = vgg16_bn(self.pretrained).features
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg19_bn':
             features = vgg19_bn(self.pretrained).features
             self.out_channels = [64, 128, 256, 512, 512]
         else:
@@ -52,15 +64,26 @@ class VGG(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.conv1 = nn.Sequential(*list(features.children())[:7])
-        self.layer1 = nn.Sequential(*list(features.children())[7:13])
-        self.layer1_pool = nn.Sequential(list(features.children())[13])
-        self.layer2 = nn.Sequential(*list(features.children())[14:23])
-        self.layer2_pool = nn.Sequential(list(features.children())[23])
-        self.layer3 = nn.Sequential(*list(features.children())[24:33])
-        self.layer3_pool = nn.Sequential(list(features.children())[33])
-        self.layer4 = nn.Sequential(*list(features.children())[34:43])
-        self.layer4_pool = nn.Sequential(list(features.children())[43])
+        if self.subtype.__contains__('_bn'):
+            self.conv1 = nn.Sequential(*list(features.children())[:7])
+            self.layer1 = nn.Sequential(*list(features.children())[7:13])
+            self.layer1_pool = nn.Sequential(list(features.children())[13])
+            self.layer2 = nn.Sequential(*list(features.children())[14:23])
+            self.layer2_pool = nn.Sequential(list(features.children())[23])
+            self.layer3 = nn.Sequential(*list(features.children())[24:33])
+            self.layer3_pool = nn.Sequential(list(features.children())[33])
+            self.layer4 = nn.Sequential(*list(features.children())[34:43])
+            self.layer4_pool = nn.Sequential(list(features.children())[43])
+        else:
+            self.conv1 = nn.Sequential(*list(features.children())[:5])
+            self.layer1 = nn.Sequential(*list(features.children())[5:9])
+            self.layer1_pool = nn.Sequential(list(features.children())[9])
+            self.layer2 = nn.Sequential(*list(features.children())[10:18])
+            self.layer2_pool = nn.Sequential(list(features.children())[18])
+            self.layer3 = nn.Sequential(*list(features.children())[19:27])
+            self.layer3_pool = nn.Sequential(list(features.children())[27])
+            self.layer4 = nn.Sequential(*list(features.children())[28:36])
+            self.layer4_pool = nn.Sequential(list(features.children())[36])
 
         if self.pretrained:
             self.load_pretrained_weights()
@@ -106,7 +129,7 @@ class VGG(nn.Module):
             self.load_state_dict(torch.load(self.backbone_path))
 
 if __name__=="__main__":
-    model =VGG('vgg16')
+    model =VGG('vgg19')
     print(model)
 
     input = torch.randn(1, 3, 224, 224)
