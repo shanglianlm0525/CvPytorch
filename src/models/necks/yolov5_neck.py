@@ -36,14 +36,13 @@ class YOLOv5Neck(nn.Module):
                 )
                 self.up_convs.append(up_conv)
 
-
         self.down_convs1 = nn.ModuleList()
         self.down_convs2 = nn.ModuleList()
         for i in range(self.num_ins):
             if i == 0:
-                self.down_convs1.append(C3(self.in_channels[i] * 2, self.out_channels[i], 3, False))
+                self.down_convs1.append(C3(self.in_channels[i] * 2, self.out_channels[i], self.layers[i], False))
             else:
-                self.down_convs1.append(C3(self.in_channels[i], self.out_channels[i], 3, False))
+                self.down_convs1.append(C3(self.in_channels[i], self.out_channels[i], self.layers[i], False))
             if i < self.num_ins-1:
                 self.down_convs2.append(Conv(self.out_channels[i], self.in_channels[i], 3, 2, 1))
 
@@ -77,7 +76,6 @@ class YOLOv5Neck(nn.Module):
                 outs[i+1] = torch.cat([self.down_convs2[i](outs[i]), outs[i+1]], dim=1)
             else:
                 outs[i] = self.down_convs1[i](outs[i])
-
         return outs
 
 
