@@ -34,6 +34,16 @@ def clip_boxes_to_image(boxes, size):
     return boxes
 
 
+class Compose(object):
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, sample):
+        for t in self.transforms:
+            sample = t(sample)
+        return sample
+
+
 class ToTensor(object):
     def __init__(self, normalize=True, target_type='uint8'):
         self.normalize = normalize
@@ -65,6 +75,7 @@ class Normalize(object):
         img, target = sample['image'], sample['target']
         return {'image': F.normalize(img, self.mean, self.std),'target': target}
 
+
 class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
@@ -74,12 +85,17 @@ class RandomHorizontalFlip(object):
         if random.random() < self.p:
             height, width, _ = img.shape
             boxes = target["boxes"]
+            keypoints = target["keypoints"]
             if boxes.shape[0] != 0:
                 xmin = width - 1 - boxes[:, 2]
                 xmax = width - 1 - boxes[:, 0]
                 boxes[:, 2] = xmax
                 boxes[:, 0] = xmin
+            if keypoints.shape[0] != 0:
+                keypoints[:, :, 0] = width - 1.0 - keypoints[:, :, 0]
+
             target["boxes"] = boxes
+            target["keypoints"] = keypoints
             return {'image': cv2.flip(img, 1),'target': target}
         return {'image': img,'target': target}
 
@@ -93,12 +109,18 @@ class RandomVerticalFlip(object):
         if random.random() < self.p:
             height, width, _ = img.shape
             boxes = target["boxes"]
+            keypoints = target["keypoints"]
             if boxes.shape[0] != 0:
                 ymin = height -1 - boxes[:, 3]
                 ymax = height -1 - boxes[:, 1]
                 boxes[:, 3] = ymax
                 boxes[:, 1] = ymin
+
+            if keypoints.shape[0] != 0:
+                keypoints[:, :, 1] = height - 1.0 - keypoints[:, :, 1]
+
             target["boxes"] = boxes
+            target["keypoints"] = keypoints
             return {'image': cv2.flip(img, 0), 'target': target}
         return {'image': img, 'target': target}
 
@@ -205,10 +227,11 @@ class ConvertCocoPolysToMask(object):
                 keypoints = None
                 if anno and "keypoints" in anno[0]:
                     keypoints = [obj["keypoints"] for obj in anno]
-                    keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
+                    keypoints = np.array(keypoints, dtype=np.float32).reshape(-1, 51)
+                    # keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
                     num_keypoints = keypoints.shape[0]
                     if num_keypoints:
-                        keypoints = keypoints.view(num_keypoints, -1, 3)
+                        keypoints = keypoints.reshape(num_keypoints, -1, 3)
                 if keypoints is not None:
                     keypoints = keypoints[keep]
                     target["keypoints"] = keypoints
