@@ -9,6 +9,7 @@ from copy import deepcopy
 from .deeplabv3_head import Deeplabv3Head
 from .deeplabv3plus_head import Deeplabv3PlusHead
 from .nanodet_head import NanoDetHead
+from .openpose_head import OpenPoseHead
 from .stdc_head import StdcHead
 from .yolo_fastestv2_head import YOLOFastestv2Head
 from .yolop_head import YOLOPHead
@@ -23,7 +24,8 @@ __all__ = [
     'YOLOPHead',
     'Deeplabv3Head',
     'Deeplabv3PlusHead',
-    'StdcHead'
+    'StdcHead',
+    'OpenPoseHead'
 ]
 
 
@@ -48,5 +50,8 @@ def build_head(cfg):
         return Deeplabv3PlusHead(**head_cfg)
     elif name == 'StdcHead':
         return StdcHead(**head_cfg)
+
+    elif name == 'OpenPoseHead':
+        return OpenPoseHead(**head_cfg)
     else:
         raise NotImplementedError
