@@ -103,7 +103,7 @@ class VGG(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         output = []
-        for i in range(1, 5):
+        for i in range(1, min(max(self.out_stages)+1, 5)):
             layer = getattr(self, 'layer{}'.format(i))
             x = layer(x)
             if i in self.out_stages:
@@ -132,7 +132,7 @@ if __name__=="__main__":
     model =VGG('vgg19')
     print(model)
 
-    input = torch.randn(1, 3, 224, 224)
+    input = torch.randn(1, 3, 368, 368)
     out = model(input)
     for o in out:
         print(o.shape)
