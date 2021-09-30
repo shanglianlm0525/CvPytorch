@@ -206,7 +206,7 @@ class YOLOv5(nn.Module):
         self.loss = YOLOv5Loss(self.num_classes)
 
         self.conf_thres = 0.001  # confidence threshold
-        self.iou_thres = 0.7  # NMS IoU threshold
+        self.iou_thres = 0.6  # NMS IoU threshold
 
     def setup_extra_params(self):
         self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
@@ -236,7 +236,7 @@ class YOLOv5(nn.Module):
             new_widths.append(target['width'])
 
         t_targets = {}
-        t_targets["new_gts"] = torch.cat(new_gts, 0)
+        t_targets["gts"] = torch.cat(new_gts, 0)
         t_targets["scales"] = new_scales if len(new_scales) > 0 else []
         t_targets["pads"] = new_pads if len(new_pads) > 0 else []
         t_targets["height"] = new_heights
@@ -262,7 +262,7 @@ class YOLOv5(nn.Module):
             x = self.head(x)
             out, train_out = tuple(x)
 
-            losses['loss'], loss_states = self.loss(train_out, targets["new_gts"])
+            losses['loss'], loss_states = self.loss(train_out, targets["gts"])
 
             losses['box_loss'] = loss_states[0]
             losses['obj_loss'] = loss_states[1]
