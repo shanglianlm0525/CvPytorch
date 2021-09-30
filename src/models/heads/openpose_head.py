@@ -80,18 +80,19 @@ class OpenPoseHead(nn.Module):
         self._init_weight()
 
     def forward(self, x):
-        saved_for_loss = []
+        vecs = []
+        heats = []
         out_1 = self.model1_1(x)
         out_2 = self.model1_2(x)
-        saved_for_loss.append(out_1)
-        saved_for_loss.append(out_2)
+        vecs.append(out_1)
+        heats.append(out_2)
         for modelx_1, modelx_2 in zip(self.modelx_1_list, self.modelx_2_list):
             out = torch.cat([out_1, out_2, x], 1)
             out_1 = modelx_1(out)
             out_2 = modelx_2(out)
-            saved_for_loss.append(out_1)
-            saved_for_loss.append(out_2)
-        return (out_1, out_2), saved_for_loss
+            vecs.append(out_1)
+            heats.append(out_2)
+        return (out_1, out_2), (heats, vecs)
 
     def _init_weight(self):
         for m in self.modules():
