@@ -37,7 +37,7 @@ class CocoDetection(Dataset):
 
         self.num_classes = len(self.dictionary)
         self.coco = COCO(os.path.join(data_cfg.LABELS.DET_DIR, 'instances_{}.json'.format(os.path.basename(data_cfg.IMG_DIR))))
-        self.ids = list(sorted(self.coco.imgs.keys()))
+        self.ids = list(sorted(self.coco.getImgIds()))
 
         self._filter_invalid_annotation()
 
@@ -180,6 +180,77 @@ def get_hash(paths):
     return h.hexdigest()  # return hash
 
 
+class CocoKeypoint(Dataset):
+    def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
+        super(CocoKeypoint, self).__init__()
+        self.data_cfg = data_cfg
+        self.dictionary = dictionary
+        self.stage = stage
+        self.load_num = data_cfg.LOAD_NUM if data_cfg.__contains__('LOAD_NUM') and self.stage=='train' else 1
+        self.transform = transform
+        self.target_transform = target_transform
+
+        self.num_classes = len(self.dictionary)
+        self.coco = COCO(os.path.join(data_cfg.LABELS.DET_DIR, 'person_keypoints_{}.json'.format(os.path.basename(data_cfg.IMG_DIR))))
+        self.cat_ids = self.coco.getCatIds(catNms=['person'])
+        self.ids = list(sorted(self.coco.getImgIds(catIds=self.cat_ids)))
+
+        self._filter_for_keypoint_annotations()
+
+    def _filter_for_keypoint_annotations(self):
+        def has_keypoint_annotation(image_id):
+            ann_ids = self.coco.getAnnIds(imgIds=image_id, catIds=self.cat_ids)
+            anns = self.coco.loadAnns(ann_ids)
+            for ann in anns:
+                if 'keypoints' not in ann:
+                    continue
+                if any(v > 0.0 for v in ann['keypoints'][2::3]):
+                    return True
+            return False
+
+        self.ids = [image_id for image_id in self.ids if has_keypoint_annotation(image_id)]
+
+    def __getitem__(self, idx):
+        img_id = self.ids[idx]
+        ann_ids = self.coco.getAnnIds(imgIds=img_id, catIds=self.cat_ids)
+        ann = self.coco.loadAnns(ann_ids)
+
+        path = self.coco.loadImgs(img_id)[0]['file_name']
+        assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
+            os.path.join(self.data_cfg.IMG_DIR, path))
+
+        # _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
+        _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
+        _target = self.encode_map(ann, idx)
+        sample = {'image': _img, 'target': _target}
+        sample =  self.transform(sample)
+
+        if self.target_transform is not None:
+            return self.target_transform(sample)
+        else:
+            return sample
+
+    def encode_map(self, ann, idx):
+        img_id = self.ids[idx]
+        target = dict(image_id=img_id, annotations=ann)
+        return target
+
+    def __len__(self):
+        return len(self.ids)
+
+    @staticmethod
+    def collate_fn(batch):
+        '''list[tuple(Tensor, dict]'''
+        _img_list = []
+        _target_list = []
+        for bch in batch:
+            _img_list.append(bch['image'])
+            _target_list.append(bch['target'])
+
+        sample = {'image': torch.stack(_img_list, 0), 'target': _target_list}
+        return sample
+
+
 class CocoSegmentation(Dataset):
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         super(CocoSegmentation, self).__init__()
@@ -192,7 +263,7 @@ class CocoSegmentation(Dataset):
 
         self.num_classes = len(self.dictionary)
         self.coco = COCO(os.path.join(data_cfg.LABELS.DET_DIR, 'instances_{}.json'.format(os.path.basename(data_cfg.IMG_DIR))))
-        self.ids = list(sorted(self.coco.imgs.keys()))
+        self.ids = list(sorted(self.coco.getImgIds()))
 
         self._filter_invalid_annotation()
 
@@ -227,7 +298,8 @@ class CocoSegmentation(Dataset):
         assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
             os.path.join(self.data_cfg.IMG_DIR, path))
 
-        _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
+        # _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
+        _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
         _target = self.encode_map(ann, idx)
         sample = {'image': _img, 'target': _target}
         return self.transform(sample)
