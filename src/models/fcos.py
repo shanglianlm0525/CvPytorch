@@ -333,7 +333,7 @@ class FCOS(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [2, 3, 4], 'output_stride': 32}
+        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True}
         self.backbone = build_backbone(backbone_cfg)
 
         self.neck = FPN(256, use_p5=True)
