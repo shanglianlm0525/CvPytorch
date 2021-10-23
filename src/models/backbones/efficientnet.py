@@ -4,11 +4,16 @@
 # @Author : liumin
 # @File : Efficientnet.py
 
+'''https://github.com/narumiruna/efficientnet-pytorch/blob/master/efficientnet/models/efficientnet.py'''
+
 import math
 import torch
 import torch.nn as nn
 
-'''https://github.com/narumiruna/efficientnet-pytorch/blob/master/efficientnet/models/efficientnet.py'''
+'''
+    EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks
+    https://arxiv.org/pdf/1905.11946.pdf
+'''
 
 model_urls = {
     'efficientnet_b0': 'https://www.dropbox.com/s/9wigibun8n260qm/efficientnet-b0-4cfa50.pth?dl=1',
@@ -110,31 +115,48 @@ class EfficientNet(nn.Module):
         'efficientnet_b6': (1.8, 2.6, 528, 0.5),
         'efficientnet_b7': (2.0, 3.1, 600, 0.5),
     }
-    def __init__(self, subtype='efficientnet_b0', num_classes=1000):
+    def __init__(self, subtype='efficientnet_b0', out_stages=[3, 5, 7], output_stride=16, classifier=False,
+                     backbone_path=None, pretrained=False):
+
         super(EfficientNet, self).__init__()
+        self.subtype = subtype
+        self.out_stages = out_stages
+        self.output_stride = output_stride  # 8, 16, 32
+        self.classifier = classifier
+        self.backbone_path = backbone_path
+        self.pretrained = pretrained
+
         self.width_coeff = self.params[subtype][0]
         self.depth_coeff = self.params[subtype][1]
         self.dropout_rate = self.params[subtype][3]
         self.depth_div = 8
 
-        self.stage1 = ConvBNAct(3, self._calculate_width(32), kernel_size=3, stride=2)
-        self.stage2 = self.make_layer(self._calculate_width(32), self._calculate_width(16), kernel_size=3, stride=1, block=self._calculate_depth(1))
-        self.stage3 = self.make_layer(self._calculate_width(16), self._calculate_width(24), kernel_size=3, stride=2, block=self._calculate_depth(2))
-        self.stage4 = self.make_layer(self._calculate_width(24), self._calculate_width(40), kernel_size=5, stride=2, block=self._calculate_depth(2))
-        self.stage5 = self.make_layer(self._calculate_width(40), self._calculate_width(80), kernel_size=3, stride=2, block=self._calculate_depth(3))
-        self.stage6 = self.make_layer(self._calculate_width(80), self._calculate_width(112), kernel_size=5, stride=1, block=self._calculate_depth(3))
-        self.stage7 = self.make_layer(self._calculate_width(112), self._calculate_width(192), kernel_size=5, stride=2, block=self._calculate_depth(4))
-        self.stage8 = self.make_layer(self._calculate_width(192), self._calculate_width(320), kernel_size=3, stride=1, block=self._calculate_depth(1))
+        self.conv1 = ConvBNAct(3, self._calculate_width(32), kernel_size=3, stride=2)
+        self.stage1 = self.make_layer(self._calculate_width(32), self._calculate_width(16), kernel_size=3, stride=1, block=self._calculate_depth(1))
+        self.stage2 = self.make_layer(self._calculate_width(16), self._calculate_width(24), kernel_size=3, stride=2, block=self._calculate_depth(2))
+        self.stage3 = self.make_layer(self._calculate_width(24), self._calculate_width(40), kernel_size=5, stride=2, block=self._calculate_depth(2))
+        self.stage4 = self.make_layer(self._calculate_width(40), self._calculate_width(80), kernel_size=3, stride=2, block=self._calculate_depth(3))
+        self.stage5 = self.make_layer(self._calculate_width(80), self._calculate_width(112), kernel_size=5, stride=1, block=self._calculate_depth(3))
+        self.stage6 = self.make_layer(self._calculate_width(112), self._calculate_width(192), kernel_size=5, stride=2, block=self._calculate_depth(4))
+        self.stage7 = self.make_layer(self._calculate_width(192), self._calculate_width(320), kernel_size=3, stride=1, block=self._calculate_depth(1))
 
-        self.classifier = nn.Sequential(
-            Conv1x1BNAct(320, 1280),
-            nn.AdaptiveAvgPool2d(1),
-            nn.Dropout2d(0.2),
-            Flatten(),
-            nn.Linear(1280, num_classes)
-        )
+        self.out_channels = [self._calculate_width(ch) for ch in [32, 16, 24, 40, 80, 112, 192, 320]]
+        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.init_weights()
+        if self.classifier:
+            self.classifier = nn.Sequential(
+                Conv1x1BNAct(320, 1280),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Dropout2d(0.2),
+                Flatten(),
+                nn.Linear(1280, 1000)
+            )
+            self.out_channels = [1000]
+
+        if self.pretrained:
+            self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
     def init_weights(self):
         for m in self.modules():
@@ -162,16 +184,23 @@ class EfficientNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.stage1(x)
-        x = self.stage2(x)
-        x = self.stage3(x)
-        x = self.stage4(x)
-        x = self.stage5(x)
-        x = self.stage6(x)
-        x = self.stage7(x)
-        x = self.stage8(x)
-        out = self.classifier(x)
-        return out
+        x = self.conv1(x)
+        output = []
+        for i in range(1, 8):
+            stage = getattr(self, 'stage{}'.format(i))
+            x = stage(x)
+            if i in self.out_stages and not self.classifier:
+                output.append(x)
+        if self.classifier:
+            x = self.classifier(x)
+            return x
+        return output if len(self.out_stages) > 1 else output[0]
+
+    def freeze_bn(self):
+        for layer in self.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.eval()
+
 
 if __name__=='__main__':
     model = EfficientNet('efficientnet_b0')
