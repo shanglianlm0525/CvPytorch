@@ -8,6 +8,7 @@ from copy import deepcopy
 
 from .csp_darknet import CspDarkNet
 from .custom_cspnet import CustomCspNet
+from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
 from .repvgg import RepVGG
 from .vgg import VGG
@@ -23,7 +24,7 @@ from .stdcnet import STDCNet
 from .yolov5_backbone import YOLOv5Backbone
 
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2',
-           'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet', 'CspDarkNet']
+           'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNet', 'EfficientNetLite', 'CustomCspNet', 'CspDarkNet']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
@@ -48,6 +49,8 @@ def build_backbone(cfg):
         return YOLOv5Backbone(**backbone_cfg)
     elif name == 'RepVGG':
         return RepVGG(**backbone_cfg)
+    elif name == 'EfficientNet':
+        return EfficientNet(**backbone_cfg)
     elif name == 'EfficientNetLite':
         return EfficientNetLite(**backbone_cfg)
     elif name == 'CustomCspNet':
