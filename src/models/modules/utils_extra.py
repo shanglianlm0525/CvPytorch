@@ -5,9 +5,7 @@ import math
 from torch import nn
 import torch.nn.functional as F
 
-from scripts.yolor.utils.activations import MemoryEfficientSwish
-
-from src.models.modules.activations import Swish
+from src.models.modules.activations import Swish, MemoryEfficientSwish
 
 
 class Conv2dStaticSamePadding(nn.Module):
