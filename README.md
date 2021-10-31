@@ -86,7 +86,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ### Training
 
-For this example, we will use [COCO](https://github.com/ultralytics/yolov5/blob/master/data/get_coco2017.sh) dataset with `yolov5l.yaml` . Feel free to use your own custom dataset and configurations.
+For this example, we will use hymenoptera dataset with `conf/hymenoptera.yml` . Feel free to use your own custom dataset and configurations.
 
 #### Single GPU:
 
