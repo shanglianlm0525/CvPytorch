@@ -5,6 +5,8 @@
 # @File : __init__bak.py
 
 from copy import deepcopy
+
+from .bifpn import BiFPN
 from .fpn import FPN
 from .yolofastestv2_neck import YoloFastestv2Neck
 from .pan import PAN
@@ -18,6 +20,7 @@ __all__ = [
     'FPN',
     'PAN',
     'TAN',
+    'BiFPN',
     'YoloFastestv2Neck',
     'YOLOXNeck',
     'YOLOv3Neck',
@@ -34,6 +37,8 @@ def build_neck(cfg):
         return PAN(**neck_cfg)
     elif name == 'TAN':
         return TAN(**neck_cfg)
+    elif name == 'BiFPN':
+        return BiFPN(**neck_cfg)
     elif name == 'YoloFastestv2Neck':
         return YoloFastestv2Neck(**neck_cfg)
     elif name == 'YOLOXNeck':
