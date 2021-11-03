@@ -155,7 +155,7 @@ class EfficientNetLite(nn.Module):
             [1, 3, 1, 6, 192, 320, 0.25]  # stage6 - 1/32
         ]
 
-        self.out_channels = [16, 24, 40, 80, 112, 192, 320]
+        self.out_channels = [32, 16, 24, 40, 80, 112, 192, 320]
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
         # Stem
@@ -176,7 +176,6 @@ class EfficientNetLite(nn.Module):
             output_filters = round_filters(output_filters, width_multiplier)
             num_repeat = num_repeat if i == 0 or i == len(mb_block_settings) - 1 else round_repeats(num_repeat,
                                                                                                     depth_multiplier)
-
             # The first block needs to take care of stride and filter size increase.
             stage.append(
                 MBConvBlock(input_filters, output_filters, kernal_size, stride, expand_ratio, se_ratio, has_se=False))
@@ -193,7 +192,6 @@ class EfficientNetLite(nn.Module):
             self.load_pretrained_weights()
         else:
             self.init_weights()
-
 
     def init_weights(self):
         for m in self.modules():
