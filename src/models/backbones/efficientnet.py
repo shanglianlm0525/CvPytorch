@@ -9,6 +9,7 @@
 import math
 import torch
 import torch.nn as nn
+from torch.utils import model_zoo
 
 '''
     EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks
@@ -165,6 +166,16 @@ class EfficientNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 init_range = 1.0 / math.sqrt(m.weight.shape[1])
                 nn.init.uniform_(m.weight, -init_range, init_range)
+
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
     def _calculate_width(self, x):
         x *= self.width_coeff
