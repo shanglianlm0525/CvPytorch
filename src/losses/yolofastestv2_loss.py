@@ -58,9 +58,9 @@ def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False):
     return iou
 
 
-class YOLOFastestv2Loss(nn.Module):
+class YoloFastestv2Loss(nn.Module):
     def __init__(self, num_classes, stride=[16., 32.], anchors=[[12.64,19.39, 37.88,51.48, 55.71,138.31], [126.91,78.23, 131.57,214.55, 279.92,258.87]], device = 'cuda:0'):
-        super(YOLOFastestv2Loss, self).__init__()
+        super(YoloFastestv2Loss, self).__init__()
         self.num_classes = num_classes
         self.stride = stride
         self.num_anchors = len(anchors[0]) // 2  # number of anchors
