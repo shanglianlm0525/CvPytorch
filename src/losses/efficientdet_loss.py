@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2021/10/27 10:37
 # @Author : liumin
-# @File : efficientdet_loss.py
+# @File : efficientdet_extra.py
 
 import torch
 import torch.nn as nn
