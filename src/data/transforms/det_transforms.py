@@ -60,8 +60,8 @@ def clip_boxes_to_image(boxes, size):
         array[N, 4]: clipped boxes
     """
     height, width = size
-    boxes[..., 0::2] = boxes[..., 0::2].clip(min=0, max=width)
-    boxes[..., 1::2] = boxes[..., 1::2].clip(min=0, max=height)
+    boxes[..., 0::2] = boxes[..., 0::2].clip(min=0, max=width-1)
+    boxes[..., 1::2] = boxes[..., 1::2].clip(min=0, max=height-1)
     return boxes
 
 
@@ -1140,6 +1140,52 @@ class YOLOv5AugWithoutMosaic(object):
         return {'image': img, 'target': target}
 
 
+class EfficientDetAugment(object):
+    def __init__(self, augment=True, img_size=512):
+        self.augment = augment
+        self.img_size = img_size
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        labels = target["labels"]
+
+        mean = [0.406, 0.456, 0.485]
+        std = [0.225, 0.224, 0.229]
+        img = (img.astype(np.float32) / 255. - mean) / std
+
+        if self.augment:
+            if random.random() < 0.5:
+                height, width, _ = img.shape
+                ymin = height - 1 - boxes[:, 3]
+                ymax = height - 1 - boxes[:, 1]
+                boxes[:, 3] = ymax
+                boxes[:, 1] = ymin
+                img = cv2.flip(img, 0)
+
+        height, width, _ = img.shape
+        if height > width:
+            scale = self.img_size / height
+            resized_height = self.img_size
+            resized_width = int(width * scale)
+        else:
+            scale = self.img_size / width
+            resized_height = int(height * scale)
+            resized_width = self.img_size
+
+        img = cv2.resize(img, (resized_width, resized_height), interpolation=cv2.INTER_LINEAR)
+
+        new_img = np.zeros((self.img_size, self.img_size, 3))
+        new_img[0:resized_height, 0:resized_width] = img
+
+        boxes *= scale
+
+        target["pads"] = torch.tensor([0, 0], dtype=torch.float)
+        target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+        target["labels"] = labels
+        target["boxes"] = torch.from_numpy(boxes)
+        return {'image': torch.from_numpy(new_img.astype(np.float32)), 'target': target}
+
 
 
 class YOLOv5AugWithoutAugment(object):
@@ -1237,6 +1283,7 @@ class ConvertCocoPolysToMask(object):
             boxes = [obj["bbox"] for obj in anno]
             # guard against no boxes via resizing
             boxes = np.array(boxes, dtype=np.float32).reshape(-1, 4)
+            # boxes -= 1 # begin from 0
             boxes[:, 2:] += boxes[:, :2]  # xywh ==> xyxy
             boxes = clip_boxes_to_image(boxes, [h, w])
 
