@@ -9,10 +9,12 @@ import src.data.transforms.cls_transforms as cls_t
 import src.data.transforms.seg_transforms as seg_t
 import src.data.transforms.det_transforms as det_t
 import src.data.transforms.ins_transforms as ins_t
+import src.data.transforms.keypoint_transforms as kyp_t
 import src.data.transforms.cls_target_transforms as cls_target_t
 import src.data.transforms.seg_target_transforms as seg_target_t
 import src.data.transforms.det_target_transforms as det_target_t
 import src.data.transforms.ins_target_transforms as ins_target_t
+import src.data.transforms.keypoint_target_transforms as kyp_target_t
 
 def build_transforms(dict_name, cfg, mode='train'):
     _params = []
@@ -25,6 +27,8 @@ def build_transforms(dict_name, cfg, mode='train'):
         trans = det_t
     elif dict_name == 'INS_CLASSES':
         trans = ins_t
+    elif dict_name == 'KEYPOINT_CLASSES':
+        trans = kyp_t
     else:
         raise ValueError("Unsupported transforms type: {}".format(dict_name))
 
@@ -46,6 +50,8 @@ def build_targets_transforms(dict_name, cfg, mode='train'):
         trans = det_target_t
     elif dict_name == 'INS_CLASSES':
         trans = ins_target_t
+    elif dict_name == 'KEYPOINT_CLASSES':
+        trans = kyp_target_t
     else:
         raise ValueError("Unsupported transforms type: {}".format(dict_name))
 
