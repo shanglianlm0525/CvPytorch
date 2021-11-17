@@ -6,6 +6,7 @@
 
 from copy import deepcopy
 
+from src.losses.ssd_loss import SsdLoss
 from src.losses.yolofastestv2_loss import YoloFastestv2Loss
 from src.losses.yolop_loss import YolopLoss
 from src.losses.yolov5_loss import Yolov5Loss
@@ -13,7 +14,7 @@ from src.losses.efficientdet_loss import EfficientDetLoss
 from src.losses.yolox_loss import YoloxLoss
 
 
-__all__ = ['Yolov5Loss', 'EfficientDetLoss', 'YoloFastestv2Loss', 'YoloxLoss',
+__all__ = ['Yolov5Loss', 'EfficientDetLoss', 'YoloFastestv2Loss', 'YoloxLoss', 'SsdLoss',
            'YolopLoss']
 
 
@@ -30,6 +31,8 @@ def build_loss(cfg):
         return YoloFastestv2Loss(**loss_cfg)
     elif name == 'YoloxLoss':
         return YoloxLoss(**loss_cfg)
+    elif name == 'SsdLoss':
+        return SsdLoss(**loss_cfg)
 
 
     elif name == 'YolopLoss':
