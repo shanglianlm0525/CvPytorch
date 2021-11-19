@@ -1,0 +1,12 @@
+DET_CLASSES:
+ - background: 1
+ - pedestrian: 1
+ - person: 1
+ - car: 1
+ - van: 1
+ - bus: 1
+ - truck: 1
+ - motor: 1
+ - bicycle: 1
+ - awning-tricycle: 1
+ - tricycle: 1
