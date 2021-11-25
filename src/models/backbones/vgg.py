@@ -37,44 +37,45 @@ class VGG(nn.Module):
 
         if self.subtype == 'vgg11':
             features = vgg11(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:3])
+            self.layer1 = nn.Sequential(*list(features.children())[3:5])
+            self.layer1_pool = nn.Sequential(list(features.children())[5])
+            self.layer2 = nn.Sequential(*list(features.children())[6:10])
+            self.layer2_pool = nn.Sequential(list(features.children())[10])
+            self.layer3 = nn.Sequential(*list(features.children())[11:15])
+            self.layer3_pool = nn.Sequential(list(features.children())[15])
+            self.layer4 = nn.Sequential(*list(features.children())[16:20])
+            self.layer4_pool = nn.Sequential(list(features.children())[20])
+
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg13':
             features = vgg13(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:5])
+            self.layer1 = nn.Sequential(*list(features.children())[5:9])
+            self.layer1_pool = nn.Sequential(list(features.children())[9])
+            self.layer2 = nn.Sequential(*list(features.children())[10:14])
+            self.layer2_pool = nn.Sequential(list(features.children())[14])
+            self.layer3 = nn.Sequential(*list(features.children())[15:19])
+            self.layer3_pool = nn.Sequential(list(features.children())[19])
+            self.layer4 = nn.Sequential(*list(features.children())[20:24])
+            self.layer4_pool = nn.Sequential(list(features.children())[24])
+
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg16':
             features = vgg16(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:5])
+            self.layer1 = nn.Sequential(*list(features.children())[5:9])
+            self.layer1_pool = nn.Sequential(list(features.children())[9])
+            self.layer2 = nn.Sequential(*list(features.children())[10:16])
+            self.layer2_pool = nn.Sequential(list(features.children())[16])
+            self.layer3 = nn.Sequential(*list(features.children())[17:23])
+            self.layer3_pool = nn.Sequential(list(features.children())[23])
+            self.layer4 = nn.Sequential(*list(features.children())[24:30])
+            self.layer4_pool = nn.Sequential(list(features.children())[30])
+
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg19':
             features = vgg19(self.pretrained).features
-            self.out_channels = [64, 128, 256, 512, 512]
-        elif self.subtype == 'vgg11_bn':
-            features = vgg11_bn(self.pretrained).features
-            self.out_channels = [64, 128, 256, 512, 512]
-        elif self.subtype == 'vgg13_bn':
-            features = vgg13_bn(self.pretrained).features
-            self.out_channels = [64, 128, 256, 512, 512]
-        elif self.subtype == 'vgg16_bn':
-            features = vgg16_bn(self.pretrained).features
-            self.out_channels = [64, 128, 256, 512, 512]
-        elif self.subtype == 'vgg19_bn':
-            features = vgg19_bn(self.pretrained).features
-            self.out_channels = [64, 128, 256, 512, 512]
-        else:
-            raise NotImplementedError
-
-        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
-
-        if self.subtype.__contains__('_bn'):
-            self.conv1 = nn.Sequential(*list(features.children())[:7])
-            self.layer1 = nn.Sequential(*list(features.children())[7:13])
-            self.layer1_pool = nn.Sequential(list(features.children())[13])
-            self.layer2 = nn.Sequential(*list(features.children())[14:23])
-            self.layer2_pool = nn.Sequential(list(features.children())[23])
-            self.layer3 = nn.Sequential(*list(features.children())[24:33])
-            self.layer3_pool = nn.Sequential(list(features.children())[33])
-            self.layer4 = nn.Sequential(*list(features.children())[34:43])
-            self.layer4_pool = nn.Sequential(list(features.children())[43])
-        else:
             self.conv1 = nn.Sequential(*list(features.children())[:5])
             self.layer1 = nn.Sequential(*list(features.children())[5:9])
             self.layer1_pool = nn.Sequential(list(features.children())[9])
@@ -84,6 +85,64 @@ class VGG(nn.Module):
             self.layer3_pool = nn.Sequential(list(features.children())[27])
             self.layer4 = nn.Sequential(*list(features.children())[28:36])
             self.layer4_pool = nn.Sequential(list(features.children())[36])
+
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg11_bn':
+            features = vgg11_bn(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:4])
+            self.layer1 = nn.Sequential(*list(features.children())[4:7])
+            self.layer1_pool = nn.Sequential(list(features.children())[7])
+            self.layer2 = nn.Sequential(*list(features.children())[8:14])
+            self.layer2_pool = nn.Sequential(list(features.children())[14])
+            self.layer3 = nn.Sequential(*list(features.children())[15:21])
+            self.layer3_pool = nn.Sequential(list(features.children())[21])
+            self.layer4 = nn.Sequential(*list(features.children())[22:28])
+            self.layer4_pool = nn.Sequential(list(features.children())[28])
+
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg13_bn':
+            features = vgg13_bn(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:7])
+            self.layer1 = nn.Sequential(*list(features.children())[7:13])
+            self.layer1_pool = nn.Sequential(list(features.children())[13])
+            self.layer2 = nn.Sequential(*list(features.children())[14:20])
+            self.layer2_pool = nn.Sequential(list(features.children())[20])
+            self.layer3 = nn.Sequential(*list(features.children())[20:27])
+            self.layer3_pool = nn.Sequential(list(features.children())[27])
+            self.layer4 = nn.Sequential(*list(features.children())[28:34])
+            self.layer4_pool = nn.Sequential(list(features.children())[34])
+
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg16_bn':
+            features = vgg16_bn(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:7])
+            self.layer1 = nn.Sequential(*list(features.children())[7:13])
+            self.layer1_pool = nn.Sequential(list(features.children())[13])
+            self.layer2 = nn.Sequential(*list(features.children())[14:23])
+            self.layer2_pool = nn.Sequential(list(features.children())[23])
+            self.layer3 = nn.Sequential(*list(features.children())[24:33])
+            self.layer3_pool = nn.Sequential(list(features.children())[33])
+            self.layer4 = nn.Sequential(*list(features.children())[34:43])
+            self.layer4_pool = nn.Sequential(list(features.children())[43])
+
+            self.out_channels = [64, 128, 256, 512, 512]
+        elif self.subtype == 'vgg19_bn':
+            features = vgg19_bn(self.pretrained).features
+            self.conv1 = nn.Sequential(*list(features.children())[:7])
+            self.layer1 = nn.Sequential(*list(features.children())[7:13])
+            self.layer1_pool = nn.Sequential(list(features.children())[13])
+            self.layer2 = nn.Sequential(*list(features.children())[14:26])
+            self.layer2_pool = nn.Sequential(list(features.children())[26])
+            self.layer3 = nn.Sequential(*list(features.children())[27:39])
+            self.layer3_pool = nn.Sequential(list(features.children())[39])
+            self.layer4 = nn.Sequential(*list(features.children())[40:52])
+            self.layer4_pool = nn.Sequential(list(features.children())[52])
+
+            self.out_channels = [64, 128, 256, 512, 512]
+        else:
+            raise NotImplementedError
+
+        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
         if self.pretrained:
             self.load_pretrained_weights()
