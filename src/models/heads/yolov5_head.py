@@ -10,7 +10,7 @@ import torch.nn as nn
 
 
 class YOLOv5Head(nn.Module):
-    def __init__(self, num_classes=80, channels=[256, 512, 1024], depth_mul=1.0, width_mul=1.0, stride=[ 8., 16., 32.], anchors=[[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]]):
+    def __init__(self, num_classes=80, channels=[256, 512, 1024], depth_mul=1.0, width_mul=1.0, stride=[ 8., 16., 32.]):
         super(YOLOv5Head, self).__init__()
         self.num_classes = num_classes  # number of classes
         self.num_outputs = num_classes + 5  # number of outputs per anchor
@@ -18,6 +18,10 @@ class YOLOv5Head(nn.Module):
         self.width_mul = width_mul
         self.stride = stride
         self.channels = list(map(lambda x: max(round(x * self.width_mul), 1), channels))
+
+        anchors = [[1.25000, 1.62500, 2.00000, 3.75000, 4.12500, 2.87500],
+                   [1.87500, 3.81250, 3.87500, 2.81250, 3.68750, 7.43750],
+                   [3.62500, 2.81250, 4.87500, 6.18750, 11.65625, 10.18750]]
         self.num_layers = len(anchors)  # number of detection layers
         self.num_anchors = len(anchors[0]) // 2  # number of anchors
         self.grid = [torch.zeros(1)] * self.num_layers  # init grid
