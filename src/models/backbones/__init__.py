@@ -11,6 +11,7 @@ from .custom_cspnet import CustomCspNet
 from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
 from .repvgg import RepVGG
+from .tph_yolov5_backbone import TPH_YOLOv5Backbone
 from .vgg import VGG
 from .resnet import ResNet
 from .resnext import ResNeXt
@@ -23,7 +24,7 @@ from .stdcnet import STDCNet
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
 
-__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2',
+__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'YOLOv5Backbone', 'TPH_YOLOv5Backbone',
            'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNet', 'EfficientNetLite', 'CustomCspNet', 'CspDarkNet']
 
 def build_backbone(cfg):
@@ -47,6 +48,8 @@ def build_backbone(cfg):
         return STDCNet(**backbone_cfg)
     elif name == 'YOLOv5Backbone':
         return YOLOv5Backbone(**backbone_cfg)
+    elif name == 'TPH_YOLOv5Backbone':
+        return TPH_YOLOv5Backbone(**backbone_cfg)
     elif name == 'RepVGG':
         return RepVGG(**backbone_cfg)
     elif name == 'EfficientNet':
