@@ -8,6 +8,7 @@ from copy import deepcopy
 
 from .bifpn import BiFPN
 from .fpn import FPN
+from .tph_yolov5_neck import TPH_YOLOv5Neck
 from .yolofastestv2_neck import YoloFastestv2Neck
 from .pan import PAN
 from .tan import TAN
@@ -25,6 +26,7 @@ __all__ = [
     'YOLOXNeck',
     'YOLOv3Neck',
     'YOLOv5Neck',
+    'TPH_YOLOv5Neck',
     'YOLOPNeck'
 ]
 
@@ -47,6 +49,8 @@ def build_neck(cfg):
         return YOLOv3Neck(**neck_cfg)
     elif name == 'YOLOv5Neck':
         return YOLOv5Neck(**neck_cfg)
+    elif name == 'TPH_YOLOv5Neck':
+        return TPH_YOLOv5Neck(**neck_cfg)
     elif name == 'YOLOPNeck':
         return YOLOPNeck(**neck_cfg)
     else:
