@@ -6,14 +6,17 @@
 
 from .eval_classification import ClassificationEvaluator
 from .eval_detection import VOCEvaluator
+from .eval_yolov5_detection import Yolov5Evaluator
 from .eval_segmentation import SegmentationEvaluator
 from .eval_coco import CocoEvaluator
 
 __all__ = [
     'ClassificationEvaluator',
     'VOCEvaluator',
+    'Yolov5Evaluator',
     'SegmentationEvaluator',
     'CocoEvaluator']
+
 
 def build_evaluator(cfg, dataset):
     'Using adapter design patterns'
@@ -21,6 +24,8 @@ def build_evaluator(cfg, dataset):
         return ClassificationEvaluator(dataset)
     elif cfg.EVALUATOR.NAME == 'voc_detection':
         return VOCEvaluator(dataset)
+    elif cfg.EVALUATOR.NAME == 'yolov5_detection':
+        return Yolov5Evaluator(dataset)
     elif cfg.EVALUATOR.NAME.startswith('coco'):
         if cfg.EVALUATOR.NAME == 'coco_segmentation':
             iou_types = ["segm"]
