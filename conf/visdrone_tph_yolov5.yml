@@ -16,7 +16,7 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 2
     NUM_WORKER: 4
-    LOAD_NUM: 1
+    LOAD_NUM: 4
     CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/visdrone'
@@ -24,9 +24,9 @@ DATASET:
       SEG_DIR: '/home/lmin/data/visdrone'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      # Mosaic: { p: 1.0, size: [640, 640], fill: 114 }
-      Resize: { size: [1536, 1536], keep_ratio: True, fill: [114, 114, 114] }
-      # RandomAffine: { p: 1.0, degrees: [0., 0.], translate: 0.1, scale: [0.5, 1.5], shear: [0., 0.], perspective: [0., 0.], border: [-320, -320], fill: [114, 114, 114] }
+      Mosaic: { p: 1.0, size: [1536, 1536], fill: 114 }
+      # Resize: { size: [1536, 1536], keep_ratio: True, fill: [114, 114, 114] }
+      RandomAffine: { p: 1.0, degrees: [0., 0.], translate: 0.1, scale: [0.5, 1.5], shear: [0., 0.], perspective: [0., 0.], border: [-768, -768], fill: [114, 114, 114] }
       RandomHorizontalFlip: { p: 0.5 }
       RandomVerticalFlip: { p: 0.5 }
       ColorHSV: { p: 1.0, hue: 0.015, saturation: 0.7, value: 0.4 }
@@ -67,7 +67,7 @@ USE_MODEL:
 
 
 EVALUATOR:
-  NAME: 'coco_detection'
+  NAME: 'yolov5_detection'
   EVAL_TYPE: 'mAP'
   EVAL_INTERVALS: 10
 
@@ -87,8 +87,8 @@ RESUME: False
 GPU_IDS: [1]
 N_MAX_EPOCHS: 80
 
-INIT_LR: 0.0032
-BACKBONE_LR: 0.0032
+INIT_LR: 0.01
+BACKBONE_LR: 0.01
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -111,8 +111,8 @@ LR_SCHEDULER:
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 6000
-  FACTOR: 0.05
+  ITERS: 1000
+  FACTOR: 0.0005
 
 MULTI_SCALE: True
 SCALE_RANGE: [0.5, 1.5]
