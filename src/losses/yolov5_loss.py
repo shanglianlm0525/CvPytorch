@@ -153,6 +153,11 @@ class Yolov5Loss:
         anchors = torch.tensor(anchors, device=self.device).view(len(anchors), 3, -1)
         stride = torch.tensor(stride, device=self.device).view(-1, 1, 1)
         self.anchors = anchors / stride
+        # print(self.anchors)
+
+        self.anchors = torch.tensor([[[1.25000, 1.62500], [2.00000, 3.75000], [4.12500, 2.87500]],
+                   [[1.87500, 3.81250], [3.87500, 2.81250], [3.68750, 7.43750]],
+                   [[3.62500, 2.81250], [4.87500, 6.18750], [11.65625, 10.18750]]], device=self.device)
 
         # Define criteria
         BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=self.device))
