@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch.nn import Parameter
 import numpy as np
 
-__all__ = ['ExternalAttention', 'SEAttention', 'SKAttention', 'SimAM', 'SAM', 'TripletAttention', 'BAM', 'CBAM', 'ResidualAttention',
+__all__ = ['ExternalAttention', 'SEAttention', 'SKAttention', 'SimAM', 'SAM', 'TripletAttention', 'BAM', 'CBAM', 'NAM','ResidualAttention',
            'FcaAttention', 'ShuffleAttention', 'ECAAttention', 'PyramidSplitAttention', 'SpatialGroupEnhance',
             'ScaledDotProductAttention', 'SimplifiedScaledDotProductAttention', 'EfficientMultiheadSelfAttention', 'CrissCrossAttention',
            'NonLocalAttention', 'GlobalContextAttention', 'DoubleAttention', 'AttentionFreeTransformer', 'MUSEAttention']
@@ -331,6 +331,27 @@ class BAM(nn.Module):
     def forward(self, x):
         att = self.sigmoid(self.channel_attention(x) * self.spatial_attention(x))
         return (1 + att) * x
+
+
+class NAM(nn.Module):
+    """
+        NAM: Normalization-based Attention Module
+        https://arxiv.org/pdf/2111.12419.pdf
+    """
+    def __init__(self, channels, t=16):
+        super(NAM, self).__init__()
+        self.channels = channels
+        self.bn2 = nn.BatchNorm2d(self.channels, affine=True)
+
+    def forward(self, x):
+        residual = x
+        x = self.bn2(x)
+        weight_bn = self.bn2.weight.data.abs() / torch.sum(self.bn2.weight.data.abs())
+        x = x.permute(0, 2, 3, 1).contiguous()
+        x = torch.mul(weight_bn, x)
+        x = x.permute(0, 3, 1, 2).contiguous()
+        x = torch.sigmoid(x) * residual  #
+        return x
 
 
 class ResidualAttention(nn.Module):
