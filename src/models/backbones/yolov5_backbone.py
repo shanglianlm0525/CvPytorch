@@ -6,11 +6,11 @@
 
 import torch
 import torch.nn as nn
-from ..modules.yolov5_modules import Focus, Conv, C3, SPP
+from src.models.modules.yolov5_modules import Conv, C3, SPPF, SPP
 
 
 class YOLOv5Backbone(nn.Module):
-    def __init__(self, subtype='yolov5s', out_stages=[2,3,4], output_stride = 32, layers=[3, 9, 9], depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='yolov5s', out_stages=[2,3,4], output_stride=32, layers=[3, 6, 9, 3], depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
         super(YOLOv5Backbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
@@ -24,7 +24,7 @@ class YOLOv5Backbone(nn.Module):
         self.out_channels = in_places = list(map(lambda x: int(x * self.width_mul), self.out_channels))
         layers = list(map(lambda x: max(round(x * self.depth_mul), 1), layers))
 
-        self.conv1 = Focus(3, in_places[0], 3)
+        self.conv1 = Conv(3, in_places[0], k=(6, 6), s=(2, 2), p=(2, 2))
         self.layer1 = nn.Sequential(Conv(in_places[0], in_places[1], 3, 2),
                                     C3(in_places[1], in_places[1], layers[0]))
         self.layer2 = nn.Sequential(Conv(in_places[1], in_places[2], 3, 2),
@@ -47,7 +47,7 @@ class YOLOv5Backbone(nn.Module):
             elif t is nn.BatchNorm2d:
                 m.eps = 1e-3
                 m.momentum = 0.03
-            elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6]:
+            elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
                 m.inplace = True
 
     def forward(self, x):
