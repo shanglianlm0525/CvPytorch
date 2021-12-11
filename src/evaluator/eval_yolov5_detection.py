@@ -153,10 +153,10 @@ def xywh2xyxy(x):
     return y
 
 class Yolov5Evaluator(BaseEvaluator):
-    def __init__(self, dataset, iou_thread=0.5):
-        self.dataset = dataset
-        self.num_class = dataset.num_classes
-        self.dictionary = dataset.dictionary
+    def __init__(self, dataset=None, iou_thread=0.5):
+        # self.dataset = dataset
+        # self.num_class = dataset.num_classes
+        # self.dictionary = dataset.dictionary
         self.iou_thread = iou_thread
 
         self.stats = []
@@ -189,7 +189,8 @@ class Yolov5Evaluator(BaseEvaluator):
         stats = [np.concatenate(x, 0) for x in zip(*self.stats)]
         p, r, ap, f1, ap_class = ap_per_class(*stats)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
-        # mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+        mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+        print(mp, mr, map50, map)
         performances = {}
         performances['precision'] = p.mean()
         performances['recall'] = r.mean()
@@ -203,7 +204,7 @@ class Yolov5Evaluator(BaseEvaluator):
         self.count = 0
 
 if __name__ == '__main__':
-    Yolov5Evaluator = Yolov5Evaluator()
+    evaluator = Yolov5Evaluator()
 
     gt_targets_list = []
     pred_list = []
@@ -224,6 +225,6 @@ if __name__ == '__main__':
         pred_list.append(pred)
 
 
-    visdroneEvaluator.update(gt_targets_list, pred_list)
-    visdroneEvaluator.evaluate()
+    evaluator.update(gt_targets_list, pred_list)
+    evaluator.evaluate()
     print()
