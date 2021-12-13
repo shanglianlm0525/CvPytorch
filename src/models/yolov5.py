@@ -10,7 +10,7 @@ import torch.nn as nn
 import numpy as np
 import torchvision
 
-from src.losses.yolov5_loss import YOLOv5Loss
+from src.losses.yolov5_loss import Yolov5Loss
 from src.models.backbones import build_backbone
 from src.models.heads import build_head
 from src.models.necks import build_neck
@@ -203,7 +203,7 @@ class YOLOv5(nn.Module):
         self.neck = build_neck(self.model_cfg.NECK)
         self.head = build_head(self.model_cfg.HEAD)
 
-        self.loss = YOLOv5Loss(self.num_classes)
+        self.loss = Yolov5Loss(self.num_classes)
 
         self.conf_thres = 0.001  # confidence threshold
         self.iou_thres = 0.6  # NMS IoU threshold
