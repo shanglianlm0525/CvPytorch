@@ -170,7 +170,7 @@ class Yolov5Evaluator(BaseEvaluator):
             gt_label = gt_target['labels'].cpu().numpy()
 
             gt_bbox = xywh2xyxy(gt_bbox)
-            gt_bbox *= 1536
+            gt_bbox *= 608
 
             pred_score = pred['scores'].cpu().numpy()
             pred_label = pred['labels'].cpu().numpy()
