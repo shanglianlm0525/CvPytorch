@@ -209,11 +209,13 @@ if __name__ == '__main__':
     gt_targets_list = []
     pred_list = []
     for si in range(548):
+        tbox = torch.load('/home/lmin/pythonCode/scripts/weights/tphyolov5/tbox_' + str(si) + '.pth')
         predn = torch.load('/home/lmin/pythonCode/scripts/weights/tphyolov5/predn_' + str(si) + '.pth')
         labelsn = torch.load('/home/lmin/pythonCode/scripts/weights/tphyolov5/labelsn_' + str(si) + '.pth')
 
         gt_targets = {}
-        gt_targets['boxes'] = labelsn[:, 1:]
+        gt_targets['boxes'] = tbox
+        # gt_targets['boxes'] = labelsn[:, 1:]
         gt_targets['labels'] = labelsn[:, 0]
 
         pred = {}
