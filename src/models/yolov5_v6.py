@@ -166,7 +166,7 @@ class YOLOv5(nn.Module):
         self.model_cfg = model_cfg
         self.dummy_input = torch.zeros(1, 3, 608, 608)
 
-        self.num_classes = len(self.dictionary)
+        self.num_classes = 80 # len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
