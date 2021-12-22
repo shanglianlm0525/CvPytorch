@@ -134,30 +134,26 @@ class QFocalLoss(nn.Module):
 
 class Yolov5Loss:
     # Compute losses
-    def __init__(self, num_classes, num_layers = 3, num_anchors = 3, stride=[ 8., 16., 32.], anchors=[[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]], device = 'cuda:0', autobalance=False):
+    def __init__(self, num_classes, stride=[ 8., 16., 32.], anchors=(), device = 'cuda:0', autobalance=False):
         super(Yolov5Loss, self).__init__()
         self.sort_obj_iou = False
         self.num_classes = num_classes
-        self.num_layers = num_layers # number of detection layers
-        self.num_anchors = num_anchors # number of anchors
+        self.num_layers = len(anchors)  # number of detection layers
+        self.num_anchors = len(anchors[0])  # number of anchors
         self.device = device
 
         fl_gamma = 0.0 # focal loss gamma
-        self.stride = stride
+        self.stride = torch.tensor(stride, device=self.device).view(-1, 1, 1)
 
         self.hyp_anchor_t = 4.0
         self.hyp_box = 0.05
         self.hyp_obj = 1.0
         self.hyp_cls = 0.5
 
-        anchors = torch.tensor(anchors, device=self.device).view(len(anchors), 3, -1)
-        stride = torch.tensor(stride, device=self.device).view(-1, 1, 1)
-        self.anchors = anchors / stride
+        # anchors = torch.tensor(anchors, device=self.device).view(len(anchors), 3, -1)
+        # stride = torch.tensor(stride, device=self.device).view(-1, 1, 1)
+        self.anchors = torch.tensor(anchors, device=self.device)
         # print(self.anchors)
-
-        self.anchors = torch.tensor([[[1.25000, 1.62500], [2.00000, 3.75000], [4.12500, 2.87500]],
-                   [[1.87500, 3.81250], [3.87500, 2.81250], [3.68750, 7.43750]],
-                   [[3.62500, 2.81250], [4.87500, 6.18750], [11.65625, 10.18750]]], device=self.device)
 
         # Define criteria
         BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=self.device))
@@ -170,7 +166,7 @@ class Yolov5Loss:
         if fl_gamma > 0:
             BCEcls, BCEobj = FocalLoss(BCEcls, fl_gamma), FocalLoss(BCEobj, fl_gamma)
 
-        self.balance = {3: [4.0, 1.0, 0.4]}.get(num_layers, [4.0, 1.0, 0.25, 0.06, .02])  # P3-P7
+        self.balance = {3: [4.0, 1.0, 0.4]}.get(self.num_layers, [4.0, 1.0, 0.25, 0.06, .02])  # P3-P7
         self.ssi = list(self.stride).index(16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.autobalance = BCEcls, BCEobj, 1.0, autobalance
 
