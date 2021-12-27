@@ -2,12 +2,13 @@
 # -- coding: utf-8 --
 # @Time : 2020/12/10 15:00
 # @Author : liumin
-# @File : __init__bak.py
+# @File : __init__.py
 
 from copy import deepcopy
 
 from .bifpn import BiFPN
 from .fpn import FPN
+from .ghost_pan import GhostPAN
 from .tph_yolov5_neck import TPH_YOLOv5Neck
 from .yolofastestv2_neck import YoloFastestv2Neck
 from .pan import PAN
@@ -27,7 +28,8 @@ __all__ = [
     'YOLOv3Neck',
     'YOLOv5Neck',
     'TPH_YOLOv5Neck',
-    'YOLOPNeck'
+    'YOLOPNeck',
+    'GhostPAN'
 ]
 
 def build_neck(cfg):
@@ -53,5 +55,7 @@ def build_neck(cfg):
         return TPH_YOLOv5Neck(**neck_cfg)
     elif name == 'YOLOPNeck':
         return YOLOPNeck(**neck_cfg)
+    elif name == 'GhostPAN':
+        return GhostPAN(**neck_cfg)
     else:
         raise NotImplementedError
