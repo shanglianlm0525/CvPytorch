@@ -10,6 +10,7 @@ from .deeplabv3_head import Deeplabv3Head
 from .deeplabv3plus_head import Deeplabv3PlusHead
 from .efficientdet_head import EfficientdetHead
 from .nanodet_head import NanoDetHead
+from .nanodetplus_head import NanoDetPlusHead
 from .openpose_head import OpenPoseHead
 from .stdc_head import StdcHead
 from .yolo_fastestv2_head import YOLOFastestv2Head
@@ -21,6 +22,7 @@ __all__ = [
     'YOLOv5Head',
     'YOLOXHead',
     'NanoDetHead',
+    'NanoDetPlusHead',
     'YOLOFastestv2Head',
     'YOLOPHead',
     'EfficientdetHead',
@@ -41,6 +43,8 @@ def build_head(cfg):
         return YOLOXHead(**head_cfg)
     elif name == 'NanoDetHead':
         return NanoDetHead(**head_cfg)
+    elif name == 'NanoDetPlusHead':
+        return NanoDetPlusHead(**head_cfg)
     elif name == 'YOLOFastestv2Head':
         return YOLOFastestv2Head(**head_cfg)
     elif name == 'YOLOPHead':
