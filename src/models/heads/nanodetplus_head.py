@@ -7,16 +7,49 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 from src.losses.det.general_focal_losses import DistributionFocalLoss, QualityFocalLoss
 from src.losses.det.iou_losses import GIoULoss
 from src.models.assigners.dsl_assigner import DynamicSoftLabelAssigner
-from src.models.heads.gfl_head import multi_apply, distance2bbox, bbox2distance, reduce_mean
-from src.models.layers.integral import Integral
+from src.models.heads.gfl_head import multi_apply, bbox2distance, reduce_mean, distance2bbox_plus
 from src.models.modules.convs import ConvModule, DepthwiseConvModule
 from src.models.modules.nms import multiclass_nms
 
+
+class Integral(nn.Module):
+    """A fixed layer for calculating integral result from distribution.
+    This layer calculates the target location by :math: `sum{P(y_i) * y_i}`,
+    P(y_i) denotes the softmax vector that represents the discrete distribution
+    y_i denotes the discrete set, usually {0, 1, 2, ..., reg_max}
+    Args:
+        reg_max (int): The maximal value of the discrete set. Default: 16. You
+            may want to reset it according to your new dataset or related
+            settings.
+    """
+
+    def __init__(self, reg_max=16):
+        super(Integral, self).__init__()
+        self.reg_max = reg_max
+        self.register_buffer(
+            "project", torch.linspace(0, self.reg_max, self.reg_max + 1)
+        )
+
+    def forward(self, x):
+        """Forward feature from the regression head to get integral result of
+        bounding box location.
+        Args:
+            x (Tensor): Features of the regression head, shape (N, 4*(n+1)),
+                n is self.reg_max.
+        Returns:
+            x (Tensor): Integral result of box locations, i.e., distance
+                offsets from the box center in four directions, shape (N, 4).
+        """
+        shape = x.size()
+        x = F.softmax(x.reshape(*shape[:-1], 4, self.reg_max + 1), dim=-1)
+        x = F.linear(x, self.project.type_as(x)).reshape(*shape[:-1], 4)
+        return x
 
 class NanoDetPlusHead(nn.Module):
     def __init__(self,
@@ -129,7 +162,7 @@ class NanoDetPlusHead(nn.Module):
         outputs = torch.cat(outputs, dim=2).permute(0, 2, 1)
         return outputs
 
-    def loss(self, preds, gt_meta, aux_preds=None):
+    def loss(self, imgs, preds, gt_meta, aux_preds=None):
         """Compute losses.
         Args:
             preds (Tensor): Prediction output.
@@ -140,14 +173,11 @@ class NanoDetPlusHead(nn.Module):
             loss (Tensor): Loss tensor.
             loss_states (dict): State dict of each loss.
         """
-        cls_scores, bbox_preds = preds
-        batch_size = cls_scores[0].shape[0]
-        device = cls_scores[0].device
         gt_bboxes = gt_meta["boxes"]
         gt_labels = gt_meta["labels"]
         device = preds.device
         batch_size = preds.shape[0]
-        input_height, input_width = gt_meta["img"].shape[2:]
+        input_height, input_width = imgs.shape[2:]
         featmap_sizes = [
             (math.ceil(input_height / stride), math.ceil(input_width) / stride)
             for stride in self.strides
@@ -165,11 +195,12 @@ class NanoDetPlusHead(nn.Module):
         ]
         center_priors = torch.cat(mlvl_center_priors, dim=1)
 
-        cls_preds, reg_preds = preds.split(
-            [self.num_classes, 4 * (self.reg_max + 1)], dim=-1
-        )
+        cls_preds, reg_preds = preds.split([self.num_classes, 4 * (self.reg_max + 1)], dim=-1)
+        # reg_preds = torch.load('/home/lmin/pythonCode/scripts/weights/nanodetplus/reg_preds.pth', map_location='cuda:0')
+        # center_priors = torch.load('/home/lmin/pythonCode/scripts/weights/nanodetplus/center_priors.pth', map_location='cuda:0')
         dis_preds = self.distribution_project(reg_preds) * center_priors[..., 2, None]
-        decoded_bboxes = distance2bbox(center_priors[..., :2], dis_preds)
+        # dis_preds = torch.load('/home/lmin/pythonCode/scripts/weights/nanodetplus/dis_preds.pth', map_location='cuda:0')
+        decoded_bboxes = distance2bbox_plus(center_priors[..., :2], dis_preds)
 
         if aux_preds is not None:
             # use auxiliary head to assign
@@ -179,7 +210,7 @@ class NanoDetPlusHead(nn.Module):
             aux_dis_preds = (
                     self.distribution_project(aux_reg_preds) * center_priors[..., 2, None]
             )
-            aux_decoded_bboxes = distance2bbox(center_priors[..., :2], aux_dis_preds)
+            aux_decoded_bboxes = distance2bbox_plus(center_priors[..., :2], aux_dis_preds)
             batch_assign_res = multi_apply(
                 self.target_assign_single_img,
                 aux_cls_preds.detach(),
@@ -281,16 +312,14 @@ class NanoDetPlusHead(nn.Module):
 
         num_priors = center_priors.size(0)
         device = center_priors.device
-        gt_bboxes = torch.from_numpy(gt_bboxes).to(device)
-        gt_labels = torch.from_numpy(gt_labels).to(device)
+        # gt_bboxes = torch.from_numpy(gt_bboxes).to(device)
+        # gt_labels = torch.from_numpy(gt_labels).to(device)
         num_gts = gt_labels.size(0)
         gt_bboxes = gt_bboxes.to(decoded_bboxes.dtype)
 
         bbox_targets = torch.zeros_like(center_priors)
         dist_targets = torch.zeros_like(center_priors)
-        labels = center_priors.new_full(
-            (num_priors,), self.num_classes, dtype=torch.long
-        )
+        labels = center_priors.new_full((num_priors,), self.num_classes, dtype=torch.long)
         label_scores = center_priors.new_zeros(labels.shape, dtype=torch.float)
         # No target
         if num_gts == 0:
@@ -357,71 +386,6 @@ class NanoDetPlusHead(nn.Module):
         result_list = self.get_bboxes(cls_scores, bbox_preds, imgs)
         return result_list
 
-    '''
-    def post_process1(self, preds, meta):
-        """Prediction results post processing. Decode bboxes and rescale
-        to original image size.
-        Args:
-            preds (Tensor): Prediction output.
-            meta (dict): Meta info.
-        """
-        cls_scores, bbox_preds = preds.split(
-            [self.num_classes, 4 * (self.reg_max + 1)], dim=-1
-        )
-        result_list = self.get_bboxes(cls_scores, bbox_preds, meta)
-        det_results = {}
-        warp_matrixes = (
-            meta["warp_matrix"]
-            if isinstance(meta["warp_matrix"], list)
-            else meta["warp_matrix"]
-        )
-        img_heights = (
-            meta["img_info"]["height"].cpu().numpy()
-            if isinstance(meta["img_info"]["height"], torch.Tensor)
-            else meta["img_info"]["height"]
-        )
-        img_widths = (
-            meta["img_info"]["width"].cpu().numpy()
-            if isinstance(meta["img_info"]["width"], torch.Tensor)
-            else meta["img_info"]["width"]
-        )
-        img_ids = (
-            meta["img_info"]["id"].cpu().numpy()
-            if isinstance(meta["img_info"]["id"], torch.Tensor)
-            else meta["img_info"]["id"]
-        )
-
-        for result, img_width, img_height, img_id, warp_matrix in zip(
-                result_list, img_widths, img_heights, img_ids, warp_matrixes
-        ):
-            det_result = {}
-            det_bboxes, det_labels = result
-            det_bboxes = det_bboxes.detach().cpu().numpy()
-            det_bboxes[:, :4] = warp_boxes(
-                det_bboxes[:, :4], np.linalg.inv(warp_matrix), img_width, img_height
-            )
-            classes = det_labels.detach().cpu().numpy()
-            for i in range(self.num_classes):
-                inds = classes == i
-                det_result[i] = np.concatenate(
-                    [
-                        det_bboxes[inds, :4].astype(np.float32),
-                        det_bboxes[inds, 4:5].astype(np.float32),
-                    ],
-                    axis=1,
-                ).tolist()
-            det_results[img_id] = det_result
-        return det_results
-
-    '''
-    '''
-    def show_result(
-            self, img, dets, class_names, score_thres=0.3, show=True, save_path=None
-    ):
-        result = overlay_bbox_cv(img, dets, class_names, score_thresh=score_thres)
-        return result
-    '''
-
     def get_bboxes(self, cls_preds, reg_preds, img_metas):
         """Decode the outputs to bboxes.
         Args:
@@ -454,7 +418,7 @@ class NanoDetPlusHead(nn.Module):
         ]
         center_priors = torch.cat(mlvl_center_priors, dim=1)
         dis_preds = self.distribution_project(reg_preds) * center_priors[..., 2, None]
-        bboxes = distance2bbox(center_priors[..., :2], dis_preds, max_shape=input_shape)
+        bboxes = distance2bbox_plus(center_priors[..., :2], dis_preds, max_shape=input_shape)
         scores = cls_preds.sigmoid()
         result_list = []
         for i in range(b):
