@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from ..module.activation import act_layers
+from src.models.modules.activations import act_layers
 
 
 def get_url(width_mult=1.0):
