@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-from src.data.transforms import center_form_to_corner_form
+from src.data.transforms.det_target_transforms import center_form_to_corner_form
 
 
 def convert_locations_to_boxes(locations, priors, center_variance,
