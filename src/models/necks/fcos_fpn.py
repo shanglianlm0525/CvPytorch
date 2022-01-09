@@ -9,20 +9,20 @@ import torch.nn.functional as F
 import math
 
 
-class FPN(nn.Module):
+class FCOSFPN(nn.Module):
     '''only for resnet50,101,152'''
 
-    def __init__(self, features=256):
-        super(FPN, self).__init__()
-        self.prj_5 = nn.Conv2d(2048, features, kernel_size=1)
-        self.prj_4 = nn.Conv2d(1024, features, kernel_size=1)
-        self.prj_3 = nn.Conv2d(512, features, kernel_size=1)
-        self.conv_5 = nn.Conv2d(features, features, kernel_size=3, padding=1)
-        self.conv_4 = nn.Conv2d(features, features, kernel_size=3, padding=1)
-        self.conv_3 = nn.Conv2d(features, features, kernel_size=3, padding=1)
+    def __init__(self, out_channels=256):
+        super(FCOSFPN, self).__init__()
+        self.prj_5 = nn.Conv2d(2048, out_channels, kernel_size=1)
+        self.prj_4 = nn.Conv2d(1024, out_channels, kernel_size=1)
+        self.prj_3 = nn.Conv2d(512, out_channels, kernel_size=1)
+        self.conv_5 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv_4 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv_3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
 
-        self.conv_out6 = nn.Conv2d(features, features, kernel_size=3, padding=1, stride=2)
-        self.conv_out7 = nn.Conv2d(features, features, kernel_size=3, padding=1, stride=2)
+        self.conv_out6 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, stride=2)
+        self.conv_out7 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, stride=2)
 
         self.init_conv_kaiming()
 

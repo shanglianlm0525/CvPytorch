@@ -7,6 +7,7 @@
 from copy import deepcopy
 
 from .bifpn import BiFPN
+from .fcos_fpn import FCOSFPN
 from .fpn import FPN
 from .ghost_pan import GhostPAN
 from .tph_yolov5_neck import TPH_YOLOv5Neck
@@ -29,7 +30,8 @@ __all__ = [
     'YOLOv5Neck',
     'TPH_YOLOv5Neck',
     'YOLOPNeck',
-    'GhostPAN'
+    'GhostPAN',
+    'FCOSFPN'
 ]
 
 def build_neck(cfg):
@@ -57,5 +59,7 @@ def build_neck(cfg):
         return YOLOPNeck(**neck_cfg)
     elif name == 'GhostPAN':
         return GhostPAN(**neck_cfg)
+    elif name == 'FCOSFPN':
+        return FCOSFPN(**neck_cfg)
     else:
         raise NotImplementedError
