@@ -362,7 +362,7 @@ class RandomResizedCrop(object):
 
     """
 
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, fill=[128, 128, 128], min_size = 3):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, fill=[0, 0, 0], min_size = 3):
         super().__init__()
         self.size = size
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
@@ -707,8 +707,9 @@ class RandomRotation(object):
 
 
 class RandomAffine(object):
+    ''' maybe have problem '''
     '''torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))'''
-    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0], fill= [128, 128, 128]):
+    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0], fill= [0, 0, 0]):
         self.p = p
         self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
         self.translate = translate
