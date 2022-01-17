@@ -14,7 +14,7 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: True
-    BATCH_SIZE: 4
+    BATCH_SIZE: 16
     NUM_WORKER: 8
     CACHE: False
     LABELS:
@@ -23,15 +23,14 @@ DATASET:
       SEG_DIR: '/home/lmin/data/coco/annotations'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
+      FilterAndRemapCocoCategories: { categories: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
       RandomHorizontalFlip: { p: 0.5 }
-      FcosAugment:
+      # FcosAugment:
+      ColorJitter: { p: 0.3, brightness: 0.1, contrast: 0.1, saturation: 0.1, hue: 0.1 }
+      RandomRotation: { p: 0.5, degrees: [-10, 10] }
       Resize: { size: [800, 800], keep_ratio: True }
-      # RandomResizedCrop: { size: [800, 800], scale: [0.6, 1.4], ratio: [0.5, 2.0], keep_ratio: True }
-      # RandomAffine: { p: 0.5, translate: 0.3 }
-      # RandomHorizontalFlip: { p: 0.5 }
-      # ColorJitter: { p: 0.5, brightness: 0.2, contrast: [0.8, 1.2], saturation: [0.8, 1.2], hue: 0 }
+      # RandomResizedCrop: { size: [800, 800], scale: [0.2, 1.0], ratio: [0.75, 1.34], keep_ratio: True }
       ToTensor:
       Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
 
@@ -41,7 +40,7 @@ DATASET:
     INDICES: ''
     SHUFFLE: False
     BATCH_SIZE: 1
-    NUM_WORKER: 1
+    NUM_WORKER: 8
     CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
@@ -49,7 +48,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/coco/annotations'
       SEG_SUFFIX: '*.png'
     TRANSFORMS:
-      FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
+      FilterAndRemapCocoCategories: { categories: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
       Resize: { size: [800, 800], keep_ratio: True }
       ToTensor:
@@ -61,14 +60,12 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.fcos.FCOS'
-  BACKBONE: { 'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x1.0', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True }
-  NECK: { 'name': 'PAN', 'in_channels': [116, 232, 464], 'out_channels': 96 }
-  HEAD: { 'name': 'NanoDetHead', 'input_channel': 96, 'feat_channels': 96,
-          'stacked_convs': 2, 'share_cls_reg': True,
-          'strides': [8, 16, 32], 'octave_base_scale': 5, 'reg_max': 7, 'norm_cfg': {'type': 'BN'},
-        'loss': { 'loss_qfl': {'name': 'QualityFocalLoss', 'beta': 2.0,'loss_weight': 1.0},
-         'loss_dfl': {'name': 'DistributionFocalLoss', 'loss_weight': 0.25},
-         'loss_bbox': {'name': 'GIoULoss', 'loss_weight': 2.0} }}
+  BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': True }
+  NECK: { 'name': 'FCOSFPN', 'out_channels': 256 } # 'in_channels': [116, 232, 464], 'out_channels': 96 }
+  HEAD: { 'name': 'FCOSHead', 'in_channel': 256, 'GN': True, 'cnt_on_reg': True, 'prior': 0.01 }
+  LOSS: { 'name': 'FCOSLoss', 'strides': [8, 16, 32, 64, 128], 'limit_range': [[-1, 64], [64, 128], [128, 256], [256, 512], [512, 999999]] }
+  DETECT: { 'name': 'FCOSDetect', 'score_threshold': 0.05, 'nms_iou_threshold': 0.6, 'max_detection_boxes_num': 1000, 'strides': [8, 16, 32, 64, 128]}
+
 
 EVALUATOR:
   NAME: 'coco_detection'
@@ -88,11 +85,11 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [3]
 N_MAX_EPOCHS: 200
 
 INIT_LR: 0.01
-BACKBONE_LR: 0.01
+BACKBONE_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -115,8 +112,8 @@ LR_SCHEDULER:
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 300
-  FACTOR: 0.1
+  ITERS: 500
+  FACTOR: 0.3
 
 
 #########################################
