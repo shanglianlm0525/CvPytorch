@@ -3,12 +3,11 @@
 # @Time : 2021/12/27 14:52
 # @Author : liumin
 # @File : nanodetplus_head.py
-import math
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 from src.losses.det.general_focal_losses import DistributionFocalLoss, QualityFocalLoss
 from src.losses.det.iou_losses import GIoULoss
@@ -51,7 +50,30 @@ class Integral(nn.Module):
         x = F.linear(x, self.project.type_as(x)).reshape(*shape[:-1], 4)
         return x
 
+
 class NanoDetPlusHead(nn.Module):
+    """Detection head used in NanoDet-Plus.
+
+    Args:
+        num_classes (int): Number of categories excluding the background
+            category.
+        loss (dict): Loss config.
+        input_channel (int): Number of channels of the input feature.
+        feat_channels (int): Number of channels of the feature.
+            Default: 96.
+        stacked_convs (int): Number of conv layers in the stacked convs.
+            Default: 2.
+        kernel_size (int): Size of the convolving kernel. Default: 5.
+        strides (list[int]): Strides of input multi-level feature maps.
+            Default: [8, 16, 32].
+        conv_type (str): Type of the convolution.
+            Default: "DWConv".
+        norm_cfg (dict): Dictionary to construct and config norm layer.
+            Default: dict(type='BN').
+        reg_max (int): The maximal value of the discrete set. Default: 7.
+        activation (str): Type of activation function. Default: "LeakyReLU".
+        assigner_cfg (dict): Config dict of the assigner. Default: dict(topk=13).
+    """
     def __init__(self,
                  num_classes,
                  loss,
@@ -185,54 +207,32 @@ class NanoDetPlusHead(nn.Module):
         # get grid cells of one image
         mlvl_center_priors = [
             self.get_single_level_center_priors(
-                batch_size,
-                featmap_sizes[i],
-                stride,
-                dtype=torch.float32,
-                device=device,
-            )
+                batch_size, featmap_sizes[i],
+                stride, dtype=torch.float32, device=device)
             for i, stride in enumerate(self.strides)
         ]
         center_priors = torch.cat(mlvl_center_priors, dim=1)
 
         cls_preds, reg_preds = preds.split([self.num_classes, 4 * (self.reg_max + 1)], dim=-1)
-        # reg_preds = torch.load('/home/lmin/pythonCode/scripts/weights/nanodetplus/reg_preds.pth', map_location='cuda:0')
-        # center_priors = torch.load('/home/lmin/pythonCode/scripts/weights/nanodetplus/center_priors.pth', map_location='cuda:0')
         dis_preds = self.distribution_project(reg_preds) * center_priors[..., 2, None]
-        # dis_preds = torch.load('/home/lmin/pythonCode/scripts/weights/nanodetplus/dis_preds.pth', map_location='cuda:0')
         decoded_bboxes = distance2bbox_plus(center_priors[..., :2], dis_preds)
 
         if aux_preds is not None:
             # use auxiliary head to assign
-            aux_cls_preds, aux_reg_preds = aux_preds.split(
-                [self.num_classes, 4 * (self.reg_max + 1)], dim=-1
-            )
-            aux_dis_preds = (
-                    self.distribution_project(aux_reg_preds) * center_priors[..., 2, None]
-            )
+            aux_cls_preds, aux_reg_preds = aux_preds.split([self.num_classes, 4 * (self.reg_max + 1)], dim=-1)
+            aux_dis_preds = (self.distribution_project(aux_reg_preds) * center_priors[..., 2, None])
             aux_decoded_bboxes = distance2bbox_plus(center_priors[..., :2], aux_dis_preds)
             batch_assign_res = multi_apply(
-                self.target_assign_single_img,
-                aux_cls_preds.detach(),
-                center_priors,
-                aux_decoded_bboxes.detach(),
-                gt_bboxes,
-                gt_labels,
+                self.target_assign_single_img, aux_cls_preds.detach(), center_priors,
+                aux_decoded_bboxes.detach(), gt_bboxes, gt_labels
             )
         else:
             # use self prediction to assign
             batch_assign_res = multi_apply(
-                self.target_assign_single_img,
-                cls_preds.detach(),
-                center_priors,
-                decoded_bboxes.detach(),
-                gt_bboxes,
-                gt_labels,
-            )
+                self.target_assign_single_img, cls_preds.detach(), center_priors,
+                decoded_bboxes.detach(), gt_bboxes, gt_labels)
 
-        loss, loss_states = self._get_loss_from_assign(
-            cls_preds, reg_preds, decoded_bboxes, batch_assign_res
-        )
+        loss, loss_states = self._get_loss_from_assign(cls_preds, reg_preds, decoded_bboxes, batch_assign_res)
 
         if aux_preds is not None:
             aux_loss, aux_loss_states = self._get_loss_from_assign(
@@ -382,7 +382,8 @@ class NanoDetPlusHead(nn.Module):
             preds (Tensor): Prediction output.
             meta (dict): Meta info.
         """
-        cls_scores, bbox_preds = preds
+        # cls_scores, bbox_preds = preds
+        cls_scores, bbox_preds = preds.split([self.num_classes, 4 * (self.reg_max + 1)], dim=-1)
         result_list = self.get_bboxes(cls_scores, bbox_preds, imgs)
         return result_list
 
@@ -398,7 +399,7 @@ class NanoDetPlusHead(nn.Module):
         """
         device = cls_preds.device
         b = cls_preds.shape[0]
-        input_height, input_width = img_metas["img"].shape[2:]
+        input_height, input_width = img_metas.shape[2:]
         input_shape = (input_height, input_width)
 
         featmap_sizes = [
