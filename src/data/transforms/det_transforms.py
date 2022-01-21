@@ -161,7 +161,7 @@ class RandomVerticalFlip(object):
 class Resize(object):
     """Resize the input img to the given size."""
 
-    def __init__(self, size, keep_ratio=True, scaleup=True, fill=[128, 128, 128]):
+    def __init__(self, size, keep_ratio=True, scaleup=True, fill=[0, 0, 0]):
         self.size = size if isinstance(size, list) else [size, size]
         self.keep_ratio = keep_ratio
         self.scaleup = scaleup # only valid when the keep_ratio is True
@@ -393,9 +393,7 @@ class RandomResizedCrop(object):
         log_ratio = torch.log(torch.tensor(ratio))
         for _ in range(10):
             target_area = area * torch.empty(1).uniform_(scale[0], scale[1]).item()
-            aspect_ratio = torch.exp(
-                torch.empty(1).uniform_(log_ratio[0], log_ratio[1])
-            ).item()
+            aspect_ratio = torch.exp(torch.empty(1).uniform_(log_ratio[0], log_ratio[1])).item()
 
             w = int(round(math.sqrt(target_area * aspect_ratio)))
             h = int(round(math.sqrt(target_area / aspect_ratio)))
@@ -432,7 +430,7 @@ class RandomResizedCrop(object):
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
         labels = target["labels"]
-        height, width, _ = img.shape
+        # height, width, _ = img.shape
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
         if self.keep_ratio:
@@ -443,62 +441,80 @@ class RandomResizedCrop(object):
 
             # resize
             scale = min(self.size[0] / h, self.size[1] / w)
-            ow = int(w * scale)
-            oh = int(h * scale)
-            img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+            oh, ow = int(round(h * scale)), int(round(w * scale))
             # pad,  left, top, right and bottom
             padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
             padh /= 2
             padw /= 2  # divide padding into 2 sides
+            if (h != oh) or (w != ow):
+                img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
             top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
             left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
             img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
+
             boxes[:, 1::2] = boxes[:, 1::2] * scale + top
             boxes[:, 0::2] = boxes[:, 0::2] * scale + left
+
             keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
                 boxes = target["boxes"]
                 scale = min(self.size[0] / h, self.size[1] / w)
-                ow = int(w * scale)
-                oh = int(h * scale)
-                img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+                oh, ow = int(round(h * scale)), int(round(w * scale))
                 padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
                 padh /= 2
                 padw /= 2  # divide padding into 2 sides
+                if (h != oh) or (w != ow):
+                    img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
                 top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
                 left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
                 img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)
+
                 boxes[:, 1::2] = boxes[:, 1::2] * scale + top
                 boxes[:, 0::2] = boxes[:, 0::2] * scale + left
+
                 target["boxes"] = boxes
+                target["pads"] = torch.tensor([top, left], dtype=torch.float)
+                target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
                 return {'image': img, 'target': target}
 
             target["labels"] = labels[keep]
             target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
+            target["pads"] = torch.tensor([top - int(i*scale), left - int(j*scale)], dtype=torch.float)
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
             return {'image': img, 'target': target}
         else:
             # crop
             img = img[i:(i + h), j:(j + w), :]
             boxes -= [j, i, j, i]
             # resize
-            img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
             scale_h, scale_w = self.size[0] / h, self.size[1] / w
+            img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
+
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+
             keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
                 boxes = target["boxes"]
-                img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
                 scale_h, scale_w = self.size[0] / h, self.size[1] / w
+                img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
+
                 boxes[:, 0::2] = boxes[:, 0::2] * scale_w
                 boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+
                 target["boxes"] = boxes
+                target["pads"] = torch.tensor([0, 0], dtype=torch.float)
+                target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
                 return {'image': img, 'target': target}
 
             target["labels"] = labels[keep]
             target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
+            target["pads"] = torch.tensor([-int(i*scale_h), -int(j*scale_w)], dtype=torch.float)
+            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
             return {'image': img, 'target': target}
 
 
