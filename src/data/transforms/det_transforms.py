@@ -456,6 +456,7 @@ class RandomResizedCrop(object):
             boxes[:, 1::2] = boxes[:, 1::2] * scale + top
             boxes[:, 0::2] = boxes[:, 0::2] * scale + left
 
+            '''
             keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
@@ -479,9 +480,10 @@ class RandomResizedCrop(object):
                 target["pads"] = torch.tensor([top, left], dtype=torch.float)
                 target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
                 return {'image': img, 'target': target}
+            '''
 
-            target["labels"] = labels[keep]
-            target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
+            target["labels"] = labels  # labels[keep]
+            target["boxes"] = boxes.astype(np.float32)  # boxes[keep].astype(np.float32)
             target["pads"] = torch.tensor([top - int(i*scale), left - int(j*scale)], dtype=torch.float)
             target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
             return {'image': img, 'target': target}
@@ -496,6 +498,7 @@ class RandomResizedCrop(object):
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
 
+            '''
             keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
@@ -510,9 +513,10 @@ class RandomResizedCrop(object):
                 target["pads"] = torch.tensor([0, 0], dtype=torch.float)
                 target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
                 return {'image': img, 'target': target}
+            '''
 
-            target["labels"] = labels[keep]
-            target["boxes"] = boxes[keep].astype(np.float32)  # boxes.numpy()
+            target["labels"] = labels  # labels[keep]
+            target["boxes"] = boxes.astype(np.float32) # boxes[keep].astype(np.float32)
             target["pads"] = torch.tensor([-int(i*scale_h), -int(j*scale_w)], dtype=torch.float)
             target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
             return {'image': img, 'target': target}
