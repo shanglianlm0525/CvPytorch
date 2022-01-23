@@ -98,7 +98,7 @@ class GhostPAN(nn.Module):
         conv = DepthwiseConvModule if use_depthwise else ConvModule
 
         # build top-down blocks
-        self.upsample = nn.Upsample(scale_factor=2, mode="bilinear")
+        self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.reduce_layers = nn.ModuleList()
         for idx in range(len(in_channels)):
             self.reduce_layers.append(
