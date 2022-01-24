@@ -208,6 +208,19 @@ class YOLOv5(nn.Module):
         self.conf_thres = 0.001  # confidence threshold
         self.iou_thres = 0.6  # NMS IoU threshold
 
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            t = type(m)
+            if t is nn.Conv2d:
+                pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif t is nn.BatchNorm2d:
+                m.eps = 1e-3
+                m.momentum = 0.03
+            elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
+                m.inplace = True
+
     def setup_extra_params(self):
         self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
         self.model_cfg.BACKBONE.__setitem__('width_mul', self.width_mul)
