@@ -41,10 +41,9 @@ class CocoDetection(Dataset):
 
         self._filter_invalid_annotation()
 
-        if self.num_classes > 80: # BACKGROUND_AS_CATEGORY
-            self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
-        else:
-            self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
+        # just for FCOS
+        # self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
+        self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
 
         # Cache images into memory for faster training (WARNING: large datasets may exceed system RAM)
