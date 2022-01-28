@@ -16,6 +16,7 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 160
     NUM_WORKER: 12
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -38,6 +39,7 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 8
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -83,7 +85,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [3]
+GPU_IDS: [2]
 N_MAX_EPOCHS: 200
 
 INIT_LR: 0.14
