@@ -87,7 +87,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [2]
 N_MAX_EPOCHS: 300
 
 INIT_LR: 0.001
@@ -114,8 +114,8 @@ LR_SCHEDULER:
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 300
-  FACTOR: 0.1
+  ITERS: 500
+  FACTOR: 0.0001
 
 
 #########################################
