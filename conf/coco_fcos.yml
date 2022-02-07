@@ -29,8 +29,8 @@ DATASET:
       # FcosAugment:
       ColorJitter: { p: 0.3, brightness: 0.1, contrast: 0.1, saturation: 0.1, hue: 0.1 }
       RandomRotation: { p: 0.5, degrees: [-10, 10] }
-      Resize: { size: [800, 800], keep_ratio: True }
-      # RandomResizedCrop: { size: [800, 800], scale: [0.2, 1.0], ratio: [0.75, 1.34], keep_ratio: True }
+      # Resize: { size: [800, 800], keep_ratio: True }
+      RandomResizedCrop: { size: [800, 800], scale: [0.2, 1.0], ratio: [0.75, 1.34], keep_ratio: True }
       ToTensor:
       Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
 
