@@ -43,18 +43,6 @@ class FCOS(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        '''
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [2, 3, 4], 'output_stride': 32,
-                        'pretrained': True}
-        self.backbone = build_backbone(backbone_cfg)
-        self.neck = FPN(256, use_p5=True)
-        self.head = ClsCntRegHead(256, class_num=80, GN=True, cnt_on_reg=True, prior=0.01)
-        self.detect = Detect(score_threshold=0.05, nms_iou_threshold=0.6, max_detection_boxes_num=1000, strides=[8, 16, 32, 64, 128])
-        strides = [8, 16, 32, 64, 128]
-        limit_range = [[-1, 64], [64, 128], [128, 256], [256, 512], [512, 999999]]
-        self.target_layer = GenTargets(strides=strides, limit_range=limit_range)
-        self.loss_layer = LOSS()
-        '''
         self.setup_extra_params()
         self.backbone = build_backbone(self.model_cfg.BACKBONE)
         self.neck = build_neck(self.model_cfg.NECK)
@@ -116,12 +104,6 @@ class FCOS(nn.Module):
         max_h = np.array(h_list).max()
         max_w = np.array(w_list).max()
         max_num = np.array(num_list).max()
-        '''
-        pad_imgs = []
-        for img in imgs:
-            pad_imgs.append(
-                F.pad(img, (0, int(max_w - img.shape[2]), 0, int(max_h - img.shape[1])), value=0.))
-        '''
 
         for i, target in enumerate(targets):
             new_boxes.append(F.pad(target['boxes'], (0, 0, 0, max_num - target['boxes'].shape[0]), value=-1))
@@ -156,8 +138,6 @@ class FCOS(nn.Module):
             all_P = self.neck([C3, C4, C5])
             cls_logits, cnt_logits, reg_preds = self.head(all_P)
             out = [cls_logits, cnt_logits, reg_preds]
-            # out_targets = self.target_layer([out, targets["boxes"], targets["labels"]])
-            # loss_tuple = self.loss_layer([out, out_targets])
             loss_tuple = self.loss(out, targets["boxes"], targets["labels"])
 
             losses['cls_loss'] = loss_tuple[0]
