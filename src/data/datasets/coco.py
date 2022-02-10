@@ -41,9 +41,12 @@ class CocoDetection(Dataset):
 
         self._filter_invalid_annotation()
 
-        # just for FCOS
-        # self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
         self.category2id = {v: i for i, v in enumerate(self.coco.getCatIds())}
+        # just for FCOS
+        if hasattr(data_cfg.TRANSFORMS, 'FilterAndRemapCocoCategories') \
+                and hasattr(data_cfg.TRANSFORMS.FilterAndRemapCocoCategories, 'categories') \
+                and len(data_cfg.TRANSFORMS.FilterAndRemapCocoCategories.categories) > 80:
+            self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
 
         # Cache images into memory for faster training (WARNING: large datasets may exceed system RAM)
