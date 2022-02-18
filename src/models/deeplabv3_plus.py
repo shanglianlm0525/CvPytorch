@@ -33,27 +33,15 @@ class Deeplabv3Plus(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        '''
-        # backbone_cfg = {'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True}
-        backbone_cfg = {'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [1, 4], 'output_stride': 16, 'pretrained': True}
-        self.backbone = build_backbone(backbone_cfg)
-        if backbone_cfg['output_stride'] == 8:
-            dilations = [12, 24, 36]
-        else:
-            dilations = [6, 12, 18]
-        head_cfg = {'name': 'Deeplabv3PlusHead', 'low_level_channels': self.backbone.out_channels[0], 'in_channels': self.backbone.out_channels[1],
-                        'dilations': dilations, 'num_classes': self.num_classes }
-        self.head = build_head(head_cfg)
-        '''
-        self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
-
+        self.setup_extra_params()
         self.backbone = build_backbone(self.model_cfg.BACKBONE)
         self.head = build_head(self.model_cfg.HEAD)
 
         self.criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
-        # self.criterion = FocalLoss().cuda()
         set_bn_momentum(self.backbone, momentum=0.01)
 
+    def setup_extra_params(self):
+        self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
 
     def _init_weight(self, *stages):
         for m in chain(*stages):
