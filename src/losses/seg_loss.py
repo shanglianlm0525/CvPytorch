@@ -37,6 +37,24 @@ class CrossEntropyLoss2d(nn.Module):
         assert output.shape[0] == target.shape[0] and output.shape[2:] == target.shape[1:]
         return self.CE(output, target.long())
 
+
+class BootstrappedCELoss2d(nn.Module):
+    def __init__(self, min_K, threshold, weight=None, ignore_index=255, reduction='none'):
+        super(BootstrappedCELoss2d, self).__init__()
+        self.min_K = min_K
+        self.threshold = threshold
+        self.criterion = nn.CrossEntropyLoss(weight=weight, ignore_index=ignore_index, reduction=reduction)
+
+    def forward(self, output, target):
+        pixel_losses = self.criterion(output, target.long()).contiguous().view(-1)
+
+        mask = (pixel_losses > self.threshold)
+        if torch.sum(mask).item()>self.min_K:
+            pixel_losses=pixel_losses[mask]
+        else:
+            pixel_losses, _ = torch.topk(pixel_losses, self.min_K)
+        return pixel_losses.mean()
+
 '''
 class OhemCrossEntropyLoss2d(nn.Module):
     def __init__(self, weight=None, thresh=0.7, min_kept=100000, ignore_index=255, reduction='mean'):
