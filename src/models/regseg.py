@@ -37,9 +37,24 @@ class RegSeg(nn.Module):
 
         self.criterion = CrossEntropyLoss2d(weight=torch.from_numpy(np.array(self.weight)).float()).cuda()
 
-
     def setup_extra_params(self):
         self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
 
-    def forward(self, x):
-        pass
+    def forward(self, imgs, targets=None, mode='infer', **kwargs):
+        batch_size, ch, _, _ = imgs.shape
+        x = self.backbone(imgs)
+        x = self.head(x)
+        outputs = F.interpolate(x, size=imgs.size()[2:], mode='bilinear', align_corners=False)
+
+        if mode == 'infer':
+
+            return torch.argmax(outputs, dim=1)
+        else:
+            losses = {}
+            losses['ce_loss'] = self.criterion(outputs, targets)
+            losses['loss'] = losses['ce_loss']
+
+            if mode == 'val':
+                return losses, torch.argmax(outputs, dim=1)
+            else:
+                return losses
