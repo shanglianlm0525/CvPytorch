@@ -8,8 +8,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils import model_zoo
-from torchvision.models.mobilenet import mobilenet_v2
+
 
 """
     Rethink Dilated Convolution for Real-time Semantic Segmentation
@@ -21,16 +20,8 @@ class ConvBnAct(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, groups=1,
                  bias=False, apply_act=True):
         super(ConvBnAct, self).__init__()
-        self.conv = nn.Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride,
-            padding,
-            dilation,
-            groups,
-            bias)
-        self.bn = nn.BatchNorm2d(out_channels)(out_channels)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias)
+        self.bn = nn.BatchNorm2d(out_channels)
         if apply_act:
             self.act = nn.ReLU(inplace=True)
         else:
@@ -84,20 +75,18 @@ class DilatedConv(nn.Module):
 
 
 class SEModule(nn.Module):
-    def __init__(self, channel,ratio = 16):
+    def __init__(self, in_channel, out_channel):
         super(SEModule, self).__init__()
-        self.squeeze = nn.AdaptiveAvgPool2d(1)
-        self.excitation = nn.Sequential(
-                nn.Linear(in_features=channel, out_features=channel // ratio),
+        mid_channel = out_channel // 4
+        self.se = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Conv2d(in_channel, mid_channel, 1, bias=True),
                 nn.ReLU(inplace=True),
-                nn.Linear(in_features=channel // ratio, out_features=channel),
+                nn.Conv2d(mid_channel, in_channel, 1, bias=True),
                 nn.Sigmoid()
             )
     def forward(self, x):
-        b, c, _, _ = x.size()
-        y = self.squeeze(x).view(b, c)
-        z = self.excitation(y).view(b, c, 1, 1)
-        return x * z.expand_as(x)
+        return x * self.se(x)
 
 
 class DBlock(nn.Module):
@@ -121,14 +110,11 @@ class DBlock(nn.Module):
         self.bn3 = nn.BatchNorm2d(out_channels)
         self.act3 = nn.ReLU(inplace=True)
         if attention == "se":
-            self.se = SEModule(out_channels, in_channels // 4)
-        elif attention == "se2":
-            self.se = SEModule(out_channels, out_channels // 4)
+            self.se = SEModule(out_channels, in_channels)
         else:
             self.se = None
         if stride != 1 or in_channels != out_channels:
-            self.shortcut = Shortcut(
-                in_channels, out_channels, stride, avg_downsample)
+            self.shortcut = Shortcut(in_channels, out_channels, stride, avg_downsample)
         else:
             self.shortcut = None
 
@@ -148,36 +134,8 @@ class DBlock(nn.Module):
         return x
 
 
-class RegSegBlock(nn.Module):
-    def __init__(self, ds):
-        super().__init__()
-        gw = 16
-        attention = "se"
-        self.stage4 = DBlock(32, 48, [1], gw, 2, attention)
-        self.stage8 = nn.Sequential(
-            DBlock(48, 128, [1], gw, 2, attention),
-            DBlock(128, 128, [1], gw, 1, attention),
-            DBlock(128, 128, [1], gw, 1, attention)
-        )
-        self.stage16 = nn.Sequential(
-            DBlock(128, 256, [1], gw, 2, attention),
-            *generate_stage2(ds[:-1], lambda d: DBlock(256, 256, d, gw, 1, attention)),
-            DBlock(256, 320, ds[-1], gw, 1, attention)
-        )
-
-    def forward(self, x):
-        x4 = self.stage4(x)
-        x8 = self.stage8(x4)
-        x16 = self.stage16(x8)
-        return {"4": x4, "8": x8, "16": x16}
-
-    def channels(self):
-        return {"4": 48, "8": 128, "16": 320}
-
-
 class RegNet(nn.Module):
-    def __init__(self, subtype='mobilenet_v2', out_stages=[
-                 3, 5, 7], output_stride=16, classifier=False, backbone_path=None, pretrained=False):
+    def __init__(self, subtype='', out_stages=[3, 5, 7], output_stride=16, classifier=False, backbone_path=None, pretrained=False):
         super(RegNet, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
@@ -186,78 +144,52 @@ class RegNet(nn.Module):
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        if self.subtype == 'mobilenet_v2':
-            features = mobilenet_v2(self.pretrained).features
-            self.out_channels = [32, 16, 24, 32, 64, 96, 160, 320]
-        else:
-            raise NotImplementedError
-
-        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
+        self.out_channels = [32, 48, 128, 320]
 
         self.conv1 = ConvBnAct(3, 32, 3, 2, 1)
+        # self.body = RegSegBlock([[1], [1, 2]] + 4 * [[1, 4]] + 7 * [[1, 14]])
 
-        ##
-        self.conv1 = nn.Sequential(list(features.children())[0])  # x2
-        self.stage1 = nn.Sequential(list(features.children())[1])
-        self.stage2 = nn.Sequential(*list(features.children())[2:4])
-        self.stage3 = nn.Sequential(*list(features.children())[4:7])
-        self.stage4 = nn.Sequential(*list(features.children())[7:11])
-        self.stage5 = nn.Sequential(*list(features.children())[11:14])
-        self.stage6 = nn.Sequential(*list(features.children())[14:17])
-        self.stage7 = nn.Sequential(list(features.children())[17])
-        if self.classifier:
-            self.last_conv = nn.Sequential(list(features.children())[18])
-            self.fc = mobilenet_v2(self.pretrained).classifier
-            self.out_channels = [1000]
+        gw = 16
+        attention = "se"
+        ds = [[1], [1, 2]] + 4 * [[1, 4]] + 7 * [[1, 14]]
+        self.stage1 = DBlock(32, 48, [1], gw, 2, attention) # 4
+        self.stage2 = nn.Sequential(
+            DBlock(48, 128, [1], gw, 2, attention),
+            DBlock(128, 128, [1], gw, 1, attention),
+            DBlock(128, 128, [1], gw, 1, attention)
+        ) # 8
+        self.stage3 = nn.Sequential(
+            DBlock(128, 256, [1], gw, 2, attention),
+            *self.generate_stage(ds[:-1], lambda d: DBlock(256, 256, d, gw, 1, attention)),
+            DBlock(256, 320, ds[-1], gw, 1, attention)
+        )  # 16
 
-        if self.output_stride == 16:
-            s4, s6, d4, d6 = (2, 1, 1, 2)
-        elif self.output_stride == 8:
-            s4, s6, d4, d6 = (1, 1, 2, 4)
+        self.init_weights()
 
-            for n, m in self.stage4.named_modules():
-                if '0.conv.1.0' in n:
-                    m.dilation, m.padding, m.stride = (
-                        d4, d4), (d4, d4), (s4, s4)
-
-        if self.output_stride == 8 or self.output_stride == 16:
-            for n, m in self.stage6.named_modules():
-                if '0.conv.1.0' in n:
-                    m.dilation, m.padding, m.stride = (
-                        d6, d6), (d6, d6), (s6, s6)
-
-        if self.pretrained:
-            self.load_pretrained_weights()
-        else:
-            self.init_weights()
+    def generate_stage(self, ds, block_fun):
+        blocks = []
+        for d in ds:
+            blocks.append(block_fun(d))
+        return blocks
 
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.normal_(m.weight, std=0.001)
+                nn.init.kaiming_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
                 nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0.0001)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         x = self.conv1(x)
         output = []
-        for i in range(1, 8):
+        for i in range(1, 4):
             stage = getattr(self, 'stage{}'.format(i))
             x = stage(x)
             if i in self.out_stages and not self.classifier:
                 output.append(x)
-        if self.classifier:
-            x = self.last_conv(x)
-            x = F.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
-            x = self.fc(x)
-            return x
         return output if len(self.out_stages) > 1 else output[0]
 
     def freeze_bn(self):
@@ -267,7 +199,7 @@ class RegNet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = RegNet('mobilenet_v2')
+    model = RegNet('')
     print(model)
 
     input = torch.randn(1, 3, 224, 224)

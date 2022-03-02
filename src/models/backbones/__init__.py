@@ -10,6 +10,7 @@ from .csp_darknet import CspDarkNet
 from .custom_cspnet import CustomCspNet
 from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
+from .regnet import RegNet
 from .repvgg import RepVGG
 from .tph_yolov5_backbone import TPH_YOLOv5Backbone
 from .vgg import VGG
@@ -25,7 +26,7 @@ from .stdcnet import STDCNet
 from .yolov5_backbone import YOLOv5Backbone
 
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'YOLOv5Backbone', 'TPH_YOLOv5Backbone',
-           'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNet', 'EfficientNetLite', 'CustomCspNet', 'CspDarkNet']
+           'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNet', 'EfficientNetLite', 'CustomCspNet', 'CspDarkNet', 'RegNet']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
@@ -60,5 +61,7 @@ def build_backbone(cfg):
         return CustomCspNet(**backbone_cfg)
     elif name == 'CspDarkNet':
         return CspDarkNet(**backbone_cfg)
+    elif name == 'RegNet':
+        return RegNet(**backbone_cfg)
     else:
         raise NotImplementedError
