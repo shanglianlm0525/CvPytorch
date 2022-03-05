@@ -63,5 +63,5 @@ class RegSegHead(nn.Module):
         x8 = F.interpolate(x8, size=x4.shape[-2:], mode='bilinear', align_corners=False)
         x4 = torch.cat((x8, x4), dim=1)
         x4 = self.conv4(x4)
-        x4 = self.classifier(x4)
-        return x4
+        out = self.classifier(x4)
+        return out
