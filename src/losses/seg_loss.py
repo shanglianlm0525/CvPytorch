@@ -39,9 +39,9 @@ class CrossEntropyLoss2d(nn.Module):
 
 
 class BootstrappedCELoss2d(nn.Module):
-    def __init__(self, min_K, threshold, weight=None, ignore_index=255, reduction='none'):
+    def __init__(self, min_K, threshold=0.3, weight=None, ignore_index=255, reduction='none'):
         super(BootstrappedCELoss2d, self).__init__()
-        self.min_K = min_K
+        self.min_K = min_K  # minK = int(batch_size * h * w / 16)
         self.threshold = threshold
         self.criterion = nn.CrossEntropyLoss(weight=weight, ignore_index=ignore_index, reduction=reduction)
 
