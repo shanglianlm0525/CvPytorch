@@ -17,7 +17,7 @@ from pycocotools import mask as coco_mask
 import random
 import numbers
 import numpy as np
-from PIL import Image, ImageOps, ImageFilter
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import collections
 from collections.abc import Sequence
 from torchvision.transforms.functional import InterpolationMode, _interpolation_modes_from_int
@@ -31,6 +31,7 @@ __all__ = ['Compose', 'ToTensor', 'Normalize',
         'RandomRotation', 'RandomPerspective',
         'ColorJitter', 'GaussianBlur',
         'Pad', 'Lambda', 'Encrypt',
+        'RandAugment',
         'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
 
@@ -58,10 +59,7 @@ class Compose(object):
 
     def __call__(self, sample):
         for t in self.transforms:
-            img, target = sample['image'], sample['target']
-            # print(t, np.asarray(target, dtype=np.uint8).shape, np.asarray(target, dtype=np.uint8))
             sample = t(sample)
-            # print(t, np.asarray(target, dtype=np.uint8).shape, np.asarray(target, dtype=np.uint8))
         return sample
 
     def __repr__(self):
@@ -311,7 +309,7 @@ class Resize(object):
 
 
 class RandomScaleCrop(object):
-    def __init__(self, size, scale=(0.08, 1.0), fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), keep_ratio=True, fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
@@ -326,6 +324,7 @@ class RandomScaleCrop(object):
             raise TypeError("Scale should be a sequence")
 
         self.scale = scale
+        self.keep_ratio = keep_ratio
         self.fill = fill
         self.ignore_label = ignore_label
         self.padding_mode = padding_mode
@@ -342,24 +341,39 @@ class RandomScaleCrop(object):
         """
         img, target = sample['image'], sample['target']
         w, h = F._get_image_size(img)
-        base_size = min(w, h)
-        # random scale (short edge)
-        short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
-        if h > w:
-            ow = short_size
-            oh = int(1.0 * h * ow / w)
+        if self.keep_ratio:
+            base_size = min(w, h)
+            # random scale (short edge)
+            short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
+            if h > w:
+                ow = short_size
+                oh = int(1.0 * h * ow / w)
+            else:
+                oh = short_size
+                ow = int(1.0 * w * oh / h)
+            img = F.resize(img, [oh, ow], self.interpolation)
+            target = F.resize(target, [oh, ow], InterpolationMode.NEAREST)
+            # pad crop
+            if short_size < min(self.size):
+                padh = self.size[0] - oh if oh < self.size[0] else 0
+                padw = self.size[1] - ow if ow < self.size[1] else 0
+                # left, top, right and bottom
+                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+                target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
         else:
-            oh = short_size
-            ow = int(1.0 * w * oh / h)
-        img = F.resize(img, [oh, ow], self.interpolation)
-        target = F.resize(target, [oh, ow], InterpolationMode.NEAREST)
-        # pad crop
-        if short_size < min(self.size):
-            padh = self.size[0] - oh if oh < self.size[0] else 0
-            padw = self.size[1] - ow if ow < self.size[1] else 0
-            # left, top, right and bottom
-            img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
-            target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
+            base_size = min(w, h)
+            # random scale (short edge)
+            short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
+
+            img = F.resize(img, short_size, self.interpolation)
+            target = F.resize(target, short_size, InterpolationMode.NEAREST)
+            # pad crop
+            if short_size < min(self.size):
+                padh = self.size[0] - short_size if short_size < self.size[0] else 0
+                padw = self.size[1] - short_size if short_size < self.size[1] else 0
+                # left, top, right and bottom
+                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+                target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
 
         # random crop crop_size
         w, h = F._get_image_size(img)
@@ -867,6 +881,141 @@ class RandomPerspective(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+# Minimum value for posterize (0 in EfficientNet implementation)
+POSTERIZE_MIN = 1
+
+# Parameters for affine warping and rotation
+WARP_PARAMS = {"fillcolor": (128, 128, 128), "resample": Image.BILINEAR}
+
+def affine_warp(im, data):
+    """Applies affine transform to image."""
+    return im.transform(im.size, Image.AFFINE, data, **WARP_PARAMS)
+
+OP_FUNCTIONS = {
+    # Each op takes an image x and a level v and returns an augmented image.
+    "auto_contrast": lambda x, _: ImageOps.autocontrast(x),
+    "equalize": lambda x, _: ImageOps.equalize(x),
+    "invert": lambda x, _: ImageOps.invert(x),
+    "rotate": lambda x, v: x.rotate(v, **WARP_PARAMS),
+    "posterize": lambda x, v: ImageOps.posterize(x, max(POSTERIZE_MIN, int(v))),
+    "posterize_inc": lambda x, v: ImageOps.posterize(x, max(POSTERIZE_MIN, 4 - int(v))),
+    "solarize": lambda x, v: x.point(lambda i: i if i < int(v) else 255 - i),
+    "solarize_inc": lambda x, v: x.point(lambda i: i if i < 256 - v else 255 - i),
+    "solarize_add": lambda x, v: x.point(lambda i: min(255, v + i) if i < 128 else i),
+    "color": lambda x, v: ImageEnhance.Color(x).enhance(v),
+    "contrast": lambda x, v: ImageEnhance.Contrast(x).enhance(v),
+    "brightness": lambda x, v: ImageEnhance.Brightness(x).enhance(v),
+    "sharpness": lambda x, v: ImageEnhance.Sharpness(x).enhance(v),
+    "color_inc": lambda x, v: ImageEnhance.Color(x).enhance(1 + v),
+    "contrast_inc": lambda x, v: ImageEnhance.Contrast(x).enhance(1 + v),
+    "brightness_inc": lambda x, v: ImageEnhance.Brightness(x).enhance(1 + v),
+    "sharpness_inc": lambda x, v: ImageEnhance.Sharpness(x).enhance(1 + v),
+    "shear_x": lambda x, v: affine_warp(x, (1, v, 0, 0, 1, 0)),
+    "shear_y": lambda x, v: affine_warp(x, (1, 0, 0, v, 1, 0)),
+    "trans_x": lambda x, v: affine_warp(x, (1, 0, v * x.size[0], 0, 1, 0)),
+    "trans_y": lambda x, v: affine_warp(x, (1, 0, 0, 0, 1, v * x.size[1])),
+}
+
+affine_ops=[
+    "rotate","shear_x","shear_y","trans_x","trans_y"
+]
+
+OP_RANGES = {
+    # Ranges for each op in the form of a (min, max, negate).
+    "auto_contrast": (0, 1, False),
+    "equalize": (0, 1, False),
+    "invert": (0, 1, False),
+    "rotate": (0.0, 30.0, True),
+    "posterize": (0, 4, False),
+    "posterize_inc": (0, 4, False),
+    "solarize": (0, 256, False),
+    "solarize_inc": (0, 256, False),
+    "solarize_add": (0, 110, False),
+    "color": (0.1, 1.9, False),
+    "contrast": (0.1, 1.9, False),
+    "brightness": (0.1, 1.9, False),
+    "sharpness": (0.1, 1.9, False),
+    "color_inc": (0, 0.9, True),
+    "contrast_inc": (0, 0.9, True),
+    "brightness_inc": (0, 0.9, True),
+    "sharpness_inc": (0, 0.9, True),
+    "shear_x": (0.0, 0.3, True),
+    "shear_y": (0.0, 0.3, True),
+    "trans_x": (0.0, 0.45, True),
+    "trans_y": (0.0, 0.45, True),
+}
+
+RANDAUG_OPS = [
+    # RandAugment list of operations using "increasing" transforms.
+    "auto_contrast",
+    "equalize",
+    #"invert",
+    "rotate",
+    "posterize_inc",
+    "solarize_inc",
+    "solarize_add",
+    "color_inc",
+    "contrast_inc",
+    "brightness_inc",
+    "sharpness_inc",
+    "shear_x",
+    "shear_y",
+    "trans_x",
+    "trans_y",
+]
+
+RANDAUG_OPS_REDUCED = [
+    "auto_contrast",
+    "equalize",
+    "rotate",
+    "color_inc",
+    "contrast_inc",
+    "brightness_inc",
+    "sharpness_inc",
+]
+
+class RandAugment(object):
+    """
+        RandAugment: Practical automated data augmentation with a reduced search space
+        https://arxiv.org/pdf/1909.13719.pdf
+    """
+    def __init__(self, p, n_ops, magnitude, ops="reduced", fill=(128,128,128), ignore_value=255):
+        super(RandAugment, self).__init__()
+        assert 0 <= magnitude <= 1
+        self.p = p
+        self.n_ops = n_ops
+        self.magnitude = magnitude
+        self.fill = fill
+        self.ignore_value = ignore_value
+        ops = ops if ops else RANDAUG_OPS
+        if ops == "full":
+            ops = RANDAUG_OPS
+        elif ops == "reduced":
+            ops = RANDAUG_OPS_REDUCED
+        else:
+            raise NotImplementedError()
+        self.ops = ops
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+
+        for op in random.sample(self.ops, int(self.n_ops)):
+            if self.p < 1 and random.random() > self.p:
+                continue
+            # img, target = apply_op_both(img, target, op, self.p, self.magnitude, self.fill, self.ignore_value)
+            min_v, max_v, negate = OP_RANGES[op]
+            v = self.magnitude * (max_v - min_v) + min_v
+            v = -v if negate and random.random() > 0.5 else v
+            WARP_PARAMS["fillcolor"] = self.fill
+            WARP_PARAMS["resample"] = Image.BILINEAR
+            img = OP_FUNCTIONS[op](img, v)
+            if op in affine_ops:
+                WARP_PARAMS["fillcolor"] = self.ignore_value
+                WARP_PARAMS["resample"] = Image.NEAREST
+                target = OP_FUNCTIONS[op](target, v)
+        return {'image': img, 'target': target}
 
 
 
