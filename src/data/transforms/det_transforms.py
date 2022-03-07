@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import torchvision
 from PIL import Image
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
@@ -169,19 +170,19 @@ class Resize(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        height, width, _ = img.shape
+        h, w, _ = img.shape
         boxes = target["boxes"]
 
         if self.keep_ratio:
-            scale = min(self.size[0] / height, self.size[1] / width)
+            scale = min(self.size[0] / h, self.size[1] / w)
             if not self.scaleup:  # only scale down, do not scale up (for better val mAP)
                 scale = min(scale, 1.0)
-            oh, ow = int(round(height * scale)), int(round(width * scale))
+            oh, ow = int(round(h * scale)), int(round(w * scale))
             padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
             padh /= 2
             padw /= 2  # divide padding into 2 sides
 
-            if (height != oh) or (width != ow):
+            if (h != oh) or (w != ow):
                 img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
             top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
@@ -196,7 +197,7 @@ class Resize(object):
             target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
             return {'image': img, 'target': target}
         else:
-            scale_h, scale_w = self.size[0] / height, self.size[1] / width
+            scale_h, scale_w = self.size[0] / h, self.size[1] / w
             img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
             boxes[:, 0::2] = boxes[:, 0::2] * scale_w
@@ -418,7 +419,6 @@ class RandomResizedCrop(object):
         j = (width - w) // 2
         return i, j, h, w
 
-
     def __call__(self, sample):
         """
         Args:
@@ -433,19 +433,19 @@ class RandomResizedCrop(object):
         # height, width, _ = img.shape
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
-        if self.keep_ratio:
-            # crop (top, left, height, width)
-            img = img[i:(i + h), j:(j + w), :]
-            boxes -= np.array([j, i, j, i])
-            boxes = clip_boxes_to_image(boxes, [h, w])
+        # crop (top, left, height, width)
+        img = img[i:(i + h), j:(j + w), :]
+        boxes -= np.array([j, i, j, i])
+        boxes = clip_boxes_to_image(boxes, [h, w])
 
+        if self.keep_ratio:
             # resize
             scale = min(self.size[0] / h, self.size[1] / w)
             oh, ow = int(round(h * scale)), int(round(w * scale))
-            # pad,  left, top, right and bottom
             padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
             padh /= 2
             padw /= 2  # divide padding into 2 sides
+
             if (h != oh) or (w != ow):
                 img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
@@ -456,22 +456,23 @@ class RandomResizedCrop(object):
             boxes[:, 1::2] = boxes[:, 1::2] * scale + top
             boxes[:, 0::2] = boxes[:, 0::2] * scale + left
 
-            '''
             keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
                 boxes = target["boxes"]
+
                 scale = min(self.size[0] / h, self.size[1] / w)
                 oh, ow = int(round(h * scale)), int(round(w * scale))
                 padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
                 padh /= 2
                 padw /= 2  # divide padding into 2 sides
+
                 if (h != oh) or (w != ow):
                     img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
                 top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
                 left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
-                img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)
+                img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
 
                 boxes[:, 1::2] = boxes[:, 1::2] * scale + top
                 boxes[:, 0::2] = boxes[:, 0::2] * scale + left
@@ -480,29 +481,24 @@ class RandomResizedCrop(object):
                 target["pads"] = torch.tensor([top, left], dtype=torch.float)
                 target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
                 return {'image': img, 'target': target}
-            '''
 
             target["labels"] = labels  # labels[keep]
             target["boxes"] = boxes.astype(np.float32)  # boxes[keep].astype(np.float32)
             target["pads"] = torch.tensor([top - int(i*scale), left - int(j*scale)], dtype=torch.float)
             target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
-            return {'image': img, 'target': target}
+            return {'image': img, 'target': target }
         else:
-            # crop
-            img = img[i:(i + h), j:(j + w), :]
-            boxes -= [j, i, j, i]
             # resize
             scale_h, scale_w = self.size[0] / h, self.size[1] / w
             img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
-
-            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
             boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
 
-            '''
             keep = remove_small_boxes(boxes, self.min_size)  # remove boxes that less than 3 pixes
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
                 boxes = target["boxes"]
+
                 scale_h, scale_w = self.size[0] / h, self.size[1] / w
                 img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
 
@@ -513,13 +509,12 @@ class RandomResizedCrop(object):
                 target["pads"] = torch.tensor([0, 0], dtype=torch.float)
                 target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
                 return {'image': img, 'target': target}
-            '''
 
             target["labels"] = labels  # labels[keep]
             target["boxes"] = boxes.astype(np.float32) # boxes[keep].astype(np.float32)
             target["pads"] = torch.tensor([-int(i*scale_h), -int(j*scale_w)], dtype=torch.float)
             target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
-            return {'image': img, 'target': target}
+            return {'image': img, 'target': target }
 
 
 class ColorJitter(object):
@@ -643,14 +638,6 @@ class ToXYXY(object):
         return {'image': img, 'target': target}
 
 
-def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  # box1(4,n), box2(4,n)
-    # Compute candidate boxes: box1 before augment, box2 after augment, wh_thr (pixels), aspect_ratio_thr, area_ratio
-    w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
-    w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
-    ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
-    return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
-
-
 class RandomMotionBlur(object):
     def __init__(self, p=0.5, degrees=[2,3]):
         super(RandomMotionBlur, self).__init__()
@@ -724,6 +711,14 @@ class RandomRotation(object):
             boxes[:, 3] = new_boxes[:, 2]
             target["boxes"] = boxes
         return {'image': img, 'target': target}
+
+
+def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  # box1(4,n), box2(4,n)
+    # Compute candidate boxes: box1 before augment, box2 after augment, wh_thr (pixels), aspect_ratio_thr, area_ratio
+    w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
+    w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
+    ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
+    return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
 
 
 class RandomAffine(object):
@@ -950,6 +945,10 @@ class CopyPaste(object):
 
 
 class Mosaic(object):
+    '''
+        YOLOv4: Optimal Speed and Accuracy of Object Detection
+        https://arxiv.org/pdf/2004.10934.pdf
+    '''
     def __init__(self, p, size, fill=128, min_size=3):
         self.p = p
         self.size = size # h, w
@@ -1207,66 +1206,6 @@ class EfficientDetAugment(object):
         target["labels"] = labels
         target["boxes"] = torch.from_numpy(boxes)
         return {'image': torch.from_numpy(new_img.astype(np.float32)), 'target': target}
-
-
-class FcosAugment(object):
-    def __init__(self, augment=True):
-        self.augment = augment
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        boxes = target["boxes"]
-        labels = target["labels"]
-
-        img = Image.fromarray(img.astype(np.uint8))
-        if random.random() < 0.3:
-            # img, boxes = colorJitter(img, boxes)
-            img = T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)(img)
-        if random.random() < 0.5:
-            # img, boxes = random_rotation(img, boxes)
-            degree = 10
-            d = random.uniform(-degree, degree)
-            w, h = img.size
-            rx0, ry0 = w / 2.0, h / 2.0
-            img = img.rotate(d)
-            a = -d / 180.0 * math.pi
-
-            new_boxes = np.zeros_like(boxes)
-            new_boxes[:, 0] = boxes[:, 1]
-            new_boxes[:, 1] = boxes[:, 0]
-            new_boxes[:, 2] = boxes[:, 3]
-            new_boxes[:, 3] = boxes[:, 2]
-            for i in range(boxes.shape[0]):
-                ymin, xmin, ymax, xmax = new_boxes[i, :]
-                xmin, ymin, xmax, ymax = float(xmin), float(ymin), float(xmax), float(ymax)
-                x0, y0 = xmin, ymin
-                x1, y1 = xmin, ymax
-                x2, y2 = xmax, ymin
-                x3, y3 = xmax, ymax
-
-                z = np.array([[y0, x0], [y1, x1], [y2, x2], [y3, x3]])
-                tp = np.zeros_like(z)
-                tp[:, 1] = (z[:, 1] - rx0) * math.cos(a) - (z[:, 0] - ry0) * math.sin(a) + rx0
-                tp[:, 0] = (z[:, 1] - rx0) * math.sin(a) + (z[:, 0] - ry0) * math.cos(a) + ry0
-
-                ymax, xmax = np.max(tp, axis=0)
-                ymin, xmin = np.min(tp, axis=0)
-                new_boxes[i] = np.array([ymin, xmin, ymax, xmax])
-            np.clip(new_boxes[:, 1::2], 0, w - 1)
-            np.clip(new_boxes[:, 0::2], 0, h - 1)
-            boxes[:, 0] = new_boxes[:, 1]
-            boxes[:, 1] = new_boxes[:, 0]
-            boxes[:, 2] = new_boxes[:, 3]
-            boxes[:, 3] = new_boxes[:, 2]
-
-        if random.random() < 0.5:
-            # img, boxes = random_crop_resize(img, boxes)
-            pass
-
-        img = np.array(img)
-        target["labels"] = labels
-        target["boxes"] = boxes
-        return {'image': img, 'target': target}
 
 
 class YOLOv5AugWithoutAugment(object):
