@@ -14,9 +14,9 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: True
-    BATCH_SIZE: 12
-    NUM_WORKER: 12
-    CACHE: True
+    BATCH_SIZE: 24
+    NUM_WORKER: 24
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -37,9 +37,9 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: False
-    BATCH_SIZE: 12
-    NUM_WORKER: 12
-    CACHE: True
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -58,14 +58,10 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.efficientdet.EfficientDet'
-  BACKBONE: { 'name': 'EfficientNet', 'subtype': 'efficientnet_b0', 'out_stages': [3, 4, 5], 'output_stride': 32, 'pretrained': True }
-  NECK: { 'name': 'PAN', 'in_channels': [116, 232, 464], 'out_channels': 96 }
-  HEAD: { 'name': 'NanoDetHead', 'input_channel': 96, 'feat_channels': 96,
-          'stacked_convs': 2, 'share_cls_reg': True,
-          'strides': [8, 16, 32], 'octave_base_scale': 5, 'reg_max': 7, 'norm_cfg': {'type': 'BN'},
-        'loss': { 'loss_qfl': {'name': 'QualityFocalLoss', 'beta': 2.0,'loss_weight': 1.0},
-         'loss_dfl': {'name': 'DistributionFocalLoss', 'loss_weight': 0.25},
-         'loss_bbox': {'name': 'GIoULoss', 'loss_weight': 2.0} }}
+  TYPE: 'efficientnet_b0'
+  BACKBONE: { 'name': 'EfficientNet', 'subtype': 'efficientnet_b0', 'out_stages': [3, 5, 7], 'output_stride': 32, 'pretrained': True }
+  NECK: { 'name': 'BiFPN', 'in_channels': [40, 112, 320], 'out_channels': 64 }
+  HEAD: { 'name': 'EfficientdetHead' }
 
 EVALUATOR:
   NAME: 'coco_detection'
@@ -85,11 +81,11 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [0]
-N_MAX_EPOCHS: 500
+GPU_IDS: [1]
+N_MAX_EPOCHS: 300
 
-INIT_LR: 0.08
-BACKBONE_LR: 0.08
+INIT_LR: 0.001
+BACKBONE_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -127,7 +123,7 @@ GRAD_CLIP:
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 200
+N_ITERS_TO_DISPLAY_STATUS: 100
 
 ## TENSORBOARD
 TENSORBOARD: True
