@@ -17,6 +17,7 @@ DATASET:
     BATCH_SIZE: 32
     NUM_WORKER: 8
     LOAD_NUM: 1
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -25,13 +26,13 @@ DATASET:
     TRANSFORMS:
       FilterAndRemapCocoCategories: { categories: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
-      # ColorJitter: { p: 1, brightness: 0.125, contrast: [0.5, 1.5], saturation: [0.5, 1.5], hue: 0.05 }
+      ColorJitter: { p: 1, brightness: 0.125, contrast: [0.5, 1.5], saturation: [0.5, 1.5], hue: 0.05 }
       RandomResizedCrop: { size: [300, 300], scale: [0.3, 1.0], ratio: [0.5, 2.0], keep_ratio: False }
       RandomHorizontalFlip: { p: 0.5 }
       # Resize: { size: [300, 300], keep_ratio: False }
       ToPercentCoords:
-      ToTensor: { normalize: False }
-      Normalize: { mean: [123, 117, 104], std: [1.0, 1.0, 1.0] }
+      ToTensor: { normalize: True }
+      Normalize: { mean: [0.482, 0.459, 0.408], std: [1.0, 1.0, 1.0] }
 
     TARGET_TRANSFORMS:
       SSDTargetTransform: { image_size: 300, feature_maps: [38, 19, 10, 5, 3, 1],
@@ -44,9 +45,10 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: False
-    BATCH_SIZE: 10
-    NUM_WORKER: 10
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
     LOAD_NUM: 1
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -57,8 +59,8 @@ DATASET:
       ConvertCocoPolysToMask:
       Resize: { size: [300, 300], keep_ratio: False }
       ToPercentCoords:
-      ToTensor: { normalize: False }
-      Normalize: { mean: [123, 117, 104], std: [1.0, 1.0, 1.0] }
+      ToTensor: { normalize: True }
+      Normalize: { mean: [0.482, 0.459, 0.408], std: [1.0, 1.0, 1.0] }
 
     TARGET_TRANSFORMS:
       SSDTargetTransform: { image_size: 300, feature_maps: [38, 19, 10, 5, 3, 1],
@@ -81,7 +83,7 @@ USE_MODEL:
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mIoU'
-  EVAL_INTERVALS: 2
+  EVAL_INTERVALS: 10
 
 
 #########################################
@@ -96,7 +98,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [3]
+GPU_IDS: [1]
 N_MAX_EPOCHS: 120
 
 INIT_LR: 0.001
@@ -115,7 +117,7 @@ OPTIMIZER:
 
 LR_SCHEDULER:
   TYPE: 'MultiStepLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
-  MILESTONES: [65, 85]
+  MILESTONES: [75, 95]
   MIN_LR: 0.00000001
   GAMMA: 0.1
   POWER: 0.9
