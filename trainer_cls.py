@@ -5,50 +5,39 @@
 # @File : trainer.py
 
 import argparse
-import copy
 import os
 from collections import defaultdict
 
-import math
-import random
 import torch
-import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
-import torchvision
-from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
-import attr
 from tqdm import tqdm
-from copy import deepcopy
 from importlib import import_module
-from time import time
 from datetime import datetime
-from math import ceil
 import torch.backends.cudnn as cudnn
 import numpy as np
-from pathlib import Path as P
 import torch.distributed as dist
 from torch.cuda import amp
 from torch.nn import SyncBatchNorm
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from src.utils.config import CommonConfiguration
-from src.utils.logger import logger
+from src.utils.global_logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
-from src.utils.distributed import init_distributed, is_main_process, reduce_dict
+from src.utils.distributed import init_distributed, reduce_dict
 from src.evaluator import build_evaluator
 from src.utils.distributed import LossLogger
 from src.optimizers import build_optimizer, get_current_lr
 from src.lr_schedulers import build_lr_scheduler
-from src.transforms import build_transforms
+from src.data.transforms import build_transforms, build_targets_transforms
 from src.utils.freeze import freeze_models
 from src.lr_schedulers.warmup import get_warmup_lr
-from src.datasets.prefetch_dataLoader import PrefetchDataLoader
+from src.data.datasets import PrefetchDataLoader
 from src.utils.torch_utils import setup_seed
 
 torch.backends.cudnn.enabled = True
@@ -63,7 +52,8 @@ class Trainer:
         self.device = self.cfg.GPU_IDS
         self.batch_size = self.cfg.DATASET.TRAIN.BATCH_SIZE * len(self.cfg.GPU_IDS)
 
-        self.n_steps_per_epoch = None
+        self.n_iters_per_epoch = None
+        self.iters_per_epoch = None
         if cfg.local_rank == 0:
             self.experiment_id = self.experiment_id(self.cfg)
             self.ckpts = Checkpoints(logger,self.cfg.CHECKPOINT_DIR,self.experiment_id)
@@ -73,7 +63,7 @@ class Trainer:
                 setup_seed(cfg.seed)
 
     def experiment_id(self, cfg):
-        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.split('.')[-1]}#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
+        return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.CLASS.split('.')[-1]}#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
 
     def _parser_dict(self):
         dictionary = CommonConfiguration.from_yaml(cfg.DATASET.DICTIONARY)
@@ -81,8 +71,12 @@ class Trainer:
             return dictionary[cfg.DATASET.DICTIONARY_NAME]
         return dictionary[cfg.DATASET.DICTIONARY_NAME][1:]
 
-    def _parser_transform(self, mode):
-        return build_transforms(cfg.DATASET.DICTIONARY_NAME,cfg.DATASET[mode.upper()].TRANSFORMS,mode)
+    def _parser_transform(self, mode, type=''):
+        if type == 'target':
+            return build_targets_transforms(cfg.DATASET.DICTIONARY_NAME, cfg.DATASET[mode.upper()].TARGET_TRANSFORMS,
+                                            mode) if cfg.DATASET[mode.upper()].TARGET_TRANSFORMS is not None else None
+        else:
+            return build_transforms(cfg.DATASET.DICTIONARY_NAME, cfg.DATASET[mode.upper()].TRANSFORMS, mode)
 
     def _parser_datasets(self):
         *dataset_str_parts, dataset_class_str = cfg.DATASET.CLASS.split(".")
@@ -108,11 +102,10 @@ class Trainer:
         dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         return datasets, dataloaders, data_samplers, dataset_sizes
 
-
     def _parser_model(self):
-        *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.split(".")
+        *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.CLASS.split(".")
         model_class = getattr(import_module(".".join(model_mod_str_parts)), model_class_str)
-        model = model_class(dictionary=self.dictionary)
+        model = model_class(dictionary=self.dictionary, model_cfg=self.cfg.USE_MODEL)
 
         if self.cfg.distributed:
             model = SyncBatchNorm.convert_sync_batchnorm(model).cuda()
@@ -257,6 +250,8 @@ class Trainer:
         ## parser_datasets
         datasets, dataloaders,data_samplers, dataset_sizes = self._parser_datasets()
 
+        self.steps_per_epoch = int(dataset_sizes['train'] // self.batch_size)
+
         ## parser_model
         model_ft = self._parser_model()
 
@@ -264,7 +259,6 @@ class Trainer:
         if cfg.SCALE_LR:
             cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / cfg.SCALE_LR
 
-        torch.save(datasets['val'], '/home/lmin/pythonCode/scripts/weights/datasets.pth')
         scaler = amp.GradScaler(enabled=False)
         if cfg.WARMUP.ITERS:
             logger.info('Start warm-up ... ')
@@ -275,7 +269,7 @@ class Trainer:
         optimizer_ft = build_optimizer(cfg, model_ft)
 
         ## parser_lr_scheduler
-        lr_scheduler_ft = build_lr_scheduler(cfg, optimizer_ft)
+        lr_scheduler_ft = build_lr_scheduler(cfg, self.iters_per_epoch, optimizer_ft)
 
         if cfg.distributed:
             model_ft = DDP(model_ft, device_ids=[cfg.local_rank], output_device=(cfg.local_rank))
@@ -292,8 +286,6 @@ class Trainer:
         ## vis network graph
         if self.cfg.TENSORBOARD_MODEL and False:
             self.tb_writer.add_graph(model_ft, (model_ft.dummy_input.cuda(),))
-
-        self.steps_per_epoch = int(dataset_sizes['train']//self.batch_size)
 
         timer = Timer()
         lossLogger = LossLogger()
@@ -416,15 +408,15 @@ if __name__ == '__main__':
     # parser.add_argument('--setting', default='conf/hymenoptera.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/coco_enet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
-    # parser.add_argument('--setting', default='conf/coco_fcos.yml', help='The path to the configuration file.')
-    # parser.add_argument('--setting', default='conf/voc_fcos.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/coco_fcos1.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/voc_fcos_bak.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/camvid_enet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_maskrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_fasterrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_retinanet.yml', help='The path to the configuration file.')
     parser.add_argument('--setting', default='conf/coco_nanodet.yml', help='The path to the configuration file.')
-    # parser.add_argument('--setting', default='conf/coco_yolov5.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/coco_yolov5_old.yml', help='The path to the configuration file.')
 
     parser.add_argument('--seed', type=int, default=None, help='random seed')
     # distributed training parameters
