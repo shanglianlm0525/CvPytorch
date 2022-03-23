@@ -41,7 +41,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from src.lr_schedulers.lr_scheduler import parser_lr_scheduler
 from src.optimizers.optimizer import parser_optimizer
 from src.utils.config import CommonConfiguration
-from src.utils.logger import logger
+from src.utils.global_logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
 from src.utils.checkpoints import Checkpoints
