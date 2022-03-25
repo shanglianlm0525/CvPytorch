@@ -287,9 +287,13 @@ class Resize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, keep_ratio= False, fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
         self.size = size
+        self.keep_ratio = keep_ratio
+        self.fill=fill
+        self.ignore_label = ignore_label
+        self.padding_mode = padding_mode
         self.interpolation = interpolation
 
     def __call__(self, sample):
@@ -300,8 +304,31 @@ class Resize(object):
             PIL Image: Rescaled image.
         """
         img, target = sample['image'], sample['target']
-        return {'image': F.resize(img, self.size, self.interpolation),
-                'target': F.resize(target, self.size, InterpolationMode.NEAREST)}
+        if self.keep_ratio:
+            w, h = F._get_image_size(img)
+            # random scale (short edge)
+            scale = min(self.size[0] / h, self.size[1] / w)
+            oh, ow = int(round(h * scale)), int(round(w * scale))
+            padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
+            padh /= 2
+            padw /= 2  # divide padding into 2 sides
+
+            if (h != oh) or (w != ow):
+                img = F.resize(img, [oh, ow], self.interpolation)
+                target = F.resize(target, [oh, ow], InterpolationMode.NEAREST)
+
+            # pad
+            if oh < self.size[0] or ow < self.size[1]:
+                padh = self.size[0] - oh if oh < self.size[0] else 0
+                padw = self.size[1] - ow if ow < self.size[1] else 0
+                # left, top, right and bottom
+                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+                target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
+
+            return { 'image': img, 'target': target }
+        else:
+            return {'image': F.resize(img, self.size, self.interpolation),
+                    'target': F.resize(target, self.size, InterpolationMode.NEAREST)}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -353,13 +380,16 @@ class RandomScaleCrop(object):
                 ow = int(1.0 * w * oh / h)
             img = F.resize(img, [oh, ow], self.interpolation)
             target = F.resize(target, [oh, ow], InterpolationMode.NEAREST)
-            # pad crop
-            if short_size < min(self.size):
-                padh = self.size[0] - oh if oh < self.size[0] else 0
-                padw = self.size[1] - ow if ow < self.size[1] else 0
-                # left, top, right and bottom
-                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
-                target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
+
+            # random crop crop_size
+            crop_h = min(self.size[0], oh)
+            crop_w = min(self.size[1], ow)
+            x1 = random.randint(0, oh - crop_h)
+            y1 = random.randint(0, ow - crop_w)
+            # top, left, height, width
+            img = F.crop(img, y1, x1, crop_h, crop_w)
+            target = F.crop(target, y1, x1, crop_h, crop_w)
+
         else:
             base_size = min(w, h)
             # random scale (short edge)
@@ -367,21 +397,25 @@ class RandomScaleCrop(object):
 
             img = F.resize(img, short_size, self.interpolation)
             target = F.resize(target, short_size, InterpolationMode.NEAREST)
-            # pad crop
-            if short_size < min(self.size):
-                padh = self.size[0] - short_size if short_size < self.size[0] else 0
-                padw = self.size[1] - short_size if short_size < self.size[1] else 0
-                # left, top, right and bottom
-                img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
-                target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
 
-        # random crop crop_size
-        w, h = F._get_image_size(img)
-        x1 = random.randint(0, w - self.size[1])
-        y1 = random.randint(0, h - self.size[0])
-        # top, left, height, width
-        return {'image': F.crop(img, y1, x1, self.size[0], self.size[1]),
-                'target': F.crop(target, y1, x1, self.size[0], self.size[1])}
+            # random crop crop_size
+            crop_h = min(self.size[0], short_size)
+            crop_w = min(self.size[1], short_size)
+            x1 = random.randint(0, short_size - crop_h)
+            y1 = random.randint(0, short_size - crop_w)
+            # top, left, height, width
+            img = F.crop(img, y1, x1, crop_h, crop_w)
+            target = F.crop(target, y1, x1, crop_h, crop_w)
+
+        # pad crop
+        if crop_h < self.size[0] or crop_w < self.size[1]:
+            padh = self.size[0] - crop_h if crop_h < self.size[0] else 0
+            padw = self.size[1] - crop_w if crop_w < self.size[1] else 0
+            # left, top, right and bottom
+            img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+            target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
+
+        return { 'image': img, 'target': target }
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
