@@ -43,7 +43,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      Resize: { size: [1024, 1024] }
+      Resize: { size: [1024, 1024], keep_ratio: False }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -75,7 +75,7 @@ RESUME: False
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
 GPU_IDS: [1]
-N_MAX_EPOCHS: 1000
+N_MAX_EPOCHS: 500
 
 INIT_LR: 0.05
 BACKBONE_LR: 0.05
