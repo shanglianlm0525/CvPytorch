@@ -8,7 +8,7 @@ import argparse
 import torch
 from trainer import Trainer
 from src.utils.config import CommonConfiguration
-from src.utils.logger import logger
+from src.utils.global_logger import logger
 
 parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
 # parser.add_argument('--training-setting', required=True, help='The path to the training setting file you want to use.')
