@@ -21,7 +21,7 @@ from torchvision import transforms as transformsT
 from tqdm import tqdm
 from pathlib import Path as P
 
-from src.utils.logger import logger
+from src.utils.global_logger import logger
 from src.utils.config import CommonConfiguration
 from src.utils.checkpoints import Checkpoints, load_checkpoint
 
@@ -70,7 +70,7 @@ def detection_collate(batch):
 
 parser = argparse.ArgumentParser(description="Generic Pytorch-based Training Framework")
 parser.add_argument('--setting',default='conf/cityscapes_test.yml', help='The path to the training setting file you want to use.')
-parser.add_argument("--model-path", default='checkpoints/Cityscapes_FastSCNN#FastSCNN#RMSprop#MultiStepLR#2020_08_04_16_25_02/Cityscapes_FastSCNN#FastSCNN#RMSprop#MultiStepLR#2020_08_04_16_25_02#best.pth', help='The storage location of the trained model.')
+parser.add_argument("--model-path", default='checkpoints1/Cityscapes_FastSCNN#FastSCNN#RMSprop#MultiStepLR#2020_08_04_16_25_02/Cityscapes_FastSCNN#FastSCNN#RMSprop#MultiStepLR#2020_08_04_16_25_02#best.pth', help='The storage location of the trained model.')
 parser.add_argument("--indices", default=None, help='The indices of the test images.')
 parser.add_argument("--dataset-dir", help='The path to the test images.')
 parser.add_argument("--batch-size", type=int, default=1)
