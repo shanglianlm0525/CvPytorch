@@ -161,8 +161,6 @@ class LFDResNet(nn.Module):
         else:
             raise NotImplementedError
 
-        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
-
         self.stem = nn.Sequential(
             nn.Conv2d(3, self.out_channels[0], kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(self.out_channels[0]),
@@ -179,6 +177,8 @@ class LFDResNet(nn.Module):
         )
 
         self._make_layer()
+
+        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
         if self.pretrained:
             self.load_pretrained_weights()
