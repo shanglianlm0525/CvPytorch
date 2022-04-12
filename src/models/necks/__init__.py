@@ -10,6 +10,7 @@ from .bifpn import BiFPN
 from .fcos_fpn import FCOSFPN
 from .fpn import FPN
 from .ghost_pan import GhostPAN
+from .lfd_neck import LFDNeck
 from .tph_yolov5_neck import TPH_YOLOv5Neck
 from .yolofastestv2_neck import YoloFastestv2Neck
 from .pan import PAN
@@ -31,7 +32,8 @@ __all__ = [
     'TPH_YOLOv5Neck',
     'YOLOPNeck',
     'GhostPAN',
-    'FCOSFPN'
+    'FCOSFPN',
+    'LFDNeck'
 ]
 
 def build_neck(cfg):
@@ -61,5 +63,7 @@ def build_neck(cfg):
         return GhostPAN(**neck_cfg)
     elif name == 'FCOSFPN':
         return FCOSFPN(**neck_cfg)
+    elif name == 'LFDNeck':
+        return LFDNeck(**neck_cfg)
     else:
         raise NotImplementedError
