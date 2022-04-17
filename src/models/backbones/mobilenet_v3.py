@@ -73,20 +73,6 @@ class MobileNetV3(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        if self.output_stride == 16:
-            s4, s6, d4, d6 = (2, 1, 1, 2)
-        elif self.output_stride == 8:
-            s4, s6, d4, d6 = (1, 1, 2, 4)
-
-            for n, m in self.stage4.named_modules():
-                if '0.conv.1.0' in n:
-                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
-
-        if self.output_stride == 8 or self.output_stride == 16:
-            for n, m in self.stage6.named_modules():
-                if '0.conv.1.0' in n:
-                    m.dilation, m.padding, m.stride = (d6, d6), (d6, d6), (s6, s6)
-
         if self.pretrained:
             self.load_pretrained_weights()
         else:
@@ -111,13 +97,13 @@ class MobileNetV3(nn.Module):
         x = self.conv1(x)
         output = []
         if self.subtype == 'mobilenet_v3_small':
-            for i in range(1, 7):
+            for i in range(1, 6):
                 stage = getattr(self, 'stage{}'.format(i))
                 x = stage(x)
                 if i in self.out_stages and not self.classifier:
                     output.append(x)
         else:
-            for i in range(1, 6):
+            for i in range(1, 7):
                 stage = getattr(self, 'stage{}'.format(i))
                 x = stage(x)
                 if i in self.out_stages and not self.classifier:
