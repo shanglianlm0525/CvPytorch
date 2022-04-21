@@ -47,7 +47,7 @@ class ConvModule(nn.Module):
                  bias='auto',
                  conv_cfg=None,
                  norm_cfg=None,
-                 activation='', # ReLU
+                 activation=None, # ReLU
                  inplace=True,
                  order=('conv', 'norm', 'act')):
         super(ConvModule, self).__init__()
