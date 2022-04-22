@@ -15,7 +15,7 @@ from torchvision.models.mobilenet import mobilenet_v3_small, mobilenet_v3_large
     https://arxiv.org/pdf/1905.02244.pdf
 """
 
-__all__ = ["MobileNetV3", "mobilenet_v3_large", "mobilenet_v3_small"]
+__all__ = ["mobilenet_v3_large", "mobilenet_v3_small"]
 
 
 model_urls = {
@@ -38,12 +38,13 @@ class MobileNetV3(nn.Module):
         if self.subtype == 'mobilenet_v3_small':
             features = mobilenet_v3_small(self.pretrained).features
 
-            self.conv1 = nn.Sequential(list(features.children())[0])  # x2
-            self.stage1 = nn.Sequential(list(features.children())[1])
-            self.stage2 = nn.Sequential(*list(features.children())[2:4])
-            self.stage3 = nn.Sequential(*list(features.children())[4:7])
-            self.stage4 = nn.Sequential(*list(features.children())[7:9])
-            self.stage5 = nn.Sequential(*list(features.children())[9:12])
+            mb3s = list(features.children())
+            self.conv1 = nn.Sequential(mb3s[0])  # x2
+            self.stage1 = nn.Sequential(mb3s[1])
+            self.stage2 = nn.Sequential(*mb3s[2:4])
+            self.stage3 = nn.Sequential(*mb3s[4:7])
+            self.stage4 = nn.Sequential(*mb3s[7:9])
+            self.stage5 = nn.Sequential(*mb3s[9:12])
 
             if self.classifier:
                 self.last_conv = nn.Sequential(list(features.children())[12])
@@ -54,13 +55,14 @@ class MobileNetV3(nn.Module):
         elif self.subtype == 'mobilenet_v3_large':
             features = mobilenet_v3_large(self.pretrained).features
 
-            self.conv1 = nn.Sequential(list(features.children())[0])  # x2
-            self.stage1 = nn.Sequential(list(features.children())[1])
-            self.stage2 = nn.Sequential(*list(features.children())[2:4])
-            self.stage3 = nn.Sequential(*list(features.children())[4:7])
-            self.stage4 = nn.Sequential(*list(features.children())[7:11])
-            self.stage5 = nn.Sequential(*list(features.children())[11:13])
-            self.stage6 = nn.Sequential(*list(features.children())[13:16])
+            mb3l = list(features.children())
+            self.conv1 = nn.Sequential(mb3l[0])  # x2
+            self.stage1 = nn.Sequential(mb3l[1])
+            self.stage2 = nn.Sequential(*mb3l[2:4])
+            self.stage3 = nn.Sequential(*mb3l[4:7])
+            self.stage4 = nn.Sequential(*mb3l[7:11])
+            self.stage5 = nn.Sequential(*mb3l[11:13])
+            self.stage6 = nn.Sequential(*mb3l[13:16])
 
             if self.classifier:
                 self.last_conv = nn.Sequential(list(features.children())[16])
@@ -73,10 +75,9 @@ class MobileNetV3(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
+        self.init_weights()
         if self.pretrained:
-            self.load_pretrained_weights()
-        else:
-            self.init_weights()
+           self.load_pretrained_weights()
 
     def init_weights(self):
         for m in self.modules():
@@ -87,6 +88,8 @@ class MobileNetV3(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0.0001)
+                m.momentum = 0.1
+                m.eps = 1e-05
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 if m.bias is not None:
@@ -128,7 +131,7 @@ class MobileNetV3(nn.Module):
 
 
 if __name__=="__main__":
-    model =MobileNetV3('mobilenet_v3_large')
+    model =MobileNetV3('mobilenet_v3_small')
     print(model)
 
     input = torch.randn(1, 3, 224, 224)
