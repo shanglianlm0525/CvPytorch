@@ -6,7 +6,11 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
-- [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**71.06mIoU**).
+- [2022.04.25] Release **TopFormer** models with *topformer_tiny* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**71.00mIoU**).
+- [2022.04.24] Release **TopFormer** models with *topformer_small* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.86mIoU**).
+- [2022.04.22] Release **TopFormer** models with *topformer_base* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**74.60mIoU**).
+- [2022.04.20] Release **SGCPNet** models with *mobilenet v3* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**56.47mIoU**).
+- [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**71.06mIoU**/**63.10mIoU**).
 - [2022.01.06] Release **FCOS** models with resnet50 backbone on [COCO](http://mscoco.org/) (**36.33mAP**).
 - [2021.07.23] Release **nanodet-repvgg** models with RepVGG backbone on [COCO](http://mscoco.org/) (**27.16mAP**).
 - [2021.07.23] Release **nanodet-g** models with cspnet backbone on [COCO](http://mscoco.org/) (**23.54mAP**).
