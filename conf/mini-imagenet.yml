@@ -1,49 +1,49 @@
-EXPERIMENT_NAME: 'Cityscapes_Deeplabv3'
+EXPERIMENT_NAME: 'Mini-Imagenet'
 
 #########################################
 # Dataset / Transforms Configurations
 #########################################
 DATASET:
-  CLASS: 'src.data.datasets.cityscapes.CityscapesSegmentation'
-  DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
-  DICTIONARY_NAME: 'SEG_CLASSES'
+  CLASS: 'src.data.datasets.mini-imagenet.MiniImageNetClassification'
+  DICTIONARY: 'conf/dicts/mini-imagenet_dict.yml'
+  DICTIONARY_NAME: 'CLS_CLASSES'
+  BACKGROUND_AS_CATEGORY: True
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
-    IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
+    IMG_DIR: '/home/lmin/data/mini-imagenet'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/mini-imagenet/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 24
+    BATCH_SIZE: 64
     NUM_WORKER: 8
-    CACHE: True
+    CACHE: False
     LABELS:
-      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
-      DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
-      SEG_SUFFIX: '*_gtFine_labelIds.png'
+      DET_DIR: ''
+      DET_SUFFIX: ''
+      SEG_DIR: ''
+      SEG_SUFFIX: ''
     TRANSFORMS:
-      RandomRotation: { degrees: [-0.5, 0.5] }
+      RandomResizedCrop: { size: [224, 224], 'keep_ratio': False }
       RandomHorizontalFlip: { p: 0.5 }
-      RandomScaleCrop: { size: [768, 768], scale: [0.5, 2.0] }
-      # ColorJitter: { p: 0.5, brightness: 0.5, contrast: 0.5, saturation: 0.5, hue: 0.01 }
+      ColorJitter: { p: 0.5, brightness: 0.125, contrast: [0.5, 1.5], saturation: [0.5, 1.5], hue: 0.07 }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
   VAL:
-    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
-    IMG_SUFFIX: '*.png'
-    INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
+    IMG_DIR: '/home/lmin/data/mini-imagenet'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/mini-imagenet/val.txt'
     SHUFFLE: False
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
-    CACHE: True
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
+    CACHE: False
     LABELS:
-      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
-      DET_SUFFIX: '.xml'
-      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
-      SEG_SUFFIX: '*_gtFine_labelIds.png'
+      DET_DIR: ''
+      DET_SUFFIX: ''
+      SEG_DIR: ''
+      SEG_SUFFIX: ''
     TRANSFORMS:
-      # Resize: { size: [1024, 2048] }
+      Resize: { size: [224, 224] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -52,14 +52,13 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  CLASS: 'src.models.deeplabv3.Deeplabv3'
-  # BACKBONE: { 'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [7], 'output_stride': 16, 'pretrained': True }
-  BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [4], 'output_stride': 16, 'pretrained': True }
-  HEAD: { 'name': 'Deeplabv3Head',  'in_channels': 2048, 'dilations': [6, 12, 18] }
+  CLASS: 'src.models.classification.Classification'
+  BACKBONE: { 'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'classifier': True, 'pretrained': True }
+
 
 EVALUATOR:
-  NAME: 'segmentation'
-  EVAL_TYPE: 'mIoU'
+  NAME: 'classification'
+  EVAL_TYPE: 'mAcc'
   EVAL_INTERVALS: 2
 
 
@@ -75,21 +74,21 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
-N_MAX_EPOCHS: 400
+GPU_IDS: [2]
+N_MAX_EPOCHS: 100
 
-INIT_LR: 0.2
-BACKBONE_LR: 0.02
+INIT_LR: 0.01
+BACKBONE_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
-  TYPE: 'SGD' # Adam, RMSprop
+  TYPE: 'AdamW' # Adam, RMSprop
   BIAS_PARAMS:
     momentum: 0.9
-    weight_decay: 0.0001
+    weight_decay: 0.01
   WEIGHT_PARAMS:
     momentum: 0.9
-    weight_decay: 0.0001
+    weight_decay: 0.01
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
@@ -97,13 +96,13 @@ LR_SCHEDULER:
   MILESTONES: [20, 40, 60, 80, 120]
   MIN_LR: 0.00000001
   GAMMA: 0.1
-  POWER: 0.9
+  POWER: 1.0
   STEP: 300
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 0
-  FACTOR: 0.33
+  ITERS: 1000
+  FACTOR: 0.01
 
 
 #########################################
