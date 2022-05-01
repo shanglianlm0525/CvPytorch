@@ -8,27 +8,25 @@ import torch
 import torch.nn as nn
 from torch.utils import model_zoo
 from torchvision.models import shufflenet_v2_x0_5, shufflenet_v2_x1_0, shufflenet_v2_x1_5, shufflenet_v2_x2_0
+from torchvision.models.shufflenetv2 import model_urls
 
 """
     ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design
     https://arxiv.org/abs/1807.11164
 """
 
-model_urls = {
-    'shufflenetv2_x0.5': 'https://download.pytorch.org/models/shufflenetv2_x0.5-f707e7126e.pth',
-    'shufflenetv2_x1.0': 'https://download.pytorch.org/models/shufflenetv2_x1-5666bf0f80.pth',
-    'shufflenetv2_x1.5': None,
-    'shufflenetv2_x2.0': None,
-}
 
 class ShuffleNetV2(nn.Module):
 
-    def __init__(self, subtype='shufflenetv2_x1.0', out_stages=[2,3,4], output_stride=32, backbone_path=None, pretrained=True):
+    def __init__(self, subtype='shufflenetv2_x1.0', out_stages=[2, 3, 4], output_stride=32, classifier=False, num_classes=1000, pretrained=True, backbone_path=None):
         super(ShuffleNetV2, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
-        self.backbone_path = backbone_path
+        self.output_stride = output_stride
+        self.classifier = classifier
+        self.num_classes = num_classes
         self.pretrained = pretrained
+        self.backbone_path = backbone_path
 
         if self.subtype == 'shufflenetv2_x0.5':
             backbone = shufflenet_v2_x0_5(self.pretrained)
@@ -45,7 +43,7 @@ class ShuffleNetV2(nn.Module):
         else:
             raise NotImplementedError
 
-        self.conv1 = backbone.conv1
+        self.stem = backbone.conv1
         self.maxpool = backbone.maxpool
         self.layer2 = backbone.stage2
         self.layer3 = backbone.stage3
@@ -53,13 +51,19 @@ class ShuffleNetV2(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
+        if self.classifier:
+            self.conv5 = backbone.conv5
+            self.fc = backbone.fc
+            self.fc = nn.Linear(self.fc.in_features, self.num_classes)
+            self.out_channels = self.num_classes
+
         if self.pretrained:
             self.load_pretrained_weights()
         else:
             self.init_weights()
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.stem(x)
         x = self.maxpool(x)
         output = []
         for i in range(2, 5):
@@ -67,7 +71,12 @@ class ShuffleNetV2(nn.Module):
             x = stage(x)
             if i in self.out_stages:
                 output.append(x)
-        return output  if len(self.out_stages) > 1 else output[0]
+            if self.classifier:
+                x = self.conv5(x)
+                x = x.mean([2, 3])  # globalpool
+                x = self.fc(x)
+                return x
+        return output if len(self.out_stages) > 1 else output[0]
 
 
     def freeze_bn(self):

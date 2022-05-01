@@ -7,39 +7,44 @@
 import torch
 import torch.nn as nn
 from torch.utils import model_zoo
-from torchvision.models.squeezenet import squeezenet1_0, squeezenet1_1
+from torchvision.models.squeezenet import squeezenet1_0, squeezenet1_1, model_urls
 
 """
     SqueezeNet: AlexNet-level accuracy with 50x fewer parameters
     https://arxiv.org/abs/1602.07360
 """
 
-model_urls = {
-    'squeezenet1_1': 'https://download.pytorch.org/models/squeezenet1_1-f364aa15.pth',
-}
 
 class SqueezeNet(nn.Module):
 
-    def __init__(self, subtype='squeezenet1_1', out_stages=[1, 2, 3], output_stride = 32, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='shufflenetv2_x1.0', out_stages=[1, 2, 3], output_stride=32, classifier=False, num_classes=1000, pretrained=True, backbone_path=None):
         super(SqueezeNet, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
-        self.output_stride = output_stride  # 8, 16, 32
-        self.backbone_path = backbone_path
+        self.output_stride = output_stride
+        self.classifier = classifier
+        self.num_classes = num_classes
         self.pretrained = pretrained
+        self.backbone_path = backbone_path
 
         if self.subtype == 'squeezenet1_1':
-            features = squeezenet1_1(self.pretrained).features
+            squeezenet = squeezenet1_1(pretrained=self.pretrained)
             self.out_channels = [96, 128, 256, 512]
         else:
             raise NotImplementedError
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        self.conv1 = nn.Sequential(*list(features.children())[0:2])
-        self.layer1 = nn.Sequential(*list(features.children())[2:5])
-        self.layer2 = nn.Sequential(*list(features.children())[5:8])
-        self.layer3 = nn.Sequential(*list(features.children())[8:13])
+        features = list(squeezenet.features.children())
+        self.stem = nn.Sequential(*features[0:2])
+        self.layer1 = nn.Sequential(*features[2:5])
+        self.layer2 = nn.Sequential(*features[5:8])
+        self.layer3 = nn.Sequential(*features[8:])
+
+        if self.classifier:
+            self.fc = squeezenet.classifier
+            self.fc[1] = nn.Linear(self.fc[1].in_features, self.num_classes)
+            self.out_channels = self.num_classes
 
         if self.pretrained:
             self.load_pretrained_weights()
@@ -57,15 +62,18 @@ class SqueezeNet(nn.Module):
                 nn.init.constant_(m.bias, 0.0001)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.stem(x)
         output = []
         for i in range(1, 4):
-            res_layer = getattr(self, 'layer{}'.format(i))
-            x = res_layer(x)
-            if i in self.out_stages:
+            stage = getattr(self, 'layer{}'.format(i))
+            x = stage(x)
+            if i in self.out_stages and not self.classifier:
                 output.append(x)
+            if self.classifier:
+                x = self.fc(x)
+                return torch.flatten(x, 1)
 
-        return output  if len(self.out_stages) > 1 else output[0]
+        return output if len(self.out_stages) > 1 else output[0]
 
     def freeze_bn(self):
         for layer in self.modules():
