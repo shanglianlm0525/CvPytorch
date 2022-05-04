@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
-import torch.nn.functional as TF
+import torch.nn.functional as F
 
 available_models = ['vgg11_bn','vgg13_bn','vgg16_bn','vgg19_bn'
                     ,'resnet18','resnet34','resnet50','resnet101','resnet152'
@@ -67,6 +67,6 @@ class ClsModel(nn.Module):
                     for _label, _weight in d.items():
                         cognize = targets == idx
                         if targets[cognize].size(0):
-                            losses['loss_'+_label] = TF.cross_entropy(outputs[cognize], targets[cognize]) * _weight
+                            losses['loss_'+_label] = F.cross_entropy(outputs[cognize], targets[cognize]) * _weight
 
                 return losses
