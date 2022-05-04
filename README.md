@@ -6,24 +6,26 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- [2022.04.27] Release **MobileNetV2** models on [Mini-ImageNet](http://image-net.org) (**77.47mAcc**).
+- [2022.04.26] Release **NanoDet-Plus-320** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**25.81mAP**).
 - [2022.04.25] Release **TopFormer** models with *topformer_tiny* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**71.00mIoU**).
 - [2022.04.24] Release **TopFormer** models with *topformer_small* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.86mIoU**).
 - [2022.04.22] Release **TopFormer** models with *topformer_base* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**74.60mIoU**).
 - [2022.04.20] Release **SGCPNet** models with *mobilenet v3* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**56.47mIoU**).
-- [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**71.06mIoU**/**63.10mIoU**).
+- [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.15mIoU**).
 - [2022.01.06] Release **FCOS** models with resnet50 backbone on [COCO](http://mscoco.org/) (**36.33mAP**).
-- [2021.07.23] Release **nanodet-repvgg** models with RepVGG backbone on [COCO](http://mscoco.org/) (**27.16mAP**).
-- [2021.07.23] Release **nanodet-g** models with cspnet backbone on [COCO](http://mscoco.org/) (**23.54mAP**).
-- [2021.07.23] Release **nanodet-efficientnet_lite** models with efficientnet_lite backbone on [COCO](http://mscoco.org/) (**25.65mAP**).
-- [2021.07.22] Release **nanodet-t** models with Transformer neck on [COCO](http://mscoco.org/) (**21.97mAP**).
-- [2021.07.20] Release **nanodet-416** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**23.30mAP**).
+- [2021.07.23] Release **NanoDet** models with RepVGG backbone on [COCO](http://mscoco.org/) (**27.16mAP**).
+- [2021.07.23] Release **NanoDet-g** models with cspnet backbone on [COCO](http://mscoco.org/) (**23.54mAP**).
+- [2021.07.23] Release **NanoDet** models with efficientnet_lite backbone on [COCO](http://mscoco.org/) (**25.65mAP**).
+- [2021.07.22] Release **NanoDet-t** models with Transformer neck on [COCO](http://mscoco.org/) (**21.97mAP**).
+- [2021.07.20] Release **NanoDet-416** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**23.30mAP**).
 - [2021.07.07] Release **STDC** models with stdc2 backbone on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.36mIoU**).
 - [2021.07.06] Release **STDC** models with stdc1 backbone on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.89mIoU**).
-- [2021.07.05] Release **nanodet-320** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**20.54mAP**).
-- [2021.07.01] Release **deeplabv3plus** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.96mIoU**).
+- [2021.07.05] Release **NanoDet-320** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**20.54mAP**).
+- [2021.07.01] Release **DeepLab v3+** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.96mIoU**).
 - [2021.06.28] Release **Unet** models on [Cityscapes](https://www.cityscapes-dataset.com/) (**56.90mIoU**).
 - [2021.06.20] Release **PSPNet** models with resnet50 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**72.59mIoU**).
-- [2021.06.15] Release **deeplabv3** models with mobilenet_v2, resnet50 and resnet101 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**68.06, 71.53 and 72.83mIoU**).
+- [2021.06.15] Release **DeepLab v3** models with mobilenet_v2, resnet50 and resnet101 backbone on [Cityscapes](https://www.cityscapes-dataset.com/) (**68.06, 71.53 and 72.83mIoU**).
 
 
 
