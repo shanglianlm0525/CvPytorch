@@ -19,13 +19,6 @@ from src.models.modules.convs import ConvModule
     https://arxiv.org/pdf/2204.05525.pdf
 """
 
-model_urls = {
-    'topformer_tiny': None, #  'weights/topformer/topformer-T-224-66.2.pth',
-    'topformer_small': None, # 'weights/topformer/topformer-S-224-72.3.pth',
-    'topformer_base': None, #  'weights/topformer/topformer-B-224-75.3.pth',
-}
-
-
 def _make_divisible(v, divisor, min_value=None):
     """
     This function is taken from the original tf repo.
@@ -465,12 +458,7 @@ class TopFormerBackbone(nn.Module):
                     m.bias.data.zero_()
 
     def load_pretrained_weights(self):
-        url = model_urls[self.subtype]
-        if url is not None:
-            pretrained_state_dict = model_zoo.load_url(url)
-            print('=> loading pretrained model {}'.format(url))
-            self.load_state_dict(pretrained_state_dict, strict=False)
-        elif self.backbone_path is not None:
+        if self.backbone_path is not None:
             print('=> loading pretrained model {}'.format(self.backbone_path))
             self.load_state_dict(torch.load(self.backbone_path)['state_dict_ema'], False)
             # self.load_state_dict(torch.load(self.backbone_path))
