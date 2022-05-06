@@ -1,0 +1,3 @@
+DET_CLASSES:
+  - background: 1               # 1  => 0
+  - face: 1               # 2  => 1
