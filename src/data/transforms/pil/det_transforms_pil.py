@@ -394,7 +394,7 @@ class RandomAffine(object):
                 else:
                     fill = [float(f) for f in fill]
 
-            img_size = F._get_image_size(img)
+            img_size = F.get_image_size(img)
             width, height = img_size
 
             ret = self.get_params(self.degrees, self.translate, self.scale, self.shear, img_size)
@@ -507,7 +507,7 @@ class RandomCrop(object):
         Returns:
             tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
         """
-        w, h = F._get_image_size(img)
+        w, h = F.get_image_size(img)
         th, tw = output_size
 
         if h + 1 < th or w + 1 < tw:
@@ -548,7 +548,7 @@ class RandomCrop(object):
         if self.padding is not None:
             img = F.pad(img, self.padding, self.fill, self.padding_mode)
 
-        width, height = F._get_image_size(img)
+        width, height = F.get_image_size(img)
         # pad the width if needed
         if self.pad_if_needed and width < self.size[1]:
             padding = [self.size[1] - width, 0]
@@ -626,7 +626,7 @@ class RandomResizedCrop(object):
             tuple: params (i, j, h, w) to be passed to ``crop`` for a random
             sized crop.
         """
-        width, height = F._get_image_size(img)
+        width, height = F.get_image_size(img)
         area = height * width
 
         log_ratio = torch.log(torch.tensor(ratio))
@@ -670,7 +670,7 @@ class RandomResizedCrop(object):
         """
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
-        width, height = F._get_image_size(img)
+        width, height = F.get_image_size(img)
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
         if self.keep_ratio:
