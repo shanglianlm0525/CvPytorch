@@ -1,0 +1,132 @@
+EXPERIMENT_NAME: 'WiderFace_FaceBoxes'
+
+#########################################
+# Dataset / Transforms Configurations
+#########################################
+DATASET:
+  CLASS: 'src.data.datasets.widerface.WiderFace'
+  DICTIONARY: 'conf/dicts/widerface_dict.yml'
+  DICTIONARY_NAME: 'DET_CLASSES'
+  BACKGROUND_AS_CATEGORY: True
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/WiderFace'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/WiderFace/train.txt'
+    SHUFFLE: True
+    BATCH_SIZE: 2 # 32
+    NUM_WORKER: 8
+    CACHE: False
+    LABELS:
+      DET_DIR: '/home/lmin/data/WiderFace'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/WiderFace'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      ColorJitter: { p: 0.5, brightness: 0.125, contrast: 0.5, saturation: 0.5, hue: 0.1 }
+      RandomResizedCrop: { size: [1024, 1024], scale: [0.3, 1.0], ratio: [0.75, 1.34], keep_ratio: True }
+      RandomHorizontalFlip: { p: 0.5 }
+      ToPercentCoords:
+      ToTensor:
+      Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
+
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/WiderFace'
+    IMG_SUFFIX: '*.jpg'
+    INDICES: '/home/lmin/data/WiderFace/val.txt'
+    SHUFFLE: False
+    BATCH_SIZE: 1
+    NUM_WORKER: 8
+    CACHE: False
+    LABELS:
+      DET_DIR: '/home/lmin/data/WiderFace'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/WiderFace'
+      SEG_SUFFIX: '*.png'
+    TRANSFORMS:
+      Resize: { size: [1024, 1024], keep_ratio: True }
+      # ToPercentCoords:
+      ToTensor:
+      Normalize: { mean: [0.406, 0.456, 0.485], std: [0.225, 0.224, 0.229] }
+
+
+
+#########################################
+# Model / Evaluator Configurations
+#########################################
+USE_MODEL:
+  CLASS: 'src.models.faceboxes.FaceBoxes'
+  # ANCHOR: { name: 'FaceBoxesPriorBox', min_sizes: [[32, 64, 128], [256], [512]], steps: [32, 64, 128], clip: False, image_size: [1024, 1024] }
+  LOSS: { name: 'FaceBoxesLoss', strides: [8, 16, 32, 64, 128], limit_range: [[-1, 64], [64, 128], [128, 256], [256, 512], [512, 999999]] }
+  DETECT: { name: 'FCOSDetect', score_threshold: 0.05, nms_iou_threshold: 0.6, max_detection_boxes_num: 1000, strides: [8, 16, 32, 64, 128]}
+
+
+EVALUATOR:
+  NAME: 'voc_detection'
+  EVAL_TYPE: 'mAP'
+  EVAL_INTERVALS: 10
+
+
+#########################################
+# Checkpoints / Resume Configurations
+#########################################
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 10
+# PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+RESUME: False
+
+
+#########################################
+# Devices / Optimizer / Lr_scheduler / Warmup Configurations
+#########################################
+GPU_IDS: [3]
+N_MAX_EPOCHS: 300
+
+INIT_LR: 0.001
+BACKBONE_LR: 0.001
+SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
+
+OPTIMIZER:
+  TYPE: 'SGD' # Adam, RMSprop
+  BIAS_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0005
+  WEIGHT_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0005
+  BIAS_LR_MULTIPLIER: 1
+
+LR_SCHEDULER:
+  TYPE: 'MultiStepLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [200, 250]
+  MIN_LR: 0.00000001
+  GAMMA: 0.1
+  POWER: 0.9
+  STEP: 10
+
+WARMUP:
+  NAME: 'linear'
+  ITERS: 0
+  FACTOR: 0.3
+
+
+#########################################
+# GRAD_CLIP Configurations
+#########################################
+GRAD_CLIP:
+  TYPE: 'norm'
+  VALUE: 0
+
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 100
+
+## TENSORBOARD
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: False
+TENSORBOARD_WEIGHT: False
+TENSORBOARD_IMAGE: False
