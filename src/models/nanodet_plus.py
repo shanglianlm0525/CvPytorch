@@ -92,7 +92,6 @@ class NanoDetPlus(nn.Module):
 
             use_aux = True
             if use_aux:
-                # aux_neck_feat = self.aux_neck(feat)
                 aux_neck_feat = self.aux_neck([f.detach() for f in feat])
                 dual_fpn_feat = (torch.cat([f, aux_f], dim=1) for f, aux_f in zip(neck_feat, aux_neck_feat))
                 aux_preds = self.aux_head(dual_fpn_feat)
