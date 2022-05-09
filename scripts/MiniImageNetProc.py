@@ -6,13 +6,8 @@
 
 import os
 import json
-
-# import pandas as pd
 import random
-
-from PIL import Image
-import matplotlib.pyplot as plt
-
+import re
 
 def read_csv_classes(csv_dir: str, csv_name: str):
     data = []
@@ -64,9 +59,9 @@ def calculate_split_info(path: str, label_dict: dict, rate: float = 0.2):
     for i, (k, v) in enumerate(data.items()):
         # print('%s:%s' % (k, v))
         if i < data_rate:
-            val_txt.write(os.path.join('image', k) + ' ' + str(classes_label[v]) + '\n')
+            val_txt.write(os.path.join('images', k) + ' ' + str(classes_label[v]) + '\n')
         else:
-            train_txt.write(os.path.join('image', k) + ' ' + str(classes_label[v]) + '\n')
+            train_txt.write(os.path.join('images', k) + ' ' + str(classes_label[v]) + '\n')
 
     train_txt.close()
     val_txt.close()
