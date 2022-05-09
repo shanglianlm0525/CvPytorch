@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Cityscapes_Deeplabv3plus'
+EXPERIMENT_NAME: 'Cityscapes_TopFormer'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -14,19 +14,18 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 24
-    NUM_WORKER: 8
-    CACHE: True
+    BATCH_SIZE: 36
+    NUM_WORKER: 16
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      RandomRotation: { degrees: [-0.5, 0.5] }
+      RandomScaleCrop: { size: [1024, 1024], scale: [0.5, 2.0] }
       RandomHorizontalFlip: { p: 0.5 }
-      RandomScaleCrop: { size: [768, 768], scale: [0.5, 2.0] }
-      ColorJitter: { p: 0.5, brightness: 0.2, contrast: 0.1, saturation: 0.2, hue: 0.01 }
+      ColorJitter: { p: 0.5, brightness: 0.125, contrast: [0.5, 1.5], saturation: [0.5, 1.5], hue: 0.07 }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -37,7 +36,7 @@ DATASET:
     SHUFFLE: False
     BATCH_SIZE: 8
     NUM_WORKER: 8
-    CACHE: True
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
       DET_SUFFIX: '.xml'
@@ -53,11 +52,13 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  CLASS: 'src.models.deeplabv3_plus.Deeplabv3Plus'
-  # BACKBONE: { 'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'out_stages': [2, 7], 'output_stride': 16, 'pretrained': True }
-  BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50', 'out_stages': [1, 4], 'output_stride': 16, 'pretrained': True }
-  # BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet101', 'out_stages': [1, 4], 'output_stride': 16, 'pretrained': True }
-  HEAD: { 'name': 'Deeplabv3PlusHead', 'low_level_channels': 256, 'in_channels': 2048, 'dilations': [6, 12, 18] }
+  CLASS: 'src.models.topformer.TopFormer'
+  BACKBONE: { 'name': 'TopFormerBackbone', 'subtype': 'topformer_tiny', 'out_stages': [2, 4, 6, 8], 'pretrained': True, 'backbone_path': './weights/topformer/topformer-T-224-66.2.pth' }
+  HEAD: { 'name': 'TopFormerHead', 'in_channels': 128 }
+  # BACKBONE: { 'name': 'TopFormerBackbone', 'subtype': 'topformer_small', 'out_stages': [2, 4, 6, 9], 'pretrained': True, 'backbone_path': './weights/topformer/topformer-S-224-72.3.pth' }
+  # HEAD: { 'name': 'TopFormerHead', 'in_channels': 192 }
+  # BACKBONE: { 'name': 'TopFormerBackbone', 'subtype': 'topformer_base', 'out_stages': [2, 4, 6, 9], 'pretrained': True, 'backbone_path': './weights/topformer/topformer-B-224-75.3.pth' }
+  # HEAD: { 'name': 'TopFormerHead', 'in_channels': 256 }
 
 EVALUATOR:
   NAME: 'segmentation'
@@ -77,21 +78,21 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [3]
-N_MAX_EPOCHS: 400
+GPU_IDS: [1]
+N_MAX_EPOCHS: 350
 
-INIT_LR: 0.2
-BACKBONE_LR: 0.02
+INIT_LR: 0.003
+BACKBONE_LR: 0.0003
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
-  TYPE: 'SGD' # Adam, RMSprop
+  TYPE: 'AdamW' # Adam, RMSprop
   BIAS_PARAMS:
     momentum: 0.9
-    weight_decay: 0.0001
+    weight_decay: 0.01
   WEIGHT_PARAMS:
     momentum: 0.9
-    weight_decay: 0.0001
+    weight_decay: 0.01
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
@@ -99,13 +100,13 @@ LR_SCHEDULER:
   MILESTONES: [20, 40, 60, 80, 120]
   MIN_LR: 0.00000001
   GAMMA: 0.1
-  POWER: 0.9
+  POWER: 1.0
   STEP: 300
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 0
-  FACTOR: 0.33
+  ITERS: 1500
+  FACTOR: 0.000001
 
 
 #########################################
