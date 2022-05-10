@@ -9,27 +9,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils import model_zoo
 from torchvision.models.mobilenet import mobilenet_v2
+from torchvision.models.mobilenetv2 import model_urls
 
 """
     MobileNetV2: Inverted Residuals and Linear Bottlenecks
     https://arxiv.org/abs/1801.04381
 """
 
-model_urls = {
-    'mobilenet_v2': 'https://download.pytorch.org/models/mobilenet_v2-b0353104.pth',
-}
 
 class MobileNetV2(nn.Module):
 
-    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, classifier=False, num_classes=1000,backbone_path=None, pretrained = False):
+    def __init__(self, subtype='mobilenet_v2', out_stages=[3, 5, 7], output_stride=16, classifier=False, num_classes=1000, pretrained = False, backbone_path=None):
         super(MobileNetV2, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
         self.classifier = classifier
         self.num_classes = num_classes
-        self.backbone_path = backbone_path
         self.pretrained = pretrained
+        self.backbone_path = backbone_path
+
 
         if self.subtype == 'mobilenet_v2':
             features = mobilenet_v2(self.pretrained).features
@@ -39,7 +38,7 @@ class MobileNetV2(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.conv1 = nn.Sequential(list(features.children())[0]) # x2
+        self.stem = nn.Sequential(list(features.children())[0]) # x2
         self.stage1 = nn.Sequential(list(features.children())[1])
         self.stage2 = nn.Sequential(*list(features.children())[2:4])
         self.stage3 = nn.Sequential(*list(features.children())[4:7])
@@ -52,20 +51,6 @@ class MobileNetV2(nn.Module):
             self.fc = mobilenet_v2(self.pretrained).classifier
             self.fc[1] = nn.Linear(self.fc[1].in_features, self.num_classes)
             self.out_channels = self.num_classes
-
-        if self.output_stride == 16:
-            s4, s6, d4, d6 = (2, 1, 1, 2)
-        elif self.output_stride == 8:
-            s4, s6, d4, d6 = (1, 1, 2, 4)
-
-            for n, m in self.stage4.named_modules():
-                if '0.conv.1.0' in n:
-                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
-
-        if self.output_stride == 8 or self.output_stride == 16:
-            for n, m in self.stage6.named_modules():
-                if '0.conv.1.0' in n:
-                    m.dilation, m.padding, m.stride = (d6, d6), (d6, d6), (s6, s6)
 
         if self.pretrained:
             self.load_pretrained_weights()
@@ -90,7 +75,7 @@ class MobileNetV2(nn.Module):
 
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.stem(x)
         output = []
         for i in range(1, 8):
             stage = getattr(self, 'stage{}'.format(i))
