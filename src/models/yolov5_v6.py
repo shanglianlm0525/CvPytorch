@@ -16,8 +16,7 @@ from src.losses import Yolov5Loss
 from src.models.modules.yolov5_modules import Conv, C3, C3TR, SPPF, SPP, CBAM, Detect
 
 """
-    TPH-YOLOv5: Improved YOLOv5 Based on Transformer Prediction Head for Object Detection on Drone-captured Scenarios
-    https://arxiv.org/pdf/2108.11539.pdf
+    https://github.com/ultralytics/yolov5
 """
 
 
@@ -151,20 +150,19 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
 
 class YOLOv5(nn.Module):
-    '''
-    anchors = [[1.58386, 2.28240, 1.93062, 4.55847, 3.66889, 3.03936, 3.63825, 5.46819],
-               [3.62027, 2.06676, 2.26368, 4.22141, 4.13688, 3.71844, 6.17563, 3.24506],
-               [1.79571, 3.34632, 3.17989, 2.94527, 5.04156, 2.64993, 3.56158, 5.11386],
-               [3.47406, 2.17478, 3.10169, 4.02693, 6.71885, 3.46030, 7.18026, 6.21415]]
+    anchors = [[[ 1.25000,  1.62500], [ 2.00000,  3.75000], [ 4.12500,  2.87500]],
+        [[ 1.87500,  3.81250],[ 3.87500,  2.81250], [ 3.68750,  7.43750]],
+        [[ 3.62500,  2.81250], [ 4.87500,  6.18750], [11.65625, 10.18750]]]
     '''
     anchors = [[[0.34012, 0.52473], [0.49851, 1.03944], [0.90099, 0.74424]],
             [[0.43946, 0.77944], [0.92282, 0.55033], [0.76345, 1.09883]],
             [[0.85858, 0.45389], [0.70519, 0.90462], [1.44648, 1.11875]]]
+    '''
     def __init__(self, dictionary=None, model_cfg=None):
         super(YOLOv5, self).__init__()
         self.dictionary = dictionary
         self.model_cfg = model_cfg
-        self.dummy_input = torch.zeros(1, 3, 608, 608)
+        self.dummy_input = torch.zeros(1, 3, 640, 640)
 
         self.num_classes = 80 # len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
@@ -234,7 +232,7 @@ class YOLOv5(nn.Module):
                 m.eps = 1e-3
                 m.momentum = 0.03
             elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
-                m.inplace = False
+                m.inplace = True
 
     def setup_extra_params(self):
         pass
