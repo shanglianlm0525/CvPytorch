@@ -308,7 +308,7 @@ class MetricLogger(object):
             self._evaluator = VOCEvaluator(self.dictionary)
         elif self.type == 'coco_detection':
             self._evaluator = COCOEvaluator(self.dictionary)
-        elif self.type == 'classification':
+        elif self.type == 'topformer':
             self._evaluator = ClassificationEvaluator(self.dictionary)
         else:
             raise NotImplementedError
