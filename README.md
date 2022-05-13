@@ -6,14 +6,19 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- 
+- [2022.05.12] Release **shufflenetv2_x0.5**  and **shufflenetv2_x1.0** models on [Mini-ImageNet](http://image-net.org) (**63.85 and 69.80mAcc**).
+- [2022.05.11] Release **mobilenet_v3_large** models on [Mini-ImageNet](http://image-net.org) (**83.26mAcc**).
+- [2022.05.11] Release **mobilenet_v3_small** models on [Mini-ImageNet](http://image-net.org) (**80.08mAcc**).
+- [2022.04.27] Release **Resnet50** models on [Mini-ImageNet](http://image-net.org) (**69.02mAcc**).
 - [2022.04.27] Release **MobileNetV2** models on [Mini-ImageNet](http://image-net.org) (**77.47mAcc**).
-- [2022.04.26] Release **NanoDet-Plus-320** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**25.81mAP**).
+- [2022.04.26] Release **NanoDet-Plus-320** models with shufflenetv2 backbone on [COCO](http://mscoco.org/) (**25.89mAP**).
 - [2022.04.25] Release **TopFormer** models with *topformer_tiny* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**71.00mIoU**).
 - [2022.04.24] Release **TopFormer** models with *topformer_small* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.86mIoU**).
 - [2022.04.22] Release **TopFormer** models with *topformer_base* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**74.60mIoU**).
 - [2022.04.20] Release **SGCPNet** models with *mobilenet v3* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**56.47mIoU**).
 - [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.15mIoU**).
-- [2022.01.06] Release **FCOS** models with resnet50 backbone on [COCO](http://mscoco.org/) (**36.33mAP**).
+- [2022.01.06] Release **FCOS**  models with resnet50 backbone for 800x800 image on [COCO](http://mscoco.org/) (**36.88mAP**).
 - [2021.07.23] Release **NanoDet** models with RepVGG backbone on [COCO](http://mscoco.org/) (**27.16mAP**).
 - [2021.07.23] Release **NanoDet-g** models with cspnet backbone on [COCO](http://mscoco.org/) (**23.54mAP**).
 - [2021.07.23] Release **NanoDet** models with efficientnet_lite backbone on [COCO](http://mscoco.org/) (**25.65mAP**).
