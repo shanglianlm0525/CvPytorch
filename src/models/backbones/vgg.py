@@ -27,16 +27,19 @@ model_urls = {
 
 class VGG(nn.Module):
 
-    def __init__(self, subtype='vgg16', out_stages=[2,3,4], output_stride=32, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='vgg16', out_stages=[2,3,4], output_stride=32, classifier=False, num_classes=1000, backbone_path=None, pretrained = False):
         super(VGG, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
+        self.classifier = classifier
+        self.num_classes = num_classes
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
         if self.subtype == 'vgg11':
             features = vgg11(self.pretrained).features
+            classifier = vgg11(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:3])
             self.layer1 = nn.Sequential(*list(features.children())[3:5])
             self.layer1_pool = nn.Sequential(list(features.children())[5])
@@ -50,6 +53,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg13':
             features = vgg13(self.pretrained).features
+            classifier = vgg13(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:5])
             self.layer1 = nn.Sequential(*list(features.children())[5:9])
             self.layer1_pool = nn.Sequential(list(features.children())[9])
@@ -63,6 +67,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg16':
             features = vgg16(self.pretrained).features
+            classifier = vgg16(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:5])
             self.layer1 = nn.Sequential(*list(features.children())[5:9])
             self.layer1_pool = nn.Sequential(list(features.children())[9])
@@ -76,6 +81,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg19':
             features = vgg19(self.pretrained).features
+            classifier = vgg19(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:5])
             self.layer1 = nn.Sequential(*list(features.children())[5:9])
             self.layer1_pool = nn.Sequential(list(features.children())[9])
@@ -89,6 +95,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg11_bn':
             features = vgg11_bn(self.pretrained).features
+            classifier = vgg11_bn(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:4])
             self.layer1 = nn.Sequential(*list(features.children())[4:7])
             self.layer1_pool = nn.Sequential(list(features.children())[7])
@@ -102,6 +109,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg13_bn':
             features = vgg13_bn(self.pretrained).features
+            classifier = vgg13_bn(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:7])
             self.layer1 = nn.Sequential(*list(features.children())[7:13])
             self.layer1_pool = nn.Sequential(list(features.children())[13])
@@ -115,6 +123,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg16_bn':
             features = vgg16_bn(self.pretrained).features
+            classifier = vgg16_bn(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:7])
             self.layer1 = nn.Sequential(*list(features.children())[7:13])
             self.layer1_pool = nn.Sequential(list(features.children())[13])
@@ -128,6 +137,7 @@ class VGG(nn.Module):
             self.out_channels = [64, 128, 256, 512, 512]
         elif self.subtype == 'vgg19_bn':
             features = vgg19_bn(self.pretrained).features
+            classifier = vgg19_bn(self.pretrained).classifier
             self.conv1 = nn.Sequential(*list(features.children())[:7])
             self.layer1 = nn.Sequential(*list(features.children())[7:13])
             self.layer1_pool = nn.Sequential(list(features.children())[13])
@@ -144,7 +154,13 @@ class VGG(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        if self.pretrained:
+        if self.classifier:
+            self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+            self.fc = classifier
+            self.fc[-1] = nn.Linear(classifier[-1].in_features, self.num_classes)
+            self.out_channels = self.num_classes
+
+        if self.pretrained and self.backbone_path is not None:
             self.load_pretrained_weights()
         else:
             self.init_weights()
@@ -170,6 +186,11 @@ class VGG(nn.Module):
             layer_pool = getattr(self, 'layer{}_pool'.format(i))
             x = layer_pool(x)
 
+        if self.classifier:
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
+            return x
         return output if len(self.out_stages) > 1 else output[0]
 
     def freeze_bn(self):
@@ -188,10 +209,10 @@ class VGG(nn.Module):
             self.load_state_dict(torch.load(self.backbone_path))
 
 if __name__=="__main__":
-    model =VGG('vgg19')
+    model =VGG('vgg19', classifier=True)
     print(model)
 
-    input = torch.randn(1, 3, 368, 368)
+    input = torch.randn(1, 3, 224, 224)
     out = model(input)
     for o in out:
         print(o.shape)
