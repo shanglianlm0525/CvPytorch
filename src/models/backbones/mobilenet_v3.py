@@ -61,7 +61,7 @@ class MobileNetV3(nn.Module):
 
             if self.classifier:
                 self.last_conv = nn.Sequential(list(features.children())[16])
-                self.fc = mobilenet_v3_small(self.pretrained).classifier
+                self.fc = mobilenet_v3_large(self.pretrained).classifier
                 self.fc[3] = nn.Linear(self.fc[3].in_features, self.num_classes)
                 self.out_channels = self.num_classes
 
