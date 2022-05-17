@@ -53,11 +53,10 @@ class ShuffleNetV2(nn.Module):
 
         if self.classifier:
             self.conv5 = backbone.conv5
-            self.fc = backbone.fc
-            self.fc = nn.Linear(self.fc.in_features, self.num_classes)
+            self.fc = nn.Linear(backbone.fc.in_features, self.num_classes)
             self.out_channels = self.num_classes
 
-        if self.pretrained:
+        if self.pretrained and self.backbone_path is not None:
             self.load_pretrained_weights()
         else:
             self.init_weights()
@@ -71,11 +70,11 @@ class ShuffleNetV2(nn.Module):
             x = stage(x)
             if i in self.out_stages:
                 output.append(x)
-            if self.classifier:
-                x = self.conv5(x)
-                x = x.mean([2, 3])  # globalpool
-                x = self.fc(x)
-                return x
+        if self.classifier:
+            x = self.conv5(x)
+            x = x.mean([2, 3])  # globalpool
+            x = self.fc(x)
+            return x
         return output if len(self.out_stages) > 1 else output[0]
 
 
@@ -106,18 +105,13 @@ class ShuffleNetV2(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def load_pretrained_weights(self):
-        url = model_urls[self.subtype]
-        if url is not None:
-            pretrained_state_dict = model_zoo.load_url(url)
-            print('=> loading pretrained model {}'.format(url))
-            self.load_state_dict(pretrained_state_dict, strict=False)
-        elif self.backbone_path is not None:
+        if self.backbone_path is not None:
             print('=> loading pretrained model {}'.format(self.backbone_path))
             self.load_state_dict(torch.load(self.backbone_path))
 
 
 if __name__=="__main__":
-    model =ShuffleNetV2('shufflenetv2_x1.0')
+    model =ShuffleNetV2('shufflenetv2_x1.0', classifier=True)
     print(model)
 
     input = torch.randn(1, 3, 224, 224)
