@@ -6,7 +6,8 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
-- 
+- [2022.05.16] Release **ConvNeXt** models with *convnext_tiny*, *convnext_small*, *convnext_base* and *convnext_large*  on [Mini-ImageNet](http://image-net.org)  (**83.45,  83.97,  85.32 and 85.90 mAcc**).
+- [2022.05.14] Release **VGG** models with *vgg11*, *vgg13*, *vgg16* and *vgg19*  on [Mini-ImageNet](http://image-net.org)  (**58.52, 62.32, 56.45  and 50.36 mIoU**).
 - [2022.05.12] Release **shufflenetv2_x0.5**  and **shufflenetv2_x1.0** models on [Mini-ImageNet](http://image-net.org) (**63.85 and 69.80mAcc**).
 - [2022.05.11] Release **mobilenet_v3_large** models on [Mini-ImageNet](http://image-net.org) (**83.26mAcc**).
 - [2022.05.11] Release **mobilenet_v3_small** models on [Mini-ImageNet](http://image-net.org) (**80.08mAcc**).
@@ -55,7 +56,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 - [x] (**ShuffleNet V2**) ShuffleNet V2: Practical Guidelines for Ecient CNN Architecture Design
 
 ## Object Detection
-- [x] (**SSD**) SSD: Single Shot MultiBox Detector
+- [ ] (**SSD**) SSD: Single Shot MultiBox Detector
 
 - [ ] (**Faster R-CNN**) Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks
 
@@ -64,7 +65,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 - [ ] (**FPN**) FPN: Feature Pyramid Networks for Object Detection
 
-- [ ] (**FCOS**) FCOS: Fully Convolutional One-Stage Object Detection
+- [x] (**FCOS**) FCOS: Fully Convolutional One-Stage Object Detection
 
 ## Semantic Segmentation
 - [ ] (**FCN**) Fully Convolutional Networks for Semantic Segmentation 
