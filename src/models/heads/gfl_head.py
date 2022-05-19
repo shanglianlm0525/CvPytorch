@@ -151,7 +151,7 @@ class GFLHead(nn.Module):
     """Generalized Focal Loss: Learning Qualified and Distributed Bounding
     Boxes for Dense Object Detection.
     GFL head structure is similar with ATSS, however GFL uses
-    1) joint representation for classification and localization quality, and
+    1) joint representation for topformer and localization quality, and
     2) flexible General distribution for bounding box locations,
     which are supervised by
     Quality Focal Loss (QFL) and Distribution Focal Loss (DFL), respectively
@@ -559,7 +559,7 @@ class GFLHead(nn.Module):
                           rescale=False):
         """
         Decode output tensors to bboxes on one image.
-        :param cls_scores: classification prediction tensors of all stages
+        :param cls_scores: topformer prediction tensors of all stages
         :param bbox_preds: regression prediction tensors of all stages
         :param img_shape: shape of input image
         :param scale_factor: scale factor of boxes
