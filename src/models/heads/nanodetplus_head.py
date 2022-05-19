@@ -294,7 +294,7 @@ class NanoDetPlusHead(nn.Module):
     def target_assign_single_img(
             self, cls_preds, center_priors, decoded_bboxes, gt_bboxes, gt_labels
     ):
-        """Compute classification, regression, and objectness targets for
+        """Compute topformer, regression, and objectness targets for
         priors in a single image.
         Args:
             cls_preds (Tensor): Classification predictions of one image,
