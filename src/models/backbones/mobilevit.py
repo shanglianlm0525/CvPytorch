@@ -7,6 +7,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 from einops import rearrange
 
 def Conv3x3BN(in_channels,out_channels,stride=1,groups=1):
@@ -164,15 +165,16 @@ class MobileViTBlock(nn.Module):
 
 
 class MobileViT(nn.Module):
-    # def __init__(self, dims, channels, expansion=4, patch_size=(2, 2), num_classes=1000):
-    def __init__(self, subtype='mobilevit_s', out_stages=[3, 4, 5], output_stride=16, classifier=False, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='mobilevit_s', out_stages=[3, 4, 5], output_stride=16, classifier=False,
+                 num_classes=1000, pretrained = False, backbone_path=None):
         super(MobileViT, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
         self.classifier = classifier
-        self.backbone_path = backbone_path
+        self.num_classes = num_classes
         self.pretrained = pretrained
+        self.backbone_path = backbone_path
 
         patch_size = (2, 2)
         if self.subtype == 'mobilevit_xxs':
@@ -195,7 +197,9 @@ class MobileViT(nn.Module):
 
         depth = [2, 4, 3]
 
-        self.conv1 = Conv3x3BNActivation(3, channels[0], 2)
+        # self.stem = torchvision.ops.ConvNormActivation()
+
+        self.stem = Conv3x3BNActivation(3, channels[0], 2)
         self.layer1 = MV2Block(in_channels=channels[0], out_channels=channels[1], stride=1, expansion_factor=expansion)
 
         self.layer2 = nn.Sequential(
@@ -247,7 +251,7 @@ class MobileViT(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.stem(x)
         output = []
         for i in range(1, 6):
             stage = getattr(self, 'layer{}'.format(i))

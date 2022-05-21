@@ -6,17 +6,23 @@
 
 from copy import deepcopy
 
+from .convnext import ConvNeXt
 from .csp_darknet import CspDarkNet
 from .custom_cspnet import CustomCspNet
 from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
 from .lfd_resnet import LFDResNet
+from .mobilenet_v3 import MobileNetV3
 from .regnet import RegNet
+from .regseg_backbone import RegSegBackbone
 from .repvgg import RepVGG
+from .sgcpnet_backbone import SGCPNetBackbone
+from .topformer_backbone import TopFormerBackbone
 from .tph_yolov5_backbone import TPH_YOLOv5Backbone
 from .vgg import VGG
 from .resnet import ResNet
 from .resnext import ResNeXt
+from .vision_transformer import VisionTransformer
 from .wide_resnet import WideResNet
 from .squeezenet import SqueezeNet
 from .mobilenet_v2 import MobileNetV2
@@ -26,13 +32,17 @@ from .stdcnet import STDCNet
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
 
-__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'YOLOv5Backbone', 'TPH_YOLOv5Backbone',
-           'ShuffleNetV2', 'STDCNet', 'RepVGG', 'EfficientNet', 'EfficientNetLite', 'CustomCspNet',
+__all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
+            'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet',
+
+           'YOLOv5Backbone', 'TPH_YOLOv5Backbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
            'CspDarkNet', 'RegNet', 'LFDResNet']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
     name = backbone_cfg.pop('name')
+
+    # default torch pretrained
     if name == 'VGG':
         return VGG(**backbone_cfg)
     elif name == 'ResNet':
@@ -45,27 +55,45 @@ def build_backbone(cfg):
         return SqueezeNet(**backbone_cfg)
     elif name == 'MobileNetV2':
         return MobileNetV2(**backbone_cfg)
+    elif name == 'MobileNetV3':
+        return MobileNetV3(**backbone_cfg)
     elif name == 'ShuffleNetV2':
         return ShuffleNetV2(**backbone_cfg)
-    elif name == 'STDCNet':
-        return STDCNet(**backbone_cfg)
-    elif name == 'YOLOv5Backbone':
-        return YOLOv5Backbone(**backbone_cfg)
-    elif name == 'TPH_YOLOv5Backbone':
-        return TPH_YOLOv5Backbone(**backbone_cfg)
-    elif name == 'RepVGG':
-        return RepVGG(**backbone_cfg)
     elif name == 'EfficientNet':
         return EfficientNet(**backbone_cfg)
+    elif name == 'RegNet':
+        return RegNet(**backbone_cfg)
+    elif name == 'ConvNeXt':
+        return ConvNeXt(**backbone_cfg)
+    elif name == 'VisionTransformer':
+        return VisionTransformer(**backbone_cfg)
+
+    # extra pretrained weight
+    elif name == 'STDCNet':
+        return STDCNet(**backbone_cfg)
+    elif name == 'EfficientNetLite':
+        return EfficientNetLite(**backbone_cfg)
+    elif name == 'TopFormerBackbone':
+        return TopFormerBackbone(**backbone_cfg)
+
+    # no pretrained weight
     elif name == 'EfficientNetLite':
         return EfficientNetLite(**backbone_cfg)
     elif name == 'CustomCspNet':
         return CustomCspNet(**backbone_cfg)
     elif name == 'CspDarkNet':
         return CspDarkNet(**backbone_cfg)
-    elif name == 'RegNet':
-        return RegNet(**backbone_cfg)
+    elif name == 'SGCPNetBackbone':
+        return SGCPNetBackbone(**backbone_cfg)
     elif name == 'LFDResNet':
         return LFDResNet(**backbone_cfg)
+    elif name == 'YOLOv5Backbone':
+        return YOLOv5Backbone(**backbone_cfg)
+    elif name == 'TPH_YOLOv5Backbone':
+        return TPH_YOLOv5Backbone(**backbone_cfg)
+    elif name == 'RepVGG':
+        return RepVGG(**backbone_cfg)
+    elif name == 'RegSegBackbone':
+        return RegSegBackbone(**backbone_cfg)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(name)

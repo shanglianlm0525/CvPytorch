@@ -7,28 +7,25 @@
 import torch
 import torch.nn as nn
 from torch.utils import model_zoo
-from torchvision.models.resnet import resnext50_32x4d, resnext101_32x8d
+from torchvision.models.resnet import resnext50_32x4d, resnext101_32x8d, model_urls
 
 """
     Wide Residual Networks
     https://arxiv.org/pdf/1605.07146.pdf
 """
 
-model_urls = {
-    'wide_resnet50_2': 'https://download.pytorch.org/models/wide_resnet50_2-95faca4d.pth',
-    'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
-}
-
 
 class WideResNet(nn.Module):
 
-    def __init__(self, subtype='wide_resnet50_2', out_stages=[2, 3, 4], output_stride=32, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='wide_resnet50_2', out_stages=[3, 5, 7], output_stride=16, classifier=False, num_classes=1000, pretrained = False, backbone_path=None):
         super(WideResNet, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
-        self.backbone_path = backbone_path
+        self.classifier = classifier
+        self.num_classes = num_classes
         self.pretrained = pretrained
+        self.backbone_path = backbone_path
 
         if subtype == 'wide_resnet50_2':
             backbone = resnext50_32x4d(self.pretrained)
@@ -41,8 +38,7 @@ class WideResNet(nn.Module):
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
-        self.conv1 = nn.Sequential(*list(backbone.children())[0:3])
-        self.maxpool = nn.Sequential(list(backbone.children())[3])
+        self.stem = nn.Sequential(*list(backbone.children())[0:4])
         self.layer1 = nn.Sequential(list(backbone.children())[4])
         self.layer2 = nn.Sequential(list(backbone.children())[5])
         self.layer3 = nn.Sequential(list(backbone.children())[6])
@@ -64,8 +60,7 @@ class WideResNet(nn.Module):
                 nn.init.constant_(m.bias, 0.0001)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.maxpool(x)
+        x = self.stem(x)
         output = []
         for i in range(1, 5):
             res_layer = getattr(self, 'layer{}'.format(i))

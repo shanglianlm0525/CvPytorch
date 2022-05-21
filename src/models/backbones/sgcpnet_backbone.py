@@ -59,7 +59,7 @@ class InvertedResidualBlock(nn.Module):
 
 class SGCPNetBackbone(nn.Module):
 
-    def __init__(self, subtype='', out_stages=[3, 4, 5], output_stride=16, classifier=False, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='', out_stages=[2, 3, 4], output_stride=16, classifier=False, backbone_path=None, pretrained = False):
         super(SGCPNetBackbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
@@ -94,9 +94,11 @@ class SGCPNetBackbone(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.init_weights()
+
         if self.pretrained:
            self.load_pretrained_weights()
+        else:
+           self.init_weights()
 
     def init_weights(self):
         for m in self.modules():

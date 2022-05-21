@@ -7,170 +7,92 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
+from torch.utils import model_zoo
+import torchvision.models as models
+from torchvision.models.regnet import model_urls
 
 """
-    Rethink Dilated Convolution for Real-time Semantic Segmentation
-    https://arxiv.org/pdf/2111.09957.pdf
+    Designing Network Design Spaces
+    https://arxiv.org/pdf/2003.13678.pdf
 """
-
-
-class ConvBnAct(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, groups=1,
-                 bias=False, apply_act=True):
-        super(ConvBnAct, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias)
-        self.bn = nn.BatchNorm2d(out_channels)
-        if apply_act:
-            self.act = nn.ReLU(inplace=True)
-        else:
-            self.act = None
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.bn(x)
-        if self.act is not None:
-            x = self.act(x)
-        return x
-
-
-class Shortcut(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, avg_downsample=False):
-        super(Shortcut, self).__init__()
-        if avg_downsample and stride != 1:
-            self.avg=nn.AvgPool2d(2,2,ceil_mode=True)
-            self.conv=nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
-            self.bn=nn.BatchNorm2d(out_channels)
-        else:
-            self.avg=None
-            self.conv=nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False)
-            self.bn=nn.BatchNorm2d(out_channels)
-    def forward(self, x):
-        if self.avg is not None:
-            x=self.avg(x)
-        x = self.conv(x)
-        x = self.bn(x)
-        return x
-
-class DilatedConv(nn.Module):
-    def __init__(self,w,dilations,group_width,stride,bias):
-        super().__init__()
-        num_splits=len(dilations)
-        assert(w%num_splits==0)
-        temp=w//num_splits
-        assert(temp%group_width==0)
-        groups=temp//group_width
-        convs=[]
-        for d in dilations:
-            convs.append(nn.Conv2d(temp,temp,3,padding=d,dilation=d,stride=stride,bias=bias,groups=groups))
-        self.convs=nn.ModuleList(convs)
-        self.num_splits=num_splits
-    def forward(self,x):
-        x=torch.tensor_split(x,self.num_splits,dim=1)
-        res=[]
-        for i in range(self.num_splits):
-            res.append(self.convs[i](x[i]))
-        return torch.cat(res,dim=1)
-
-
-class SEModule(nn.Module):
-    def __init__(self, in_channel, out_channel):
-        super(SEModule, self).__init__()
-        mid_channel = out_channel // 4
-        self.se = nn.Sequential(
-                nn.AdaptiveAvgPool2d(1),
-                nn.Conv2d(in_channel, mid_channel, 1, bias=True),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(mid_channel, in_channel, 1, bias=True),
-                nn.Sigmoid()
-            )
-    def forward(self, x):
-        return x * self.se(x)
-
-
-class DBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, dilations,
-                 group_width, stride, attention="se"):
-        super().__init__()
-        avg_downsample = True
-        groups = out_channels // group_width
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.act1 = nn.ReLU(inplace=True)
-        if len(dilations) == 1:
-            dilation = dilations[0]
-            self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3,
-                stride=stride, groups=groups, padding=dilation, dilation=dilation, bias=False)
-        else:
-            self.conv2 = DilatedConv(out_channels, dilations, group_width=group_width, stride=stride, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_channels)
-        self.act2 = nn.ReLU(inplace=True)
-        self.conv3 = nn.Conv2d(out_channels, out_channels, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(out_channels)
-        self.act3 = nn.ReLU(inplace=True)
-        if attention == "se":
-            self.se = SEModule(out_channels, in_channels)
-        else:
-            self.se = None
-        if stride != 1 or in_channels != out_channels:
-            self.shortcut = Shortcut(in_channels, out_channels, stride, avg_downsample)
-        else:
-            self.shortcut = None
-
-    def forward(self, x):
-        shortcut = self.shortcut(x) if self.shortcut else x
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.act1(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.act2(x)
-        if self.se is not None:
-            x = self.se(x)
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = self.act3(x + shortcut)
-        return x
-
 
 class RegNet(nn.Module):
-    def __init__(self, subtype='', out_stages=[3, 5, 7], output_stride=16, classifier=False, backbone_path=None, pretrained=False):
+    def __init__(self, subtype='regnet_y_400mf', out_stages=[2, 3, 4], output_stride=16, classifier=False, num_classes=1000,
+                     pretrained=True, backbone_path=None):
         super(RegNet, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride  # 8, 16, 32
         self.classifier = classifier
-        self.backbone_path = backbone_path
+        self.num_classes = num_classes
         self.pretrained = pretrained
+        self.backbone_path = backbone_path
 
-        self.out_channels = [32, 48, 128, 320]
+        if self.subtype == 'regnet_y_400mf':
+            regnet = models.regnet_y_400mf(pretrained=self.pretrained)
+            self.out_channels = [32, 48, 104, 208, 440]
+        elif self.subtype == 'regnet_y_800mf':
+            regnet = models.regnet_y_800mf(pretrained=self.pretrained)
+            self.out_channels = [32, 64, 144, 320, 784]
+        elif self.subtype == 'regnet_y_1_6gf':
+            regnet = models.regnet_y_1_6gf(pretrained=self.pretrained)
+            self.out_channels = [32, 48, 120, 336, 888]
+        elif self.subtype == 'regnet_y_3_2gf':
+            regnet = models.regnet_y_3_2gf(pretrained=self.pretrained)
+            self.out_channels = [32, 72, 216, 576, 1512]
+        elif self.subtype == 'regnet_y_8gf':
+            regnet = models.regnet_y_8gf(pretrained=self.pretrained)
+            self.out_channels = [32, 224, 448, 896, 2016]
+        elif self.subtype == 'regnet_y_16gf':
+            regnet = models.regnet_y_16gf(pretrained=self.pretrained)
+            self.out_channels = [32, 224, 448, 1232, 3024]
+        elif self.subtype == 'regnet_y_32gf':
+            regnet = models.regnet_y_32gf(pretrained=self.pretrained)
+            self.out_channels = [32, 232, 696, 1392, 3712]
+        elif self.subtype == 'regnet_y_128gf':
+            regnet = models.regnet_y_128gf(pretrained=self.pretrained)
+            self.out_channels = [32, 528, 1056, 2904, 7392]
+        elif self.subtype == 'regnet_x_400mf':
+            regnet = models.regnet_x_400mf(pretrained=self.pretrained)
+            self.out_channels = [32, 32, 64, 160, 400]
+        elif self.subtype == 'regnet_x_800mf':
+            regnet = models.regnet_x_800mf(pretrained=self.pretrained)
+            self.out_channels = [32, 64, 128, 288, 672]
+        elif self.subtype == 'regnet_x_1_6gf':
+            regnet = models.regnet_x_1_6gf(pretrained=self.pretrained)
+            self.out_channels = [32, 72, 168, 408, 912]
+        elif self.subtype == 'regnet_x_3_2gf':
+            regnet = models.regnet_x_3_2gf(pretrained=self.pretrained)
+            self.out_channels = [32, 96, 192, 432, 1008]
+        elif self.subtype == 'regnet_x_8gf':
+            regnet = models.regnet_x_8gf(pretrained=self.pretrained)
+            self.out_channels = [32, 80, 240, 720, 1920]
+        elif self.subtype == 'regnet_x_16gf':
+            regnet = models.regnet_x_16gf(pretrained=self.pretrained)
+            self.out_channels = [32, 256, 512, 896, 2048]
+        elif self.subtype == 'regnet_x_32gf':
+            regnet = models.regnet_x_32gf(pretrained=self.pretrained)
+            self.out_channels = [32, 336, 672, 1344, 2520]
+        else:
+            raise NotImplementedError
 
-        self.conv1 = ConvBnAct(3, 32, 3, 2, 1)
-        # self.body = RegSegBlock([[1], [1, 2]] + 4 * [[1, 4]] + 7 * [[1, 14]])
+        self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        gw = 16
-        attention = "se"
-        ds = [[1], [1, 2]] + 4 * [[1, 4]] + 7 * [[1, 14]]
-        self.stage1 = DBlock(32, 48, [1], gw, 2, attention) # 4
-        self.stage2 = nn.Sequential(
-            DBlock(48, 128, [1], gw, 2, attention),
-            DBlock(128, 128, [1], gw, 1, attention),
-            DBlock(128, 128, [1], gw, 1, attention)
-        ) # 8
-        self.stage3 = nn.Sequential(
-            DBlock(128, 256, [1], gw, 2, attention),
-            *self.generate_stage(ds[:-1], lambda d: DBlock(256, 256, d, gw, 1, attention)),
-            DBlock(256, 320, ds[-1], gw, 1, attention)
-        )  # 16
+        self.stem = regnet.stem # x2
+        self.stage1 = regnet.trunk_output.block1
+        self.stage2 = regnet.trunk_output.block2
+        self.stage3 = regnet.trunk_output.block3
+        self.stage4 = regnet.trunk_output.block4
+        if self.classifier:
+            self.avgpool = regnet.avgpool
+            self.fc = nn.Linear(regnet.fc.in_features, self.num_classes)
+            self.out_channels = self.num_classes
 
-        self.init_weights()
+        if self.pretrained:
+            self.load_pretrained_weights()
+        else:
+            self.init_weights()
 
-    def generate_stage(self, ds, block_fun):
-        blocks = []
-        for d in ds:
-            blocks.append(block_fun(d))
-        return blocks
 
     def init_weights(self):
         for m in self.modules():
@@ -183,14 +105,29 @@ class RegNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.stem(x)
         output = []
-        for i in range(1, 4):
+        for i in range(1, 5):
             stage = getattr(self, 'stage{}'.format(i))
             x = stage(x)
             if i in self.out_stages and not self.classifier:
                 output.append(x)
+        if self.classifier:
+            x = self.last_conv(x)
+            x = self.avgpool(x)
+            x = self.fc(x)
+            return x
         return output if len(self.out_stages) > 1 else output[0]
+
+    def load_pretrained_weights(self):
+        url = model_urls[self.subtype]
+        if url is not None:
+            pretrained_state_dict = model_zoo.load_url(url)
+            print('=> loading pretrained model {}'.format(url))
+            self.load_state_dict(pretrained_state_dict, strict=False)
+        elif self.backbone_path is not None:
+            print('=> loading pretrained model {}'.format(self.backbone_path))
+            self.load_state_dict(torch.load(self.backbone_path))
 
     def freeze_bn(self):
         for layer in self.modules():
@@ -199,7 +136,7 @@ class RegNet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = RegNet('')
+    model = RegNet('regnet_y_400mf')
     print(model)
 
     input = torch.randn(1, 3, 224, 224)

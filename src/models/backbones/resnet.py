@@ -6,7 +6,6 @@
 
 import torch
 import torch.nn as nn
-from torch.utils import model_zoo
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
 """
@@ -14,53 +13,49 @@ from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, r
     https://arxiv.org/pdf/1512.03385.pdf
 """
 
-model_urls = {
-    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
-    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
-    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
-    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
-}
-
 
 class ResNet(nn.Module):
 
-    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], output_stride = 32, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='resnet50', out_stages=[2, 3, 4], output_stride=32, classifier=False, num_classes=1000, backbone_path=None, pretrained = True):
         super(ResNet, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
-        self.output_stride = output_stride # 8, 16, 32
+        self.output_stride = output_stride  # 8, 16, 32
+        self.classifier = classifier
+        self.num_classes = num_classes
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
         if self.subtype == 'resnet18':
-            backbone = resnet18(self.pretrained)
+            resnet = resnet18(self.pretrained)
             self.out_channels = [64, 64, 128, 256, 512]
         elif self.subtype == 'resnet34':
-            backbone = resnet34(self.pretrained)
+            resnet = resnet34(self.pretrained)
             self.out_channels = [64, 64, 128, 256, 512]
         elif self.subtype == 'resnet50':
-            backbone = resnet50(self.pretrained)
+            resnet = resnet50(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif self.subtype == 'resnet101':
-            backbone = resnet101(self.pretrained)
+            resnet = resnet101(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         elif self.subtype == 'resnet152':
-            backbone = resnet152(self.pretrained)
+            resnet = resnet152(self.pretrained)
             self.out_channels = [64, 256, 512, 1024, 2048]
         else:
             raise NotImplementedError
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        self.conv1 = backbone.conv1
-        self.bn1 = backbone.bn1
-        self.relu = backbone.relu
-        self.maxpool = backbone.maxpool
-        self.layer1 = backbone.layer1
-        self.layer2 = backbone.layer2
-        self.layer3 = backbone.layer3
-        self.layer4 = backbone.layer4
+        self.stem = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool)
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
+
+        if self.classifier:
+            self.avgpool = resnet.avgpool
+            self.fc = nn.Linear(resnet.fc.in_features, self.num_classes)
+            self.out_channels = self.num_classes
 
         if self.output_stride == 16:
             s3, s4, d3, d4 = (2, 1, 1, 2)
@@ -84,21 +79,26 @@ class ResNet(nn.Module):
                 elif 'downsample.0' in n:
                     m.stride = (s4, s4)
 
-        if self.pretrained:
+        if self.pretrained and self.backbone_path is not None:
             self.load_pretrained_weights()
         else:
             self.init_weights()
 
 
     def forward(self, x):
-        x = self.maxpool(self.relu(self.bn1(self.conv1(x))))
+        x = self.stem(x)
         output = []
         for i in range(1, 5):
             res_layer = getattr(self, 'layer{}'.format(i))
             x = res_layer(x)
-            if i in self.out_stages:
+            if i in self.out_stages and not self.classifier:
                 output.append(x)
 
+        if self.classifier:
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
+            return x
         return output if len(self.out_stages) > 1 else output[0]
 
     def freeze_bn(self):
@@ -107,11 +107,11 @@ class ResNet(nn.Module):
                 layer.eval()
 
     def freeze_stages(self, stage):
-        if stage >= 0:
-            self.bn1.eval()
-            for m in [self.conv1, self.bn1]:
-                for param in m.parameters():
-                    param.requires_grad = False
+        self.stem[1].eval()
+        for m in [self.stem[0], self.stem[1]]:
+            for param in m.parameters():
+                param.requires_grad = False
+
         for i in range(1, stage + 1):
             layer = getattr(self, 'layer{}'.format(i))
             layer.eval()
@@ -129,18 +129,13 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.bias, 0.0001)
 
     def load_pretrained_weights(self):
-        url = model_urls[self.subtype]
-        if url is not None:
-            pretrained_state_dict = model_zoo.load_url(url)
-            print('=> loading pretrained model {}'.format(url))
-            self.load_state_dict(pretrained_state_dict, strict=False)
-        elif self.backbone_path is not None:
+        if self.backbone_path is not None:
             print('=> loading pretrained model {}'.format(self.backbone_path))
             self.load_state_dict(torch.load(self.backbone_path))
 
 
 if __name__ == "__main__":
-    model = ResNet('resnet50')
+    model = ResNet('resnet50', classifier=True)
     print(model)
 
     input = torch.randn(1, 3, 224, 224)
