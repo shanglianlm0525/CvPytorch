@@ -4,18 +4,19 @@
 
 ## Datasets  
 
-- **CamVid**: is a road/driving scene understanding database with 367 training images and 233 testing images of day and dusk scenes. The challenge is to segment 11 classes such as building, tree, sky, car, sign, road, pedestrian, fence, pole, sidewalk, and bicyclist etc. We usually resize images to 360x480 pixels for training and testing.
+- **CamVid**: is a road scene dataset, which is taken from a driving automobile perspective. The challenge is to segment 11 classes such as building, tree, sky, car, sign, road, pedestrian, fence, pole, sidewalk, and bicyclist etc. This dataset contains 701 annotated images extracted from the video sequence, in which 367 for training, 101 for validation and 233 for testing. The images have a resolution of 960 × 720 and 32 semantic categories, in which the subset of 11 classes are used for segmentation experiments.  
 
-  <p align="center"><img width="100%" src="imgs/CamVid_demo.png" /></p>
+- <p align="center"><img width="100%" src="imgs/CamVid_demo.png" /></p>
 
 - **Pascal VOC:** For pascal voc, first download the [original dataset](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar), after extracting the files we'll end up with `VOCtrainval_11-May-2012/VOCdevkit/VOC2012` containing, the image sets, the XML annotation for both object detection and segmentation, and JPEG images.
   The second step is to augment the dataset using the additionnal annotations provided by [Semantic Contours from Inverse Detectors](http://home.bharathh.info/pubs/pdfs/BharathICCV2011.pdf). First download the image sets (`train_aug`, `trainval_aug`, `val_aug` and `test_aug`) from this link: [Aug ImageSets](https://www.dropbox.com/sh/jicjri7hptkcu6i/AACHszvCyYQfINpRI1m5cNyta?dl=0&lst=), and add them the rest of the segmentation sets in `/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/ImageSets/Segmentation`, and then download new annotations [SegmentationClassAug](https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=0) and add them to the path `VOCtrainval_11-May-2012/VOCdevkit/VOC2012`, now we're set, for training use the path to `VOCtrainval_11-May-2012`
   
   The original dataset contains 1464 (train), 1449 (val), and 1456 (test) pixel-level annotated images. We augment the dataset by the extra annotations provided by [76], resulting in 10582 (trainaug) training images. The performance is measured in terms of pixel intersection-over-union averaged across the 21 classes (mIOU).
   *./datasets/data/train_aug.txt* includes names of 10582 trainaug images (val images are excluded). You need to download additional labels from [Dropbox](https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=0) or [Tencent Weiyun](https://share.weiyun.com/5NmJ6Rk). Those labels come from [DrSleep's repo](https://github.com/DrSleep/tensorflow-deeplab-resnet).
+  
   <p align="center"><img width="100%" src="imgs/VOC_demo.png" /></p>
   
-- **CityScapes:** First download the images and the annotations (there is two types of annotations, Fine `gtFine_trainvaltest.zip` and Coarse `gtCoarse.zip` annotations, and the images `leftImg8bit_trainvaltest.zip`) from the official website [cityscapes-dataset.com](https://www.cityscapes-dataset.com/downloads/), extract all of them in the same folder, and use the location of this folder in `config.json` for training.
+- **CityScapes:**  is a semantic scene parsing dataset, which is taken from a car perspective. It contains 5,000 fine annotated images and split into training, validation and test sets, with 2,975, 500 and 1,525 images respectively. The annotation includes 30 classes, 19 of which are used for semantic segmentation task. The images have a high resolution of 2; 048 × 1; 024, thus it is challenging for the real-time semantic segmentation.  
 
   <p align="center"><img width="100%" src="imgs/CityScapes_demo.png" /></p>
 
@@ -27,6 +28,59 @@
   Note that when using COCO dataset, 164k version is used per default, if 10k is prefered, this needs to be specified with an additionnal parameter `partition = 'CocoStuff164k'` in the config file with the corresponding path.
   
   <p align="center"><img width="100%" src="imgs/COCO_demo.png" /></p>
+
+
+
+​	
+
+```bash
+data
+├── CamVid
+│   ├── train
+│   │   ├── images
+│   │   ├── masks
+│   ├── val
+│   │   ├── images
+│   │   ├── masks
+├── cityscapes
+│   ├── leftImg8bit
+│   │   ├── train
+│   │   ├── val
+│   ├── gtFine
+│   │   ├── train
+│   │   ├── val
+├── VOCdevkit
+│   ├── VOC2012
+│   │   ├── JPEGImages
+│   │   ├── SegmentationClass
+│   │   ├── ImageSets
+│   │   │   ├── Segmentation
+│   ├── VOC2010
+│   │   ├── JPEGImages
+│   │   ├── SegmentationClassContext
+│   │   ├── ImageSets
+│   │   │   ├── SegmentationContext
+│   │   │   │   ├── train.txt
+│   │   │   │   ├── val.txt
+│   │   ├── trainval_merged.json
+│   ├── VOCaug
+│   │   ├── dataset
+│   │   │   ├── cls
+├── ADEChallengeData2016
+│   ├── annotations
+│   │   ├── training
+│   │   ├── validation
+│   ├── images
+│   │   ├── training
+│   │   ├── validation
+├── coco
+│   ├── images
+│   │   ├── train2017
+│   │   ├── val2017
+│   ├── annotations
+│   │   ├── train2017
+│   │   ├── val2017
+```
 
 
 
