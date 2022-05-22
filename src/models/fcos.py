@@ -20,17 +20,6 @@ from src.models.detects import build_detect
     https://arxiv.org/pdf/1904.01355.pdf
 """
 
-class ClipBoxes(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self,batch_imgs,batch_boxes):
-        batch_boxes=batch_boxes.clamp_(min=0)
-        h,w = batch_imgs.shape[2:]
-        batch_boxes[...,[0,2]]=batch_boxes[...,[0,2]].clamp_(max=w-1)
-        batch_boxes[...,[1,3]]=batch_boxes[...,[1,3]].clamp_(max=h-1)
-        return batch_boxes
-
 
 class FCOS(nn.Module):
     def __init__(self, dictionary=None, model_cfg=None):
@@ -49,7 +38,6 @@ class FCOS(nn.Module):
         self.head = build_head(self.model_cfg.HEAD)
         self.detect = build_detect(self.model_cfg.DETECT)
         self.loss = build_loss(self.model_cfg.LOSS)
-        self.clip_boxes = ClipBoxes()
 
         self.conf_thres = 0.05  # confidence threshold
         self.iou_thres = 0.6  # NMS IoU threshold
@@ -66,8 +54,9 @@ class FCOS(nn.Module):
             if t is nn.Conv2d:
                 pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif t is nn.BatchNorm2d:
-                m.eps = 1e-3
-                m.momentum = 0.03
+                pass
+                # m.eps = 1e-3
+                # m.momentum = 0.03
             elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
                 m.inplace = False
 
@@ -147,7 +136,10 @@ class FCOS(nn.Module):
 
             if mode == 'val':
                 pred_scores, pred_labels, pred_boxes = self.detect(out)
-                pred_boxes = self.clip_boxes(imgs, pred_boxes)
+                # pred_boxes = self.clip_boxes(imgs, pred_boxes)
+                img_h, img_w = imgs.shape[2:]
+                pred_boxes[..., [0, 2]] = pred_boxes[..., [0, 2]].clamp_(min=0, max=img_h - 1)
+                pred_boxes[..., [1, 3]] = pred_boxes[..., [1, 3]].clamp_(min=0, max=img_w - 1)
 
                 outputs = []
                 for i, (width, height, scale, pad, pred_box, pred_label, pred_score) in enumerate(
