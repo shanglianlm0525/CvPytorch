@@ -17,6 +17,7 @@ from .openpose_head import OpenPoseHead
 from .regseg_head import RegSegHead
 from .sgcpnet_head import SGCPNetHead
 from .stdc_head import StdcHead
+from .topformer_head import TopFormerHead
 from .yolo_fastestv2_head import YOLOFastestv2Head
 from .yolop_head import YOLOPHead
 from .yolov5_head import YOLOv5Head
@@ -37,7 +38,8 @@ __all__ = [
     'StdcHead',
     'RegSegHead',
     'OpenPoseHead',
-    'SGCPNetHead'
+    'SGCPNetHead',
+    'TopFormerHead'
 ]
 
 
@@ -74,6 +76,8 @@ def build_head(cfg):
         return RegSegHead(**head_cfg)
     elif name == 'SGCPNetHead':
         return SGCPNetHead(**head_cfg)
+    elif name == 'TopFormerHead':
+        return TopFormerHead(**head_cfg)
 
     elif name == 'OpenPoseHead':
         return OpenPoseHead(**head_cfg)
