@@ -17,7 +17,7 @@ def quality_focal_loss(pred, target, beta=2.0):
     <https://arxiv.org/abs/2006.04388>`_.
 
     Args:
-        pred (torch.Tensor): Predicted joint representation of classification
+        pred (torch.Tensor): Predicted joint representation of topformer
             and quality (IoU) estimation with shape (N, C), C is the number of
             classes.
         target (tuple([torch.Tensor])): Target category label with shape (N,)
@@ -107,7 +107,7 @@ class QualityFocalLoss(nn.Module):
 
         Args:
             pred (torch.Tensor): Predicted joint representation of
-                classification and quality (IoU) estimation with shape (N, C),
+                topformer and quality (IoU) estimation with shape (N, C),
                 C is the number of classes.
             target (tuple([torch.Tensor])): Target category label with shape
                 (N,) and target quality label with shape (N,).
