@@ -53,7 +53,14 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.classification.Classification'
-  BACKBONE: { 'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'MobileNetV2', 'subtype': 'mobilenet_v2', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'ShuffleNetV2', 'subtype': 'shufflenetv2_x0.5', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'VGG', 'subtype': 'vgg19_bn', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'ConvNeXt', 'subtype': 'convnext_large', 'classifier': True, 'pretrained': True }
+  BACKBONE: { 'name': 'EfficientNet', 'subtype': 'efficientnet_b4', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'MobileNetV3', 'subtype': 'mobilenet_v3_small', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'MobileNetV3', 'subtype': 'mobilenet_v3_large', 'classifier': True, 'pretrained': True }
+  # BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50', 'classifier': True, 'pretrained': True }
 
 
 EVALUATOR:
@@ -74,7 +81,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [2]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 100
 
 INIT_LR: 0.01
@@ -92,7 +99,7 @@ OPTIMIZER:
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
-  TYPE: 'PolyLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  TYPE: 'CosineAnnealingLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
   MILESTONES: [20, 40, 60, 80, 120]
   MIN_LR: 0.00000001
   GAMMA: 0.1
