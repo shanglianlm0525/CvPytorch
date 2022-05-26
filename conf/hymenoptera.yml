@@ -55,7 +55,7 @@ DATASET:
 #########################################
 USE_MODEL: 'src.models.cls_model.ClsModel'
 EVALUATOR:
-  NAME: 'classification'
+  NAME: 'topformer'
   EVAL_TYPE: 'mAcc'
   EVAL_INTERVALS: 2
 
