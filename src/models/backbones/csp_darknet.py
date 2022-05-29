@@ -7,14 +7,22 @@
 import torch
 import torch.nn as nn
 
-from src.models.modules.yolov5_modules import Focus, BottleneckCSP, Conv, SPP
+from src.models.modules.yolox_modules import Focus, BaseConv, CSPLayer, SPPBottleneck
 
 """
     YOLOv4: Optimal Speed and Accuracy of Object Detection
     https://arxiv.org/pdf/2004.10934.pdf
+    YOLOX: Exceeding YOLO Series in 2021
+    https://arxiv.org/pdf/2107.08430.pdf
 """
 
 class CspDarkNet(nn.Module):
+    cfg = {"nano": [0.33, 0.25],
+            "tiny": [0.33, 0.375],
+            "s": [0.33, 0.5],
+            "m": [0.67, 0.75],
+            "l": [1.0, 1.0],
+            "x": [1.33, 1.25]}
     def __init__(self, subtype='cspdark_s', out_stages=[2, 3, 4], output_stride=32, backbone_path=None,
                  pretrained=False):
         super(CspDarkNet, self).__init__()
@@ -24,6 +32,7 @@ class CspDarkNet(nn.Module):
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
+        '''
         if self.subtype == 'cspdark_s':
             dep_mul, wid_mul = 0.33, 0.5
             self.out_channels = [32, 64, 128, 256, 512]
@@ -38,36 +47,40 @@ class CspDarkNet(nn.Module):
             self.out_channels = [80, 160, 320, 640, 1280]
         else:
             raise NotImplementedError
+        '''
+        depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
+        self.out_channels = [64, 128, 256, 512, 1024]
+        layers = [3, 9, 9, 3]
+        self.out_channels = in_places = list(map(lambda x: int(x * width_mul), self.out_channels))
+        layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
 
-        base_channels = int(wid_mul * 64)  # 64
-        base_depth = max(round(dep_mul * 3), 1)  # 3
-
+        act = "silu"
         # stem
-        self.stem = Focus(3, base_channels, k=3)
+        self.stem = Focus(3, in_places[0], ksize=3, act=act)
 
         # dark2
         self.stage1 = nn.Sequential(
-            Conv(base_channels, base_channels * 2, 3, 2),
-            BottleneckCSP(base_channels * 2, base_channels * 2, n=base_depth),
+            BaseConv(in_places[0], in_places[1], 3, 2, act=act),
+            CSPLayer(in_places[1], in_places[1], n=layers[0], act=act),
         )
 
         # dark3
         self.stage2 = nn.Sequential(
-            Conv(base_channels * 2, base_channels * 4, 3, 2),
-            BottleneckCSP(base_channels * 4, base_channels * 4, n=base_depth * 3),
+            BaseConv(in_places[1], in_places[2], 3, 2, act=act),
+            CSPLayer(in_places[2], in_places[2], n=layers[1], act=act),
         )
 
         # dark4
         self.stage3 = nn.Sequential(
-            Conv(base_channels * 4, base_channels * 8, 3, 2),
-            BottleneckCSP(base_channels * 8, base_channels * 8, n=base_depth * 3),
+            BaseConv(in_places[2], in_places[3], 3, 2),
+            CSPLayer(in_places[3], in_places[3], n=layers[2]),
         )
 
         # dark5
         self.stage4 = nn.Sequential(
-            Conv(base_channels * 8, base_channels * 16, 3, 2),
-            SPP(base_channels * 16, base_channels * 16),
-            BottleneckCSP(base_channels * 16, base_channels * 16, n=base_depth, shortcut=False),
+            BaseConv(in_places[3], in_places[4], 3, 2, act=act),
+            SPPBottleneck(in_places[4], in_places[4], act=act),
+            CSPLayer(in_places[4], in_places[4], n=layers[3], shortcut=False, act=act),
         )
 
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
@@ -85,25 +98,10 @@ class CspDarkNet(nn.Module):
         return tuple(output) if len(self.out_stages) > 1 else output[0]
 
     def init_weights(self):
-        for name, m in self.named_modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.normal_(m.weight, 0, 1.0 / m.weight.shape[1])
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0.0001)
-                nn.init.constant_(m.running_mean, 0)
-            elif isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0.0001)
-                nn.init.constant_(m.running_mean, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eps = 1e-3
+                m.momentum = 0.03
 
 
 if __name__ == "__main__":
