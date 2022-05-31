@@ -422,10 +422,10 @@ class Detect(nn.Module):
         d = self.anchors[i].device
         yv, xv = torch.meshgrid([torch.arange(ny).to(d), torch.arange(nx).to(d)])
         grid = torch.stack((xv, yv), 2).expand((1, self.num_anchors, ny, nx, 2)).float()
+        # print('Detect anchors: ', self.anchors)
         anchor_grid = (self.anchors[i].clone() * self.stride[i]) \
             .view((1, self.num_anchors, 1, 1, 2)).expand((1, self.num_anchors, ny, nx, 2)).float()
         return grid, anchor_grid
-
 
 
 class Classify(nn.Module):
