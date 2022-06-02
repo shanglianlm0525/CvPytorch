@@ -14,6 +14,7 @@ from .nanodet_head import NanoDetHead
 from .nanodetplus_aux_head import NanoDetPlusAuxHead
 from .nanodetplus_head import NanoDetPlusHead
 from .openpose_head import OpenPoseHead
+from .ppliteseg_head import PPLiteSegHead
 from .regseg_head import RegSegHead
 from .sgcpnet_head import SGCPNetHead
 from .stdc_head import StdcHead
@@ -39,6 +40,7 @@ __all__ = [
     'RegSegHead',
     'OpenPoseHead',
     'SGCPNetHead',
+    'PPLiteSegHead',
     'TopFormerHead'
 ]
 
@@ -72,6 +74,8 @@ def build_head(cfg):
         return Deeplabv3PlusHead(**head_cfg)
     elif name == 'StdcHead':
         return StdcHead(**head_cfg)
+    elif name == 'PPLiteSegHead':
+        return PPLiteSegHead(**head_cfg)
     elif name == 'RegSegHead':
         return RegSegHead(**head_cfg)
     elif name == 'SGCPNetHead':
