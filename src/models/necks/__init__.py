@@ -18,7 +18,7 @@ from .tan import TAN
 from .yolop_neck import YOLOPNeck
 from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
-from .yolox_fpn import YOLOXNeck
+from .yolox_neck import YOLOXNeck
 
 __all__ = [
     'FPN',
