@@ -14,10 +14,6 @@ from torch.utils import model_zoo
     https://arxiv.org/pdf/2104.13188.pdf
 """
 
-model_urls = {
-    'stdc1': None,
-    'stdc2': None
-}
 
 
 class ConvX(nn.Module):
@@ -181,7 +177,7 @@ class STDCNet(nn.Module):
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
-        if self.pretrained:
+        if self.pretrained and self.backbone_path is not None:
             self.load_pretrained_weights()
         else:
             self.init_weights()
@@ -252,11 +248,7 @@ class STDCNet(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def load_pretrained_weights(self):
-        url = model_urls[self.subtype]
-        if url is not None:
-            state_dict = model_zoo.load_url(url)
-            print('=> loading pretrained model {}'.format(url))
-        elif self.backbone_path is not None:
+        if self.backbone_path is not None:
             print('=> loading pretrained model {}'.format(self.backbone_path))
             state_dict = torch.load(self.backbone_path)["state_dict"]
         else:
