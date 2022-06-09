@@ -334,6 +334,95 @@ class RandomCrop(object):
         return {'image': img, 'target': target}
 
 
+## add by liumin 20220521
+## RandomShape sizes = sizes=[320, 352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768] resize_box
+## RandomExpand prob=0.5, ratio=4.
+
+class RandomResize(object):
+    """Resize the input img to the choice size."""
+    def __init__(self, sizes=[[320, 320], [352, 352], [384, 384], [416, 416], [448, 448],
+                              [480, 480], [512, 512], [544, 544], [576, 576], [608, 608],
+                              [640, 640], [672, 672], [704, 704], [736, 736], [768, 768]], keep_ratio=True, scaleup=True, fill=[0, 0, 0]):
+        super(RandomResize, self).__init__()
+        self.sizes = sizes
+        self.keep_ratio = keep_ratio
+        self.scaleup = scaleup  # only valid when the keep_ratio is True
+        self.fill = fill
+
+
+    def __call__(self, sample):
+        size = np.random.choice(self.sizes)
+
+        img, target = sample['image'], sample['target']
+        h, w, _ = img.shape
+        boxes = target["boxes"]
+
+        if self.keep_ratio:
+            scale = min(size[0] / h, size[1] / w)
+            if not self.scaleup:  # only scale down, do not scale up (for better val mAP)
+                scale = min(scale, 1.0)
+            oh, ow = int(round(h * scale)), int(round(w * scale))
+            padh, padw = size[0] - oh, size[1] - ow  # wh padding
+            padh /= 2
+            padw /= 2  # divide padding into 2 sides
+
+            if (h != oh) or (w != ow):
+                img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
+            top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
+            left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
+
+            boxes[:, 1::2] = boxes[:, 1::2] * scale + top
+            boxes[:, 0::2] = boxes[:, 0::2] * scale + left
+
+            target["boxes"] = boxes
+            target["pads"] = torch.tensor([top, left], dtype=torch.float)
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+            return {'image': img, 'target': target}
+        else:
+            scale_h, scale_w = size[0] / h, size[1] / w
+            img = cv2.resize(img, size[::-1], interpolation=cv2.INTER_LINEAR)
+            boxes[:, 1::2] = boxes[:, 1::2] * scale_h
+            boxes[:, 0::2] = boxes[:, 0::2] * scale_w
+
+            target["boxes"] = boxes
+            target["pads"] = torch.tensor([0, 0], dtype=torch.float)
+            target["scales"] = torch.tensor([scale_h, scale_w], dtype=torch.float)
+            return {'image': img, 'target': target}
+
+
+
+class RandomExpand(object):
+    def __init__(self, p=0.5, ratio=[1.0, 4.0], fill=[127, 127, 127]):
+        super().__init__()
+        self.p = p
+        self.ratio = ratio
+        self.fill = fill
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            boxes = target["boxes"]
+            height, width, _ = img.shape
+            scale = np.random.uniform(self.ratio[0], self.ratio[1])
+            h = int(height * scale)
+            w = int(width * scale)
+            if not h > height or not w > width:
+                return sample
+            y = np.random.randint(0, h - height)
+            x = np.random.randint(0, w - width)
+            canvas = np.ones((h, w, 3), dtype=np.uint8)
+            canvas *= np.array(self.fill, dtype=np.uint8)
+            canvas[y:y + height, x:x + width, :] = img.astype(np.uint8)
+
+            boxes += np.array([x, y] * 2, dtype=np.float32)
+            target["boxes"] = boxes
+            target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
+            return {'image': canvas, 'target': target}
+        return sample
+
+
 class RandomResizedCrop(object):
     """Crop a random portion of image and resize it to a given size.
 
@@ -427,6 +516,7 @@ class RandomResizedCrop(object):
         Returns:
             PIL Image or Tensor: Randomly cropped and resized image.
         """
+        # torch.save(sample, '/home/lmin/pythonCode/scripts/weights/nanodet/sample.pth')
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
         labels = target["labels"]
@@ -460,7 +550,7 @@ class RandomResizedCrop(object):
             if keep.shape[0] < 1:
                 img, target = sample['image'], sample['target']
                 boxes = target["boxes"]
-
+                h, w, _ = img.shape
                 scale = min(self.size[0] / h, self.size[1] / w)
                 oh, ow = int(round(h * scale)), int(round(w * scale))
                 padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
@@ -499,6 +589,7 @@ class RandomResizedCrop(object):
                 img, target = sample['image'], sample['target']
                 boxes = target["boxes"]
 
+                h, w = img.shape[:2]
                 scale_h, scale_w = self.size[0] / h, self.size[1] / w
                 img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
 
@@ -721,15 +812,155 @@ def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  #
     return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
 
 
+class RandomAffineWithMosaic(object):
+    ''' maybe have problem '''
+    '''torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))'''
+    def __init__(self, p=0.5, size=[640, 640], degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], stretch = [[0., 0.], [0., 0.]], perspective=[0., 0.], fill= [0, 0, 0]):
+        self.p = p
+        self.size = size if isinstance(size, list) else (-size, size)
+        self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
+        self.translate = translate
+        self.scale = scale if isinstance(scale, list) else (1 - scale, 1 + scale)
+        self.shear = shear if isinstance(shear, list) else (-shear, shear)
+        self.stretch = stretch
+        self.perspective = perspective if isinstance(perspective, list) else (-perspective, perspective)
+        self.border = (-self.size[0] // 2, -self.size[1] // 2)
+        self.fill = fill
+
+    def __call__(self, sample):
+        assert len(sample) == 4, 'the number of input must eq. 4'
+        labels4 = []
+        boxes4 = []
+        yc, xc = [int(random.uniform(x * 0.5, x * 1.5)) for x in self.size]
+        for i, sp in enumerate(sample):
+            img_t, target_t = sp['image'], sp['target']
+            boxes_t = target_t["boxes"]
+            h0, w0, c = img_t.shape
+
+            r = min(self.size[0] / h0, self.size[1] / w0)
+            h, w = int(round(h0 * r)), int(round(w0 * r))
+            if (h0 != h) or (w0 != w):
+                img_t = cv2.resize(img_t, (w, h),
+                                   interpolation=cv2.INTER_LINEAR if r > 1 else cv2.INTER_AREA)
+            boxes_t *= r
+
+            # place img in img4
+            if i == 0:  # top left
+                img = np.full((self.size[0] * 2, self.size[1] * 2, c), self.fill,
+                               dtype=np.uint8)  # base image with 4 tiles
+                x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
+                x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
+            elif i == 1:  # top right
+                x1a, y1a, x2a, y2a = xc, max(yc - h, 0), min(xc + w, self.size[0] * 2), yc
+                x1b, y1b, x2b, y2b = 0, h - (y2a - y1a), min(w, x2a - x1a), h
+            elif i == 2:  # bottom left
+                x1a, y1a, x2a, y2a = max(xc - w, 0), yc, xc, min(self.size[0] * 2, yc + h)
+                x1b, y1b, x2b, y2b = w - (x2a - x1a), 0, w, min(y2a - y1a, h)
+            elif i == 3:  # bottom right
+                x1a, y1a, x2a, y2a = xc, yc, min(xc + w, self.size[1] * 2), min(self.size[0] * 2, yc + h)
+                x1b, y1b, x2b, y2b = 0, 0, min(w, x2a - x1a), min(y2a - y1a, h)
+
+            img[y1a:y2a, x1a:x2a] = img_t[y1b:y2b, x1b:x2b]  # img4[ymin:ymax, xmin:xmax]
+            padw = x1a - x1b
+            padh = y1a - y1b
+
+            boxes_t[:, 0::2] += padw
+            boxes_t[:, 1::2] += padh
+
+            # Labels
+            boxes4.append(boxes_t)
+            labels4.append(target_t["labels"])
+
+        # Concat/clip labels
+        boxes = np.concatenate(boxes4, 0)
+        labels = np.concatenate(labels4, 0)
+
+        # clip when using random_perspective()
+        boxes = clip_boxes_to_image(boxes, [s * 2 for s in self.size])
+
+        # im, targets = (), segments = (), degrees = 10, translate = .1, scale = .1, shear = 10, perspective = 0.0, border = (0, 0)
+        height = img.shape[0] + self.border[0] * 2  # shape(h,w,c)
+        width = img.shape[1] + self.border[1] * 2
+
+        # Center
+        C = np.eye(3)
+        C[0, 2] = -img.shape[1] / 2  # x translation (pixels)
+        C[1, 2] = -img.shape[0] / 2  # y translation (pixels)
+
+        # Perspective
+        P = np.eye(3)
+        P[2, 0] = random.uniform(self.perspective[0], self.perspective[1])  # x perspective (about y)
+        P[2, 1] = random.uniform(self.perspective[0], self.perspective[1])  # y perspective (about x)
+
+        # Rotation and Scale
+        R = np.eye(3)
+        a = random.uniform(self.degrees[0], self.degrees[1])
+        # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
+        s = random.uniform(self.scale[0], self.scale[1])
+        # s = 2 ** random.uniform(-scale, scale)
+        R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
+
+        # Shear
+        S = np.eye(3)
+        S[0, 1] = math.tan(random.uniform(self.shear[0], self.shear[1]) * math.pi / 180)  # x shear (deg)
+        S[1, 0] = math.tan(random.uniform(self.shear[0], self.shear[1]) * math.pi / 180)  # y shear (deg)
+
+        # Translation
+        T = np.eye(3)
+        T[0, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * width  # x translation (pixels)
+        T[1, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * height  # y translation (pixels)
+
+        # Combined rotation matrix
+        M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
+        if (self.border[0] != 0) or (self.border[1] != 0) or (M != np.eye(3)).any():  # image changed
+            if self.perspective:
+                img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
+            else:  # affine
+                img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+
+
+        # Transform label coordinates
+        n = len(boxes)
+        if n:
+            new = np.zeros((n, 4))
+            # warp boxes
+            xy = np.ones((n * 4, 3))
+            # xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+            xy[:, :2] = boxes[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+            xy = xy @ M.T  # transform
+            xy = (xy[:, :2] / xy[:, 2:3] if self.perspective else xy[:, :2]).reshape(n, 8)  # perspective rescale or affine
+
+            # create new boxes
+            x = xy[:, [0, 2, 4, 6]]
+            y = xy[:, [1, 3, 5, 7]]
+            new = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
+
+            # clip
+            new[:, [0, 2]] = new[:, [0, 2]].clip(0, width)
+            new[:, [1, 3]] = new[:, [1, 3]].clip(0, height)
+
+            # filter candidates
+            i = box_candidates(box1=boxes.T * s, box2=new.T, area_thr=0.10)
+            boxes = boxes[i]
+            boxes[:, :] = new[i]
+            labels = labels[i]
+
+        target = {}
+        target["boxes"] = boxes.astype(np.float32)
+        target["labels"] = torch.tensor(labels)
+        return {'image': img ,'target': target}
+
+
 class RandomAffine(object):
     ''' maybe have problem '''
     '''torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))'''
-    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0], fill= [0, 0, 0]):
+    def __init__(self, p=0.5, degrees=[0., 0.], translate=0., scale=[0.5, 1.5], shear=[0., 0.], stretch = [[0., 0.], [0., 0.]], perspective=[0., 0.], border=[0, 0], fill= [0, 0, 0]):
         self.p = p
         self.degrees = degrees if isinstance(degrees, list) else (-degrees, degrees)
         self.translate = translate
         self.scale = scale
         self.shear = shear if isinstance(shear, list) else (-shear, shear)
+        self.stretch = stretch
         self.perspective = perspective if isinstance(perspective, list) else (-perspective, perspective)
         self.border = border if isinstance(border, list) else (border, border)
         self.fill = fill
@@ -766,13 +997,18 @@ class RandomAffine(object):
             S[0, 1] = math.tan(random.uniform(self.shear[0], self.shear[1]) * math.pi / 180)  # x shear (deg)
             S[1, 0] = math.tan(random.uniform(self.shear[0], self.shear[1]) * math.pi / 180)  # y shear (deg)
 
+            # Stretch
+            Str = np.eye(3)
+            Str[0, 0] *= random.uniform(*self.stretch[1])
+            Str[1, 1] *= random.uniform(*self.stretch[0])
+
             # Translation
             T = np.eye(3)
             T[0, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * width  # x translation (pixels)
             T[1, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * height  # y translation (pixels)
 
             # Combined rotation matrix
-            M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
+            M = T @ Str @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
             if (self.border[0] != 0) or (self.border[1] != 0) or (M != np.eye(3)).any():  # image changed
                 if self.perspective:
                     img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=self.fill)
@@ -818,15 +1054,77 @@ class RandomGrayscale(object):
 
 
 class GaussianBlur(object):
-    def __init__(self, p=0.1, ksize=[(3, 3), (5, 5), (7, 7)]):
+    def __init__(self, p=0.01, ksize=[3, 5, 7]):
         self.p = p
         self.ksize = ksize
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            img = cv2.GaussianBlur(img, random.choice(self.ksize), 0)
+            ksize = int(random.choice(self.ksize))
+            img = cv2.GaussianBlur(img, (ksize, ksize), 0)
         return {'image': img, 'target': target}
+
+
+class MedianBlur(object):
+    def __init__(self, p=0.01, ksize=[3, 5, 7]):
+        self.p = p
+        self.ksize = ksize
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            img = cv2.medianBlur(img, int(random.choice(self.ksize)))
+        return {'image': img, 'target': target}
+
+
+class RandomGamma(object):
+    def __init__(self, p=0.01, gamma_limit=(80, 120)):
+        self.p = p
+        self.gamma_limit = gamma_limit
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            gamma = random.randint(self.gamma_limit[0], self.gamma_limit[1]) / 100.0
+            if img.dtype == np.uint8:
+                table = (np.arange(0, 256.0 / 255, 1.0 / 255) ** gamma) * 255
+                img = cv2.LUT(img, table.astype(np.uint8))
+            else:
+                img = np.power(img, gamma)
+        return {'image': img, 'target': target}
+
+
+class EqualizeHist(object):
+    def __init__(self, p=0.01):
+        self.p = p
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            img = cv2.equalizeHist(img)
+        return {'image': img, 'target': target}
+
+
+class CLAHE(object):
+    def __init__(self, p=0.01, clip_limit=4.0, tile_grid_size=(8, 8)):
+        self.p = p
+        self.clip_limit = clip_limit
+        self.tile_grid_size = tile_grid_size
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        if random.random() < self.p:
+            clip_limit = random.uniform(self.clip_limit[0], self.clip_limit[1])
+            clahe_mat = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=self.tile_grid_size)
+            if len(img.shape) == 2 or img.shape[2] == 1:
+                img = clahe_mat.apply(img)
+            else:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+                img[:, :, 0] = clahe_mat.apply(img[:, :, 0])
+                img = cv2.cvtColor(img, cv2.COLOR_LAB2RGB)
+        return {'image': img, 'target': target}
+
 
 
 class RandomFog(object):
@@ -905,17 +1203,6 @@ class RandomFog(object):
             mask[:, :, 1] = np.repeat(np.linspace(0, 1, w).reshape((1, w)), h, axis=0) - 0.5
         return mask
 
-
-class MedianBlur(object):
-    def __init__(self, p=0.1, ksize=[3, 5, 7]):
-        self.p = p
-        self.ksize = ksize
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        if random.random() < self.p:
-            img = cv2.medianBlur(img, int(random.choice(self.ksize)))
-        return {'image': img, 'target': target}
 
 
 def bbox_ioa(box1, box2, eps=1E-7):
@@ -1017,6 +1304,7 @@ class CopyPaste(object):
         self.p = p
 
     def __call__(self, sample):
+        img, target = sample['image'], sample['target']
 
         return {'image': img, 'target': target}
 
@@ -1026,7 +1314,7 @@ class Mosaic(object):
         YOLOv4: Optimal Speed and Accuracy of Object Detection
         https://arxiv.org/pdf/2004.10934.pdf
     '''
-    def __init__(self, p, size, fill=128, min_size=3):
+    def __init__(self, p, size, fill=[114, 114, 114], min_size=3):
         self.p = p
         self.size = size # h, w
         self.fill = fill
@@ -1045,7 +1333,8 @@ class Mosaic(object):
             scale = min(self.size[0] / h0, self.size[1] / w0)
             h, w = int(round(h0 * scale)), int(round(w0 * scale))
             if (h0 != h) or (w0 != w):
-                img_t = cv2.resize(img_t, (w, h), interpolation=cv2.INTER_LINEAR)
+                img_t = cv2.resize(img_t, (w, h), interpolation=cv2.INTER_LINEAR if scale > 1 else cv2.INTER_AREA)
+
             boxes_t *= scale
 
             # place img in img4
@@ -1078,12 +1367,12 @@ class Mosaic(object):
         labels4 = np.concatenate(labels4, 0)
 
         # clip when using random_perspective()
-        # boxes4 = clip_boxes_to_image(boxes4, self.size)
+        boxes4 = clip_boxes_to_image(boxes4, [s * 2 for s in self.size])
         # keep4 = remove_small_boxes(boxes4, self.min_size) # remove boxes that less than 3 pixes
 
         target = {}
-        target["height"] = torch.tensor(self.size[0] * 2)
-        target["width"] = torch.tensor(self.size[1] * 2)
+        target["height"] = torch.tensor(self.size[0])
+        target["width"] = torch.tensor(self.size[1])
         target["boxes"] = boxes4
         target["labels"] = torch.tensor(labels4)
         return {'image': img4, 'target': target}
@@ -1120,6 +1409,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     return im, ratio, (dw, dh)
+
 
 def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0,
                        border=(0, 0)):
@@ -1177,7 +1467,8 @@ def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, sc
         new = np.zeros((n, 4))
         # warp boxes
         xy = np.ones((n * 4, 3))
-        xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+        # xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+        xy[:, :2] = targets[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
         xy = xy @ M.T  # transform
         xy = (xy[:, :2] / xy[:, 2:3] if perspective else xy[:, :2]).reshape(n, 8)  # perspective rescale or affine
 
@@ -1191,11 +1482,19 @@ def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, sc
         new[:, [1, 3]] = new[:, [1, 3]].clip(0, height)
 
         # filter candidates
+        '''
         i = box_candidates(box1=targets[:, 1:5].T * s, box2=new.T, area_thr=0.10)
         targets = targets[i]
         targets[:, 1:5] = new[i]
+        '''
+        i = box_candidates(box1=targets.T * s, box2=new.T, area_thr=0.10)
+        targets = targets[i]
+        targets[:, :] = new[i]
+        # targets[:, 1:5] = new[i]
+        return im, targets, i
+    else:
+        return im, targets, None
 
-    return im, targets
 
 
 def xyxy2xywhn(x, w=640, h=640, clip=False, eps=0.0):
@@ -1212,105 +1511,343 @@ def xyxy2xywhn(x, w=640, h=640, clip=False, eps=0.0):
     return y
 
 
-class YOLOv5AugWithoutMosaic(object):
-    def __init__(self, augment=True, img_size=640):
+def augment_hsv(im, hgain=0.5, sgain=0.5, vgain=0.5):
+    # HSV color-space augmentation
+    if hgain or sgain or vgain:
+        r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
+        hue, sat, val = cv2.split(cv2.cvtColor(im, cv2.COLOR_BGR2HSV))
+        dtype = im.dtype  # uint8
+
+        x = np.arange(0, 256, dtype=r.dtype)
+        lut_hue = ((x * r[0]) % 180).astype(dtype)
+        lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
+        lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+
+        im_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val)))
+        cv2.cvtColor(im_hsv, cv2.COLOR_HSV2BGR, dst=im)  # no return needed
+
+
+class YOLOv5Augment(object):
+    def __init__(self, augment=True, size=640, fill=114):
         self.augment = augment
-        self.img_size = img_size
+        self.size = size
+        self.fill = fill
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         boxes = target["boxes"]
         labels = target["labels"]
 
-        # load_image + letterbox
-        h0, w0 = img.shape[:2]  # orig hw
-        r = 640 / max(h0, w0)  # ratio
+        h0, w0 = img.shape[:2]
+        r = self.size / max(h0, w0)  # ratio
         if r != 1:  # if sizes are not equal
-            img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=cv2.INTER_LINEAR)
-        # return img, (h0, w0), img.shape[:2]  # im, hw_original, hw_resized
-        img, ratio, pad = letterbox(img, self.img_size, auto=False, scaleup=self.augment)
+            img = cv2.resize(img, (int(w0 * r), int(h0 * r)),
+                            interpolation=cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA)
 
-        lbls = np.hstack((labels, boxes))
-        img, lbls = random_perspective(img, lbls,degrees=0,translate=0.1,scale=0.5,shear=0,perspective=0.0)
-        labels, boxes = lbls[:,0], lbls[:,1:]
-
-        target["boxes"] = boxes
-        return {'image': img, 'target': target}
-
-
-class EfficientDetAugment(object):
-    def __init__(self, augment=True, img_size=512):
-        self.augment = augment
-        self.img_size = img_size
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        boxes = target["boxes"]
-        labels = target["labels"]
-
-        mean = [0.406, 0.456, 0.485]
-        std = [0.225, 0.224, 0.229]
-        img = (img.astype(np.float32) / 255. - mean) / std
-
-        if self.augment:
-            if random.random() < 0.5:
-                height, width, _ = img.shape
-                ymin = height - 1 - boxes[:, 3]
-                ymax = height - 1 - boxes[:, 1]
-                boxes[:, 3] = ymax
-                boxes[:, 1] = ymin
-                img = cv2.flip(img, 0)
-
-        height, width, _ = img.shape
-        if height > width:
-            scale = self.img_size / height
-            resized_height = self.img_size
-            resized_width = int(width * scale)
-        else:
-            scale = self.img_size / width
-            resized_height = int(height * scale)
-            resized_width = self.img_size
-
-        img = cv2.resize(img, (resized_width, resized_height), interpolation=cv2.INTER_LINEAR)
-
-        new_img = np.zeros((self.img_size, self.img_size, 3))
-        new_img[0:resized_height, 0:resized_width] = img
-
-        boxes *= scale
-
-        target["pads"] = torch.tensor([0, 0], dtype=torch.float)
-        target["scales"] = torch.tensor([scale, scale], dtype=torch.float)
-        target["labels"] = labels
-        target["boxes"] = torch.from_numpy(boxes)
-        return {'image': torch.from_numpy(new_img.astype(np.float32)), 'target': target}
-
-
-class YOLOv5AugWithoutAugment(object):
-    def __init__(self, augment=True, img_size=640):
-        self.augment = augment
-        self.img_size = img_size
-
-    def __call__(self, sample):
-        img, target = sample['image'], sample['target']
-        boxes = target["boxes"]
-        labels = target["labels"]
-
-        # load_image + letterbox
-        h0, w0 = img.shape[:2]  # orig hw
-        r = self.img_size / max(h0, w0)  # ratio
-        if r != 1:  # if sizes are not equal
-            img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=cv2.INTER_LINEAR)
-        # return img, (h0, w0), img.shape[:2]  # im, hw_original, hw_resized
-        img, ratio, pad = letterbox(img, self.img_size, auto=False, scaleup=self.augment)
-
+        img, ratio, pad = letterbox(img, self.size, auto=False, scaleup=self.augment)
         boxes[:, 0::2] = boxes[:, 0::2] * r + pad[0]
         boxes[:, 1::2] = boxes[:, 1::2] * r + pad[1]
-        boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+        if self.augment:
+            img, boxes, keep = random_perspective(img, boxes,
+                                             degrees=0.0, translate=0.1, scale=0.5, shear=0.0, perspective=0.0)
+            labels = labels[keep] if keep is not None else labels
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+            # Albumentations
+            if random.random() < 0.01:
+                ksize = random.choice([3, 5, 7])
+                img = cv2.GaussianBlur(img, (ksize, ksize), 0)
+            if random.random() < 0.01:
+                img = cv2.medianBlur(img, random.choice([3, 5, 7]))
+            if random.random() < 0.01:
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+                # HSV color-space
+                augment_hsv(img, hgain=0.015, sgain=0.7, vgain=0.4)
+
+
+            # Flip left-right
+            if random.random() < 0.5:
+                img = np.fliplr(img)
+                boxes[:, 0] = 1 - boxes[:, 0]
+        else:
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
 
         target["pads"] = torch.tensor([pad[1], pad[0]], dtype=torch.float)
         target["scales"] = torch.tensor([r, r], dtype=torch.float)
         target["labels"] = labels
         target["boxes"] = boxes
+        return {'image': img, 'target': target}
+
+
+class YOLOv5Mosaic(object):
+    def __init__(self, augment=True, size=[640, 640], fill=114):
+        self.augment = augment
+        self.size = size
+        self.fill = fill
+
+    def __call__(self, sample):
+        if self.augment:
+            assert len(sample) == 4, 'the number of input must eq. 4'
+            labels4 = []
+            boxes4 = []
+            yc, xc = [int(random.uniform(x * 0.5, x * 1.5)) for x in self.size]
+            for i, sp in enumerate(sample):
+                img_t, target_t = sp['image'], sp['target']
+                boxes_t = target_t["boxes"]
+                h0, w0, c = img_t.shape
+
+                r = min(self.size[0] / h0, self.size[1] / w0)
+                h, w = int(round(h0 * r)), int(round(w0 * r))
+                if (h0 != h) or (w0 != w):
+                    img_t = cv2.resize(img_t, (w, h),
+                                     interpolation=cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA)
+                boxes_t *= r
+
+                # place img in img4
+                if i == 0:  # top left
+                    img4 = np.full((self.size[0] * 2, self.size[1] * 2, c), self.fill, dtype=np.uint8)  # base image with 4 tiles
+                    x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
+                    x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
+                elif i == 1:  # top right
+                    x1a, y1a, x2a, y2a = xc, max(yc - h, 0), min(xc + w, self.size[0] * 2), yc
+                    x1b, y1b, x2b, y2b = 0, h - (y2a - y1a), min(w, x2a - x1a), h
+                elif i == 2:  # bottom left
+                    x1a, y1a, x2a, y2a = max(xc - w, 0), yc, xc, min(self.size[0] * 2, yc + h)
+                    x1b, y1b, x2b, y2b = w - (x2a - x1a), 0, w, min(y2a - y1a, h)
+                elif i == 3:  # bottom right
+                    x1a, y1a, x2a, y2a = xc, yc, min(xc + w, self.size[1] * 2), min(self.size[0] * 2, yc + h)
+                    x1b, y1b, x2b, y2b = 0, 0, min(w, x2a - x1a), min(y2a - y1a, h)
+
+                img4[y1a:y2a, x1a:x2a] = img_t[y1b:y2b, x1b:x2b]  # img4[ymin:ymax, xmin:xmax]
+                padw = x1a - x1b
+                padh = y1a - y1b
+
+                boxes_t[:, 0::2] += padw
+                boxes_t[:, 1::2] += padh
+
+                # Labels
+                boxes4.append(boxes_t)
+                labels4.append(target_t["labels"])
+
+            # Concat/clip labels
+            boxes = np.concatenate(boxes4, 0)
+            labels = np.concatenate(labels4, 0)
+
+            # clip when using random_perspective()
+            boxes = clip_boxes_to_image(boxes, [s * 2 for s in self.size])
+
+            img, boxes, keep = random_perspective(img4, boxes, degrees=0.0, translate=0.1, scale=0.5,
+                                                  shear=0.0, perspective=0.0, border=[-self.size[0] // 2, -self.size[1] // 2])
+
+            labels = labels[keep] if keep is not None else labels
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+            # Albumentations
+            if random.random() < 0.01:
+                ksize = random.choice([3, 5, 7])
+                img = cv2.GaussianBlur(img, (ksize, ksize), 0)
+            if random.random() < 0.01:
+                img = cv2.medianBlur(img, random.choice([3, 5, 7]))
+            if random.random() < 0.01:
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+
+            # HSV color-space
+            augment_hsv(img, hgain=0.015, sgain=0.7, vgain=0.4)
+
+            # Flip left-right
+            if random.random() < 0.5:
+                img = np.fliplr(img)
+                boxes[:, 0] = 1 - boxes[:, 0]
+
+            target = {}
+            target["boxes"] = boxes
+            target["labels"] = torch.tensor(labels)
+        else:
+            img, target = sample['image'], sample['target']
+            boxes = target["boxes"]
+
+            h0, w0 = img.shape[:2]
+            r = min(self.size[0] / h0, self.size[1] / w0)
+            h, w = int(round(h0 * r)), int(round(w0 * r))
+            if (h0 != h) or (w0 != w):
+                img = cv2.resize(img, (w, h), interpolation=cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA)
+
+            img, ratio, pad = letterbox(img, self.size, auto=False, scaleup=self.augment)
+            boxes[:, 0::2] = boxes[:, 0::2] * r + pad[0]
+            boxes[:, 1::2] = boxes[:, 1::2] * r + pad[1]
+
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+            target["pads"] = torch.tensor([pad[1], pad[0]], dtype=torch.float)
+            target["scales"] = torch.tensor([r, r], dtype=torch.float)
+            # target["labels"] = torch.tensor(labels)
+            target["boxes"] = boxes
+
+        return {'image': img, 'target': target}
+
+
+class YOLOXAugment(object):
+    def __init__(self, augment=True, size=640, fill=114):
+        self.augment = augment
+        self.size = size
+        self.fill = fill
+
+    def __call__(self, sample):
+        img, target = sample['image'], sample['target']
+        boxes = target["boxes"]
+        labels = target["labels"]
+
+        h0, w0 = img.shape[:2]
+        r = self.size / max(h0, w0)  # ratio
+        if r != 1:  # if sizes are not equal
+            img = cv2.resize(img, (int(w0 * r), int(h0 * r)),
+                            interpolation=cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA)
+
+        img, ratio, pad = letterbox(img, self.size, auto=False, scaleup=self.augment)
+        boxes[:, 0::2] = boxes[:, 0::2] * r + pad[0]
+        boxes[:, 1::2] = boxes[:, 1::2] * r + pad[1]
+
+        if self.augment:
+            img, boxes, keep = random_perspective(img, boxes,
+                                             degrees=0.0, translate=0.1, scale=0.5, shear=0.0, perspective=0.0)
+            labels = labels[keep] if keep is not None else labels
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+            # Albumentations
+            if random.random() < 0.01:
+                ksize = random.choice([3, 5, 7])
+                img = cv2.GaussianBlur(img, (ksize, ksize), 0)
+            if random.random() < 0.01:
+                img = cv2.medianBlur(img, random.choice([3, 5, 7]))
+            if random.random() < 0.01:
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+
+            # HSV color-space
+            augment_hsv(img, hgain=0.015, sgain=0.7, vgain=0.4)
+
+            # Flip left-right
+            if random.random() < 0.5:
+                img = np.fliplr(img)
+                boxes[:, 0] = 1 - boxes[:, 0]
+        else:
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+        target["pads"] = torch.tensor([pad[1], pad[0]], dtype=torch.float)
+        target["scales"] = torch.tensor([r, r], dtype=torch.float)
+        target["labels"] = labels
+        target["boxes"] = boxes
+        return {'image': img, 'target': target}
+
+
+class YOLOXMosaic(object):
+    def __init__(self, augment=True, size=[640, 640], fill=114):
+        self.augment = augment
+        self.size = size
+        self.fill = fill
+
+    def __call__(self, sample):
+        if self.augment:
+            assert len(sample) == 4, 'the number of input must eq. 4'
+            labels4 = []
+            boxes4 = []
+            yc, xc = [int(random.uniform(x * 0.5, x * 1.5)) for x in self.size]
+            for i, sp in enumerate(sample):
+                img_t, target_t = sp['image'], sp['target']
+                boxes_t = target_t["boxes"]
+                h0, w0, c = img_t.shape
+
+                r = min(self.size[0] / h0, self.size[1] / w0)
+                h, w = int(round(h0 * r)), int(round(w0 * r))
+                if (h0 != h) or (w0 != w):
+                    img_t = cv2.resize(img_t, (w, h),
+                                     interpolation=cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA)
+                boxes_t *= r
+
+                # place img in img4
+                if i == 0:  # top left
+                    img4 = np.full((self.size[0] * 2, self.size[1] * 2, c), self.fill, dtype=np.uint8)  # base image with 4 tiles
+                    x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
+                    x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
+                elif i == 1:  # top right
+                    x1a, y1a, x2a, y2a = xc, max(yc - h, 0), min(xc + w, self.size[0] * 2), yc
+                    x1b, y1b, x2b, y2b = 0, h - (y2a - y1a), min(w, x2a - x1a), h
+                elif i == 2:  # bottom left
+                    x1a, y1a, x2a, y2a = max(xc - w, 0), yc, xc, min(self.size[0] * 2, yc + h)
+                    x1b, y1b, x2b, y2b = w - (x2a - x1a), 0, w, min(y2a - y1a, h)
+                elif i == 3:  # bottom right
+                    x1a, y1a, x2a, y2a = xc, yc, min(xc + w, self.size[1] * 2), min(self.size[0] * 2, yc + h)
+                    x1b, y1b, x2b, y2b = 0, 0, min(w, x2a - x1a), min(y2a - y1a, h)
+
+                img4[y1a:y2a, x1a:x2a] = img_t[y1b:y2b, x1b:x2b]  # img4[ymin:ymax, xmin:xmax]
+                padw = x1a - x1b
+                padh = y1a - y1b
+
+                boxes_t[:, 0::2] += padw
+                boxes_t[:, 1::2] += padh
+
+                # Labels
+                boxes4.append(boxes_t)
+                labels4.append(target_t["labels"])
+
+            # Concat/clip labels
+            boxes = np.concatenate(boxes4, 0)
+            labels = np.concatenate(labels4, 0)
+
+            # clip when using random_perspective()
+            boxes = clip_boxes_to_image(boxes, [s * 2 for s in self.size])
+
+            img, boxes, keep = random_perspective(img4, boxes, degrees=0.0, translate=0.1, scale=0.5,
+                                                  shear=0.0, perspective=0.0, border=[-self.size[0] // 2, -self.size[1] // 2])
+
+            labels = labels[keep] if keep is not None else labels
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+            # Albumentations
+            if random.random() < 0.01:
+                ksize = random.choice([3, 5, 7])
+                img = cv2.GaussianBlur(img, (ksize, ksize), 0)
+            if random.random() < 0.01:
+                img = cv2.medianBlur(img, random.choice([3, 5, 7]))
+            if random.random() < 0.01:
+                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+
+            # HSV color-space
+            augment_hsv(img, hgain=0.015, sgain=0.7, vgain=0.4)
+
+            # Flip left-right
+            if random.random() < 0.5:
+                img = np.fliplr(img)
+                boxes[:, 0] = 1 - boxes[:, 0]
+
+            target = {}
+            target["boxes"] = boxes
+            target["labels"] = torch.tensor(labels)
+        else:
+            img, target = sample['image'], sample['target']
+            boxes = target["boxes"]
+
+            h0, w0 = img.shape[:2]
+            r = min(self.size[0] / h0, self.size[1] / w0)
+            h, w = int(round(h0 * r)), int(round(w0 * r))
+            if (h0 != h) or (w0 != w):
+                img = cv2.resize(img, (w, h), interpolation=cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA)
+
+            img, ratio, pad = letterbox(img, self.size, auto=False, scaleup=self.augment)
+            boxes[:, 0::2] = boxes[:, 0::2] * r + pad[0]
+            boxes[:, 1::2] = boxes[:, 1::2] * r + pad[1]
+
+            boxes = xyxy2xywhn(boxes, w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
+
+            target["pads"] = torch.tensor([pad[1], pad[0]], dtype=torch.float)
+            target["scales"] = torch.tensor([r, r], dtype=torch.float)
+            # target["labels"] = torch.tensor(labels)
+            target["boxes"] = boxes
+
         return {'image': img, 'target': target}
 
 
@@ -1431,12 +1968,19 @@ if __name__ == '__main__':
     # trf = RandomHorizontalFlip(p=1)
     # trf = RandomVerticalFlip(p=1)
     # trf = ColorHSV(p=1, hue=0.5, saturation=0.5, brightness=0.5)
-    trf = RandomAffine(degrees=[5, 5], translate=0.1, scale=[1.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0])
+    # trf = RandomAffine(degrees=[5, 5], translate=0.1, scale=[1.5, 1.5], shear=[0., 0.], perspective=[0., 0.], border=[0, 0])
     # trf = RandomResizedCrop(size=[320, 320], scale=[0.6, 1.4], ratio=[0.5, 2.0], keep_ratio=True)
     # trf = RandomCrop(size=[320, 320])
-
-    sample = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/sample1.pth')
+    # trf = YOLOv5Augment()
+    # sample = torch.load('/home/lmin/pythonCode/scripts/weights/yolov5/sample.pth')
     # print(sample)
+
+    augment = False
+    trf = YOLOv5Mosaic(augment=augment)
+    if augment:
+        sample = torch.load('/home/lmin/pythonCode/scripts/weights/yolov5/sample_mosaic.pth')
+    else:
+        sample = torch.load('/home/lmin/pythonCode/scripts/weights/yolov5/sample.pth')
 
     '''
     img, target = sample['image'], sample['target']
@@ -1448,40 +1992,24 @@ if __name__ == '__main__':
 
     sample1 = trf(sample)
     img1, target1 = sample1['image'], sample1['target']
+
+    height, width, _ = img1.shape
+    print(img1.shape)
+
+    img1 = np.ascontiguousarray(img1)
+    boxes1 = target1["boxes"]
+    for box in boxes1:
+        # print(box)
+        # cv2.rectangle(img1, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 0, 255), 1, 0)
+        # print(int((box[0] - box[2] * 0.5) * 640), int((box[1] - box[3] * 0.5) * 640), int((box[0] + box[2] * 0.5) * 640), int((box[1] + box[3] * 0.5) * 640))
+        cv2.rectangle(img1, (int((box[0] - box[2] * 0.5) * 640), int((box[1] - box[3] * 0.5) * 640)),
+                      (int((box[0] + box[2] * 0.5) * 640), int((box[1] + box[3] * 0.5) * 640)), (0, 0, 255), 1, 0)
+    cv2.imwrite('/home/lmin/pythonCode/scripts/weights/yolov5/mosaic_img1.jpg', img1)
+    ''''''
+
+    '''
     boxes1 = target1["boxes"]
     for box in boxes1:
         cv2.rectangle(img1, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0,0,255), 1, 0)
     cv2.imwrite('img2.jpg', img1)
-
-    import cv2
-    import numpy as np
-    import copy
-
-    # torch.save(imgs, '/home/lmin/pythonCode/scripts/weights/ssd/imgs.pth')
-    # torch.save(targets, '/home/lmin/pythonCode/scripts/weights/ssd/targets.pth')
-
-    imgs = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/imgs.pth')
-    targets = torch.load('/home/lmin/pythonCode/scripts/weights/ssd/targets.pth')
-
-    for i, (img, target) in enumerate(zip(imgs, targets)):
-        img = img.cpu().numpy().transpose((1, 2, 0))
-        img = np.ascontiguousarray(img)
-        height = target['height'].cpu().numpy()
-        width = target['width'].cpu().numpy()
-        for bb in target['boxes']:
-            bb = bb.cpu().numpy()
-            '''
-            bb_cp = copy.deepcopy(bb)
-            bb_cp[0] = bb[0] - bb[2] * 0.5  # top left x
-            bb_cp[1] = bb[1] - bb[3] * 0.5  # top left y
-            bb_cp[2] = bb[0] + bb[2] * 0.5  # bottom right x
-            bb_cp[3] = bb[1] + bb[3] * 0.5  # bottom right y
-            bb_cp[0::2] *= width
-            bb_cp[1::2] *= height
-            img = img.astype(np.uint8)
-            cv2.rectangle(img, (int(bb_cp[0]), int(bb_cp[1])), (int(bb_cp[2]), int(bb_cp[3])), (0, 0, 255), 1, 0)
-            '''
-            img = img.astype(np.uint8)
-            cv2.rectangle(img, (int(bb[0]), int(bb[1])), (int(bb[2]), int(bb[3])), (0, 0, 255), 1, 0)
-        # cv2.imwrite('aaa_' + str(i) + '.jpg', img)
-        assert 1 == 2
+    '''

@@ -1,57 +1,24 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2021/7/29 9:15
+# @Time : 2021/12/13 19:14
 # @Author : liumin
 # @File : yolov5.py
+
 
 import time
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
-import torchvision
+from torchvision.ops import nms
 
-from src.losses.yolov5_loss import Yolov5Loss
-from src.models.backbones import build_backbone
-from src.models.heads import build_head
-from src.models.necks import build_neck
+from src.losses import Yolov5Loss
+from src.models.modules.yolov5_modules import Conv, C3, C3TR, SPPF, SPP, CBAM, Detect
 
+"""
+    https://github.com/ultralytics/yolov5
+"""
 
-def clip_coords(boxes, shape):
-    # Clip bounding xyxy bounding boxes to image shape (height, width)
-    if isinstance(boxes, torch.Tensor):  # faster individually
-        boxes[:, 0].clamp_(0, shape[1])  # x1
-        boxes[:, 1].clamp_(0, shape[0])  # y1
-        boxes[:, 2].clamp_(0, shape[1])  # x2
-        boxes[:, 3].clamp_(0, shape[0])  # y2
-    else:  # np.array (faster grouped)
-        boxes[:, [0, 2]] = boxes[:, [0, 2]].clip(0, shape[1])  # x1, x2
-        boxes[:, [1, 3]] = boxes[:, [1, 3]].clip(0, shape[0])  # y1, y2
-
-
-def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
-    # Rescale coords (xyxy) from img1_shape to img0_shape
-    if ratio_pad is None:  # calculate from img0_shape
-        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
-    else:
-        gain = ratio_pad[0][0]
-        pad = ratio_pad[1]
-
-    coords[:, [0, 2]] -= pad[0]  # x padding
-    coords[:, [1, 3]] -= pad[1]  # y padding
-    coords[:, :4] /= gain
-    clip_coords(coords, img0_shape)
-    return coords
-
-
-def xywh2xyxy(x):
-    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
-    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
-    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
-    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
-    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
-    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
-    return y
 
 def box_iou(box1, box2):
     # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
@@ -76,6 +43,16 @@ def box_iou(box1, box2):
     # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
     inter = (torch.min(box1[:, None, 2:], box2[:, 2:]) - torch.max(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
     return inter / (area1[:, None] + area2 - inter)  # iou = inter / (area1 + area2 - inter)
+
+
+def xywh2xyxy(x):
+    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
+    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
+    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
+    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    return y
 
 
 def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False, multi_label=False,
@@ -153,7 +130,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+        i = nms(boxes, scores, iou_thres)  # NMS
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
@@ -173,6 +150,9 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
 
 class YOLOv5(nn.Module):
+    anchors = [[[ 1.25000,  1.62500], [ 2.00000,  3.75000], [ 4.12500,  2.87500]],
+        [[ 1.87500,  3.81250],[ 3.87500,  2.81250], [ 3.68750,  7.43750]],
+        [[ 3.62500,  2.81250], [ 4.87500,  6.18750], [11.65625, 10.18750]]]
     def __init__(self, dictionary=None, model_cfg=None):
         super(YOLOv5, self).__init__()
         self.dictionary = dictionary
@@ -198,12 +178,40 @@ class YOLOv5(nn.Module):
         else:
             raise NotImplementedError
 
-        self.setup_extra_params()
-        self.backbone = build_backbone(self.model_cfg.BACKBONE)
-        self.neck = build_neck(self.model_cfg.NECK)
-        self.head = build_head(self.model_cfg.HEAD)
+        stride = [8., 16., 32.]
+        layers = [3, 6, 9, 3, 3, 3, 3, 3]
+        out_channels = [64, 128, 256, 512, 1024]
+        in_places = list(map(lambda x: int(x * self.width_mul), out_channels))
+        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), layers))
 
-        self.loss = Yolov5Loss(self.num_classes)
+        self.setup_extra_params()
+        self.backbone_conv1 = Conv(3, in_places[0], k=(6, 6), s=(2, 2), p=(2, 2))  # 0
+        self.backbone_layer1 = nn.Sequential(Conv(in_places[0], in_places[1], 3, 2),
+                                             C3(in_places[1], in_places[1], layers[0]))  # 2
+        self.backbone_layer2 = nn.Sequential(Conv(in_places[1], in_places[2], 3, 2),
+                                             C3(in_places[2], in_places[2], layers[1]))
+        self.backbone_layer3 = nn.Sequential(Conv(in_places[2], in_places[3], 3, 2),  # 4
+                                             C3(in_places[3], in_places[3], layers[2]))
+        self.backbone_layer4 = nn.Sequential(Conv(in_places[3], in_places[4], 3, 2),  # 6
+                                             C3(in_places[4], in_places[4], layers[3]),
+                                             SPPF(in_places[4], in_places[4], 5))  # 9
+
+        self.head_up_1_conv = Conv(in_places[4], in_places[3], 1, 1)  # 10
+        self.head_up_1 = C3(in_places[3] * 2, in_places[3], layers[4], False)  # 13
+
+        self.head_up_2_conv = Conv(in_places[3], in_places[2], 1, 1)  # 14
+        self.head_up_2 = C3(in_places[2] * 2, in_places[2], layers[5], False)  # 17
+
+        self.head_down_1_conv = Conv(in_places[2], in_places[2], 3, 2)       # 18
+        self.head_down_1 = C3(in_places[3], in_places[3], layers[6], False)  # 20
+
+        self.head_down_2_conv = Conv(in_places[3], in_places[3], 3, 2)         # 21
+        self.head_down_2 = C3(in_places[4], in_places[4], layers[7], False)  # 33
+
+        # nc=80, stride=[4.,  8., 16., 32.], anchors=(), ch=()
+        self.detect = Detect(num_classes=self.num_classes, stride=stride, anchors=self.anchors, ch=in_places[2:])
+
+        self.loss = Yolov5Loss(self.num_classes, anchors=self.anchors)
 
         self.conf_thres = 0.001  # confidence threshold
         self.iou_thres = 0.6  # NMS IoU threshold
@@ -222,13 +230,7 @@ class YOLOv5(nn.Module):
                 m.inplace = True
 
     def setup_extra_params(self):
-        self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
-        self.model_cfg.BACKBONE.__setitem__('width_mul', self.width_mul)
-        self.model_cfg.NECK.__setitem__('depth_mul', self.depth_mul)
-        self.model_cfg.NECK.__setitem__('width_mul', self.width_mul)
-        self.model_cfg.HEAD.__setitem__('depth_mul', self.depth_mul)
-        self.model_cfg.HEAD.__setitem__('width_mul', self.width_mul)
-        self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
+        pass
 
     def trans_specific_format(self, imgs, targets):
         new_gts = []
@@ -245,8 +247,10 @@ class YOLOv5(nn.Module):
                 new_scales.append(target['scales'])
             if target.__contains__('pads'):
                 new_pads.append(target['pads'])
-            new_heights.append(target['height'])
-            new_widths.append(target['width'])
+            if target.__contains__('height'):
+                new_heights.append(target['height'])
+            if target.__contains__('width'):
+                new_widths.append(target['width'])
 
         t_targets = {}
         t_targets["gts"] = torch.cat(new_gts, 0)
@@ -257,24 +261,31 @@ class YOLOv5(nn.Module):
         return imgs, t_targets
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
-
         if mode == 'infer':
-            '''
-                for inference mode, img should preprocessed before feeding in net 
-            '''
-
+            ''' for inference mode, img should preprocessed before feeding in net '''
             return
         else:
             imgs, targets = self.trans_specific_format(imgs, targets)
             b, _, height, width = imgs.shape
-            # imgs 16 x 3 x 640 x 640
+            # imgs 2 x 3 x 640 x 640
             # targets [15.00000, 55.00000, 0.38317, 0.30502, 0.59623, 0.46391]
             losses = {}
-            x = self.backbone(imgs)
-            x = self.neck(x)
-            x = self.head(x)
-            out, train_out = tuple(x)
+            out2 = self.backbone_layer1(self.backbone_conv1(imgs))
+            out4 = self.backbone_layer2(out2)
+            out6 = self.backbone_layer3(out4)
+            out9 = self.backbone_layer4(out6)
 
+            # up
+            out10 = self.head_up_1_conv(out9)
+            out13 = self.head_up_1(torch.cat([F.interpolate(out10, scale_factor=2, mode="nearest"), out6], dim=1))
+            out14 = self.head_up_2_conv(out13)
+            out17 = self.head_up_2(torch.cat([F.interpolate(out14, scale_factor=2, mode="nearest"), out4], dim=1))
+
+            # down
+            out20 = self.head_down_1(torch.cat([self.head_down_1_conv(out17), out14], dim=1))
+            out23 = self.head_down_2(torch.cat([self.head_down_2_conv(out20), out10], dim=1))
+
+            out, train_out = self.detect([out17, out20, out23])
             losses['loss'], loss_states = self.loss(train_out, targets["gts"])
 
             losses['box_loss'] = loss_states[0]
@@ -284,13 +295,15 @@ class YOLOv5(nn.Module):
             if mode == 'val':
                 outputs = []
                 if out is not None:
-                    preds = non_max_suppression(out, self.conf_thres, self.iou_thres, multi_label=True) # N * 6
-                    for i, (width, height, scale, pad, pred) in enumerate(zip(targets['width'], targets['height'], targets['scales'], targets['pads'], preds)):
+                    preds = non_max_suppression(out, self.conf_thres, self.iou_thres, multi_label=True)  # N * 6
+                    for i, (width, height, scale, pad, pred) in enumerate(
+                            zip(targets['width'], targets['height'], targets['scales'], targets['pads'], preds)):
                         scale = scale.cpu().numpy()
                         pad = pad.cpu().numpy()
                         width = width.cpu().numpy()
                         height = height.cpu().numpy()
                         predn = pred.clone()
+
                         bboxes_np = predn[:, :4].cpu().numpy()
                         bboxes_np[:, [0, 2]] -= pad[1]  # x padding
                         bboxes_np[:, [1, 3]] -= pad[0]
@@ -301,6 +314,7 @@ class YOLOv5(nn.Module):
                         bboxes_np[:, [0, 2]] = bboxes_np[:, [0, 2]].clip(0, width)
                         bboxes_np[:, [1, 3]] = bboxes_np[:, [1, 3]].clip(0, height)
                         outputs.append({"boxes": torch.tensor(bboxes_np), "labels": pred[:, 5], "scores": pred[:, 4]})
+                        # outputs.append({"boxes": pred[:, :4], "labels": pred[:, 5], "scores": pred[:, 4]})
                 return losses, outputs
             else:
                 return losses
