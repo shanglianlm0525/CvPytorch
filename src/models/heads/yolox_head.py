@@ -56,7 +56,7 @@ class YOLOXHead(nn.Module):
             self.reg_preds.append(nn.Conv2d(in_places,4, 1, 1, 0))
             self.obj_preds.append(nn.Conv2d(in_places, self.n_anchors * 1, 1, 1, 0))
 
-        self._init_weight()
+        self.init_weights()
 
 
     def init_weights(self, prior_prob=1e-2):
@@ -88,11 +88,7 @@ class YOLOXHead(nn.Module):
             reg_feat = reg_conv(x)
             reg_output = self.reg_preds[k](reg_feat)
             obj_output = self.obj_preds[k](reg_feat)
-            if self.reid_dim > 0:
-                reid_output = self.reid_preds[k](reg_feat)
-                output = torch.cat([reg_output, obj_output, cls_output, reid_output], 1)
-            else:
-                output = torch.cat([reg_output, obj_output, cls_output], 1)
+            output = torch.cat([reg_output, obj_output, cls_output], 1)
             outputs.append(output)
 
         return outputs
