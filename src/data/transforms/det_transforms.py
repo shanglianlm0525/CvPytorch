@@ -1563,9 +1563,9 @@ class YOLOv5Augment(object):
             if random.random() < 0.01:
                 gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
                 img = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
-                # HSV color-space
-                augment_hsv(img, hgain=0.015, sgain=0.7, vgain=0.4)
 
+            # HSV color-space
+            augment_hsv(img, hgain=0.015, sgain=0.7, vgain=0.4)
 
             # Flip left-right
             if random.random() < 0.5:
