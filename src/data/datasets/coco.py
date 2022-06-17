@@ -85,7 +85,7 @@ class CocoDetection(Dataset):
             sample = []
             for img_id in img_ids:
                 if self.is_cache:
-                    s = self.cache[self.ids[idx]]
+                    s = self.cache[img_id]
                 else:
                     ann_ids = self.coco.getAnnIds(imgIds=img_id)
                     ann = self.coco.loadAnns(ann_ids)
