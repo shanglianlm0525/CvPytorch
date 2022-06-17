@@ -23,7 +23,6 @@ from tqdm import tqdm
     http://mscoco.org/dataset/#detections-challenge2016
 """
 
-
 class CocoDetection(Dataset):
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
         super(CocoDetection, self).__init__()
