@@ -4,16 +4,11 @@
 # @Author : liumin
 # @File : early_stopping.py
 
+from src.utils.global_logger import logger
+
 
 class EarlyStopping:
     # YOLOv5 simple early stopper
-    '''
-        stopper = EarlyStopping(patience=30)
-
-        # Stop Single-GPU
-        if RANK == -1 and stopper(epoch=epoch, fitness=fi):
-            break
-    '''
     def __init__(self, patience=30):
         self.best_fitness = 0.0  # i.e. mAP
         self.best_epoch = 0
@@ -28,5 +23,8 @@ class EarlyStopping:
         self.possible_stop = delta >= (self.patience - 1)  # possible stop may occur next epoch
         stop = delta >= self.patience  # stop training if patience exceeded
         if stop:
-            print(f'EarlyStopping patience {self.patience} exceeded, stopping training.')
+            logger.info(f'Stopping training early as no improvement observed in last {self.patience} epochs. '
+                        f'Best results observed at epoch {self.best_epoch}, best model saved as best.pt.\n'
+                        f'To update EarlyStopping(patience={self.patience}) pass a new patience value, '
+                        f'i.e. `python train.py --patience 300` or use `--patience 0` to disable EarlyStopping.')
         return stop
