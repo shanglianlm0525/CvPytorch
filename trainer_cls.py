@@ -14,17 +14,20 @@ from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler, SequentialSampler
 
-from tqdm import tqdm
 from importlib import import_module
 from datetime import datetime
+from copy import deepcopy
 import torch.backends.cudnn as cudnn
 import numpy as np
 import torch.distributed as dist
+
 from torch.cuda import amp
 from torch.nn import SyncBatchNorm
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from src.utils.config import CommonConfiguration
+from src.utils.early_stopping import EarlyStopping
+from src.utils.ema import ModelEMA
 from src.utils.global_logger import logger
 from src.utils.timer import Timer
 from src.utils.tensorboard import DummyWriter
@@ -37,8 +40,7 @@ from src.lr_schedulers import build_lr_scheduler
 from src.data.transforms import build_transforms, build_targets_transforms
 from src.utils.freeze import freeze_models
 from src.lr_schedulers.warmup import get_warmup_lr
-from src.data.datasets import PrefetchDataLoader
-from src.utils.torch_utils import setup_seed
+from src.data.datasets.prefetch_dataLoader import PrefetchDataLoader
 
 torch.backends.cudnn.enabled = True
 torch.set_default_tensor_type(torch.FloatTensor)
@@ -58,9 +60,6 @@ class Trainer:
             self.experiment_id = self.experiment_id(self.cfg)
             self.ckpts = Checkpoints(logger,self.cfg.CHECKPOINT_DIR,self.experiment_id)
             self.tb_writer = DummyWriter(log_dir="%s/%s" % (self.cfg.TENSORBOARD_LOG_DIR, self.experiment_id))
-            if cfg.seed is not None:
-                logger.log('Set random seed to {}'.format(cfg.seed))
-                setup_seed(cfg.seed)
 
     def experiment_id(self, cfg):
         return f"{cfg.EXPERIMENT_NAME}#{cfg.USE_MODEL.CLASS.split('.')[-1]}#{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
@@ -84,7 +83,7 @@ class Trainer:
 
         datasets = {x: dataset_class(data_cfg=cfg.DATASET[x.upper()], dictionary=self.dictionary,
                                      transform=self._parser_transform(x),
-                                     target_transform=None, stage=x) for x in ['train', 'val']}
+                                     target_transform=self._parser_transform(x, 'target'), stage=x) for x in ['train', 'val']}
 
         data_samplers = defaultdict()
         if self.cfg.distributed:
@@ -98,9 +97,10 @@ class Trainer:
                           num_workers=cfg.DATASET[x.upper()].NUM_WORKER,
                           collate_fn=dataset_class.collate_fn if hasattr(dataset_class,
                                                                          'collate_fn') else default_collate,
-                          pin_memory=True, drop_last=True) for x in ['train', 'val']}
+                          pin_memory=True, drop_last=(x=='train')) for x in ['train', 'val']}
         dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
         return datasets, dataloaders, data_samplers, dataset_sizes
+
 
     def _parser_model(self):
         *model_mod_str_parts, model_class_str = self.cfg.USE_MODEL.CLASS.split(".")
@@ -163,7 +163,7 @@ class Trainer:
             optimizer.zero_grad()
 
             # Autocast
-            with amp.autocast(enabled=False):
+            with amp.autocast(enabled=True):
                 out = model(imgs, targets, prefix)
                 if not isinstance(out, tuple):
                     losses, predicts = out, None
@@ -184,6 +184,8 @@ class Trainer:
             scaler.step(optimizer)
             # Updates the scale for next iteration.
             scaler.update()
+
+            self.ema.update(model)
         else:
             losses, predicts = model(imgs, targets, prefix)
 
@@ -250,17 +252,22 @@ class Trainer:
         ## parser_datasets
         datasets, dataloaders,data_samplers, dataset_sizes = self._parser_datasets()
 
-        self.steps_per_epoch = int(dataset_sizes['train'] // self.batch_size)
+        self.iters_per_epoch = int(dataset_sizes['train'] // self.batch_size)
 
         ## parser_model
         model_ft = self._parser_model()
+        # print(model_ft)
+
+        # EMA
+        self.ema = ModelEMA(model_ft) if cfg.local_rank == 0 else None
 
         # Scale learning rate based on global batch size
         if cfg.SCALE_LR:
             cfg.INIT_LR = cfg.INIT_LR * float(self.batch_size) / cfg.SCALE_LR
 
-        scaler = amp.GradScaler(enabled=False)
-        if cfg.WARMUP.ITERS:
+        scaler = amp.GradScaler(enabled=cfg.AMP)
+        stopper = EarlyStopping(patience=cfg.PATIENCE)
+        if cfg.WARMUP.NAME is not None and cfg.WARMUP.ITERS:
             logger.info('Start warm-up ... ')
             self.warm_up(scaler, model_ft, dataloaders['train'], cfg)
             logger.info('finish warm-up!')
@@ -287,30 +294,32 @@ class Trainer:
         if self.cfg.TENSORBOARD_MODEL and False:
             self.tb_writer.add_graph(model_ft, (model_ft.dummy_input.cuda(),))
 
-        timer = Timer()
-        lossLogger = LossLogger()
-        performanceLogger = build_evaluator(self.cfg, datasets['val'])
-
         best_acc = 0.0
         best_perf_rst = None
         for epoch in range(self.start_epoch + 1, self.cfg.N_MAX_EPOCHS):
             if cfg.distributed:
                 dataloaders['train'].sampler.set_epoch(epoch)
-            self.train_epoch(scaler, epoch, model_ft,datasets['train'], dataloaders['train'], optimizer_ft, timer, lossLogger, performanceLogger)
+            self.train_epoch(scaler, epoch, model_ft,datasets['train'], dataloaders['train'], optimizer_ft)
             lr_scheduler_ft.step()
-            if self.cfg.DATASET.VAL and (not epoch % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1):
-                acc, perf_rst = self.val_epoch(epoch, model_ft, datasets['val'], dataloaders['val'], timer, lossLogger, performanceLogger)
+
+            if self.cfg.DATASET.VAL and (not (epoch+1) % cfg.EVALUATOR.EVAL_INTERVALS or epoch==self.cfg.N_MAX_EPOCHS-1 or stopper.possible_stop):
+                acc, perf_rst = self.val_epoch(epoch, self.ema.ema, datasets['val'], dataloaders['val'])
+
                 if cfg.local_rank == 0:
                     # start to save best performance model after learning rate decay to 1e-6
                     if best_acc < acc:
-                        self.ckpts.autosave_checkpoint(model_ft, epoch, 'best', optimizer_ft)
+                        self.ckpts.autosave_checkpoint(deepcopy(self.ema.ema), epoch, 'best', optimizer_ft)
                         best_acc = acc
                         best_perf_rst = perf_rst
                         # continue
 
+                    # Stop Single-GPU
+                    if stopper(epoch=epoch, fitness=acc):
+                        break
+
             if not epoch % cfg.N_EPOCHS_TO_SAVE_MODEL:
                 if cfg.local_rank == 0:
-                    self.ckpts.autosave_checkpoint(model_ft, epoch,'last', optimizer_ft)
+                    self.ckpts.autosave_checkpoint(deepcopy(self.ema.ema), epoch, 'last', optimizer_ft)
 
         if best_perf_rst is not None:
             logger.info(best_perf_rst.replace("(val)", "(best)"))
@@ -321,36 +330,38 @@ class Trainer:
         dist.destroy_process_group() if cfg.local_rank!=0 else None
         torch.cuda.empty_cache()
 
-    def train_epoch(self, scaler, epoch, model, dataset, dataloader, optimizer, timer, lossLogger, performanceLogger, prefix="train"):
+    def train_epoch(self, scaler, epoch, model, dataset, dataloader, optimizer, prefix="train"):
         model.train()
+
+        _timer = Timer()
+        lossLogger = LossLogger()
+        performanceLogger = build_evaluator(self.cfg, dataset)
 
         num_iters = len(dataloader)
         for i, sample in enumerate(dataloader):
             self.n_iters_elapsed += 1
-            timer.tic()
+            _timer.tic()
             self.run_step(scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix)
             torch.cuda.synchronize()
-            timer.toc()
+            _timer.toc()
 
             if (i + 1) % self.cfg.N_ITERS_TO_DISPLAY_STATUS == 0:
                 if self.cfg.local_rank == 0:
                     template = "[epoch {}/{}, iter {}/{}, lr {}] Total train loss: {:.4f} " "(ips = {:.2f})\n" "{}"
                     logger.info(
                         template.format(
-                            epoch, self.cfg.N_MAX_EPOCHS-1, i, num_iters - 1,
+                            epoch, self.cfg.N_MAX_EPOCHS - 1, i, num_iters - 1,
                             round(get_current_lr(optimizer), 6),
                             lossLogger.meters["loss"].value,
-                                   self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / timer.diff,
+                                   self.batch_size * self.cfg.N_ITERS_TO_DISPLAY_STATUS / _timer.diff,
                             "\n".join(
                                 ["{}: {:.4f}".format(n, l.value) for n, l in lossLogger.meters.items() if n != "loss"]),
                         )
                     )
 
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
-            # summarywriter.add_scalar("train/recall", recall, global_step=epoch)
-            # summarywriter.add_scalar("train/f1score", f1score, global_step=epoch)
             # Logging train losses
-            [self.tb_writer.add_scalar("loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
+            [self.tb_writer.add_scalar(f"loss/{prefix}_{n}", l.global_avg, epoch) for n, l in lossLogger.meters.items()]
             performances = performanceLogger.evaluate()
             if performances is not None and len(performances):
                 [self.tb_writer.add_scalar(f"performance/{prefix}_{k}", v, epoch) for k, v in performances.items()]
@@ -361,15 +372,15 @@ class Trainer:
                 attr = attr[1:]
                 self.tb_writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
-        lossLogger.reset()
-        performanceLogger.reset()
-
     @torch.no_grad()
-    def val_epoch(self, epoch, model, dataset, dataloader, timer, lossLogger, performanceLogger, prefix="val"):
+    def val_epoch(self, epoch, model, dataset, dataloader, prefix="val"):
         model.eval()
 
+        lossLogger = LossLogger()
+        performanceLogger = build_evaluator(self.cfg, dataset)
+
         with torch.no_grad():
-            for sample in tqdm(dataloader):
+            for sample in dataloader:
                 self.run_step(None, model, sample, None, lossLogger, performanceLogger, prefix)
 
         if self.cfg.TENSORBOARD and self.cfg.local_rank == 0:
@@ -398,36 +409,34 @@ class Trainer:
 
         acc = performances['performance']
 
-        lossLogger.reset()
-        performanceLogger.reset()
         return acc, perf_log
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generic Pytorch-based Training Framework')
+    parser.add_argument('--setting', default='conf/mini-imagenet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/hymenoptera.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/coco_enet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/cityscapes_deeplabv3plus.yml', help='The path to the configuration file.')
-    # parser.add_argument('--setting', default='conf/coco_fcos1.yml', help='The path to the configuration file.')
-    # parser.add_argument('--setting', default='conf/voc_fcos_bak.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/coco_fcos.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/camvid_enet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_maskrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_fasterrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_retinanet.yml', help='The path to the configuration file.')
-    parser.add_argument('--setting', default='conf/coco_nanodet.yml', help='The path to the configuration file.')
-    # parser.add_argument('--setting', default='conf/coco_yolov5_old.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/visdrone_tph_yolov5.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/coco_nanodetplus.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/cityscapes_regseg.yml', help='The path to the configuration file.')
+    # parser.add_argument('--setting', default='conf/cityscapes_topformer.yml', help='The path to the configuration file.')
 
-    parser.add_argument('--seed', type=int, default=None, help='random seed')
     # distributed training parameters
     parser.add_argument("--local_rank", default=0, type=int)
 
     args = parser.parse_args()
     cfg = CommonConfiguration.from_yaml(args.setting)
     cfg.local_rank = args.local_rank
-    cfg.seed = args.seed
 
-    if cfg.local_rank == 0:
+    if cfg.local_rank==0:
         logger.info('Loaded configuration file: {}'.format(args.setting))
         logger.info('Use gpu ids: {}'.format(cfg.GPU_IDS))
 
