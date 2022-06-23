@@ -163,7 +163,7 @@ class Trainer:
 
         if prefix=='train':
             # zero the parameter gradients
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             # Autocast
             with amp.autocast(enabled=True):
