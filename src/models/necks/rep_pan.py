@@ -9,7 +9,7 @@ from torch import nn
 from src.models.modules.yolov6_modules import RepBlock, Transpose, SimConv
 
 
-class RepPANNeck(nn.Module):
+class RepPAN(nn.Module):
     """RepPANNeck Module
     EfficientRep is the default backbone of this model.
     RepPANNeck has the balance of feature fusion ability and hardware efficiency.
