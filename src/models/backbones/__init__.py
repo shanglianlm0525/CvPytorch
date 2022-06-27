@@ -11,6 +11,7 @@ from .csp_darknet import CspDarkNet
 from .custom_cspnet import CustomCspNet
 from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
+from .efficientrep import EfficientRep
 from .lfd_resnet import LFDResNet
 from .mobilenet_v3 import MobileNetV3
 from .regnet import RegNet
@@ -36,7 +37,7 @@ __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2'
             'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet',
 
            'YOLOv5Backbone', 'TPH_YOLOv5Backbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
-           'CspDarkNet', 'RegNet', 'LFDResNet']
+           'CspDarkNet', 'RegNet', 'LFDResNet', 'EfficientRep']
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
@@ -83,6 +84,8 @@ def build_backbone(cfg):
         return CustomCspNet(**backbone_cfg)
     elif name == 'CspDarkNet':
         return CspDarkNet(**backbone_cfg)
+    elif name == 'EfficientRep':
+        return EfficientRep(**backbone_cfg)
     elif name == 'SGCPNetBackbone':
         return SGCPNetBackbone(**backbone_cfg)
     elif name == 'LFDResNet':
@@ -95,5 +98,6 @@ def build_backbone(cfg):
         return RepVGG(**backbone_cfg)
     elif name == 'RegSegBackbone':
         return RegSegBackbone(**backbone_cfg)
+
     else:
         raise NotImplementedError(name)
