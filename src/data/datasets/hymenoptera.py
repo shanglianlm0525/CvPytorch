@@ -4,15 +4,15 @@
 # @Author : liumin
 # @File : hymenoptera.py
 
-import glob
+
 import os
 
+import cv2
+from glob2 import glob
 import torch
-import torchvision.transforms as T
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
-from torchvision.datasets import ImageFolder
 
 """
     hymenoptera_data
@@ -35,16 +35,15 @@ class HymenopteraClassification(Dataset):
 
         self._imgs = []
         self._targets = []
-        # self.imgs = ImageFolder(root_path)
         if self.stage == 'infer':
             for root, fnames, _ in sorted(os.walk(data_cfg.IMG_DIR)):
                 for fname in sorted(fnames):
-                    self._imgs.extend(glob.glob(os.path.join(root, fname, data_cfg.IMG_SUFFIX)))
+                    self._imgs.extend(glob(os.path.join(root, fname, data_cfg.IMG_SUFFIX)))
         else:
             self.cls_label = [d.name for d in os.scandir(data_cfg.IMG_DIR) if d.is_dir()]
             for root, fnames, _ in sorted(os.walk(data_cfg.IMG_DIR)):
                 for fname in sorted(fnames):
-                    imgs = glob.glob(os.path.join(root, fname, data_cfg.IMG_SUFFIX))
+                    imgs = glob(os.path.join(root, fname, data_cfg.IMG_SUFFIX))
                     self._imgs.extend(imgs)
                     self._targets.extend([self.cls_label.index(fname) for _ in imgs])
 
@@ -53,28 +52,20 @@ class HymenopteraClassification(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
-            img_id = os.path.splitext(os.path.basename(self._imgs[idx]))[0]
-            sample = {'image': _img, 'mask': None}
-            return self.transform(sample), img_id
+            # _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
+            _img = cv2.imread(self._imgs[idx])  # BGR
+            sample = {'image': _img, 'target': None}
+            return self.transform(sample)
         else:
-            _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), self._targets[idx]
-            _target = self.encode_map(_target, idx)
+            # _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), self._targets[idx]
+            _img = cv2.imread(self._imgs[idx]) # BGR
+            _target = self._targets[idx]
+            _target = self.encode_target(_target, idx)
             sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
-    def encode_map(self, _target, idx):
+    def encode_target(self, _target, idx):
         return _target
 
     def __len__(self):
         return len(self._imgs)
-
-
-if __name__ == '__main__':
-    root_path = '/home/lmin/data/hymenoptera/train'
-    dataset = HymenopteraClassification(root_path)
-
-    print(dataset.__len__())
-    print(dataset.__getitem__(0))
-    print(len(dataset.cls_label))
-    print('finished!')
