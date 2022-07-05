@@ -7,6 +7,7 @@
 from copy import deepcopy
 
 from .bifpn import BiFPN
+from .fastestdet_neck import FastestDetNeck
 from .fcos_fpn import FCOSFPN
 from .fpn import FPN
 from .ghost_pan import GhostPAN
@@ -35,7 +36,8 @@ __all__ = [
     'GhostPAN',
     'FCOSFPN',
     'LFDNeck',
-    'RepPAN'
+    'RepPAN',
+    'FastestDetNeck'
 ]
 
 def build_neck(cfg):
@@ -67,6 +69,8 @@ def build_neck(cfg):
         return FCOSFPN(**neck_cfg)
     elif name == 'RepPAN':
         return RepPAN(**neck_cfg)
+    elif name == 'FastestDetNeck':
+        return FastestDetNeck(**neck_cfg)
     elif name == 'LFDNeck':
         return LFDNeck(**neck_cfg)
     else:
