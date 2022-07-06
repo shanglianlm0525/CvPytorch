@@ -10,6 +10,7 @@ from .deeplabv3_head import Deeplabv3Head
 from .deeplabv3plus_head import Deeplabv3PlusHead
 from .efficient_dehead import EfficientDeHead
 from .efficientdet_head import EfficientdetHead
+from .fastestdet_head import FastestDetHead
 from .fcos_head import FCOSHead
 from .nanodet_head import NanoDetHead
 from .nanodetplus_aux_head import NanoDetPlusAuxHead
@@ -36,6 +37,7 @@ __all__ = [
     'FCOSHead',
     'EfficientdetHead',
     'EfficientDeHead',
+    'FastestDetHead',
     'Deeplabv3Head',
     'Deeplabv3PlusHead',
     'StdcHead',
@@ -71,6 +73,8 @@ def build_head(cfg):
         return EfficientdetHead(**head_cfg)
     elif name == 'EfficientDeHead':
         return EfficientDeHead(**head_cfg)
+    elif name == 'FastestDetHead':
+        return FastestDetHead(**head_cfg)
 
     elif name == 'Deeplabv3Head':
         return Deeplabv3Head(**head_cfg)
