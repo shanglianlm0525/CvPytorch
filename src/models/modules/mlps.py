@@ -64,7 +64,7 @@ class PreAffinePostLayerScale(nn.Module):  # https://arxiv.org/abs/2103.17239
 
 class ResMLP(nn.Module):
     '''
-        ResMLP: Feedforward networks for image classification with data-efficient training
+        ResMLP: Feedforward networks for image topformer with data-efficient training
         https://arxiv.org/pdf/2105.03404.pdf
     '''
     def __init__(self, dim=128, image_size=14, patch_size=7, expansion_factor=4, depth=4, class_num=1000):
