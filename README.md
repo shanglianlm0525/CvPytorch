@@ -6,6 +6,8 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- [2022.07.17] Release **FastestDet** models on [COCO](http://mscoco.org/) (**11.17mAP**).
+- [2022.07.10] Release **YOLO6** models with yolov6-s on [COCO](http://mscoco.org/) (**32.14mAP**).
 - [2022.06.11] Release **YOLOX** models with yolox-s on [COCO](http://mscoco.org/) (**38.36mAP**).
 - [2022.05.31] Release **YOLOv5** models with yolov5s on [COCO](http://mscoco.org/) (**35.89mAP**).
 - [2022.05.19] Release **EfficientNet** models with *efficientnet_b0*, *efficientnet_b1*, *efficientnet_b2*, *efficientnet_b3*, *efficientnet_b4*, *efficientnet_b5*, *efficientnet_b6* and *efficientnet_b7*  on [Mini-ImageNet](http://image-net.org)  (**85.08,  85.60,  85.74,  86.06,  88.69, 85.62,  85.76 and  85.54 mAcc**).
