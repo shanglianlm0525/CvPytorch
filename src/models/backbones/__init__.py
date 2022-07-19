@@ -32,12 +32,16 @@ from .densenet import Densenet
 from .stdcnet import STDCNet
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
+from .yolov7_backbone import YOLOv7Backbone
 
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
             'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet',
 
-           'YOLOv5Backbone', 'TPH_YOLOv5Backbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
+           'YOLOv5Backbone', 'YOLOv7Backbone', 'TPH_YOLOv5Backbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
            'CspDarkNet', 'RegNet', 'LFDResNet', 'EfficientRep']
+
+
+
 
 def build_backbone(cfg):
     backbone_cfg = deepcopy(cfg)
@@ -92,6 +96,8 @@ def build_backbone(cfg):
         return LFDResNet(**backbone_cfg)
     elif name == 'YOLOv5Backbone':
         return YOLOv5Backbone(**backbone_cfg)
+    elif name == 'YOLOv7Backbone':
+        return YOLOv7Backbone(**backbone_cfg)
     elif name == 'TPH_YOLOv5Backbone':
         return TPH_YOLOv5Backbone(**backbone_cfg)
     elif name == 'RepVGG':
