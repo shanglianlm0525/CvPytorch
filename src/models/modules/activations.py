@@ -48,6 +48,7 @@ activations = {'ReLU': nn.ReLU,
                'GELU': nn.GELU,
                'Swish': Swish,
                'CReLU': CReLU,
+               'SiLU': nn.SiLU,
                'MemoryEfficientSwish': MemoryEfficientSwish,
                 None: nn.Identity
                }
