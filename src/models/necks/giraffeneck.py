@@ -243,17 +243,18 @@ class GiraffeNeck(nn.Module):
         super(GiraffeNeck, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = list(map(lambda x: max(round(x * width_mul), 1), in_channels))
+        self.fpn_channels = list(map(lambda x: max(round(x * width_mul), 1), fpn_channels))
         self.out_channels = list(map(lambda x: max(round(x * width_mul), 1), out_channels))
         self.num_ins = len(in_channels)
 
         self.resample = nn.ModuleDict()
         self.cell = nn.Sequential()
         giraffe_layer = GiraffeLayer(
-            in_channels=in_channels,
+            in_channels=self.in_channels,
             strides=strides,
             fpn_config=self.fpn_config,
-            inner_fpn_channels=fpn_channels,
-            outer_fpn_channels=out_channels,
+            inner_fpn_channels=self.fpn_channels,
+            outer_fpn_channels=self.out_channels,
             separable_conv=separable_conv,
             merge_type=merge_type
         )
@@ -274,7 +275,6 @@ class GiraffeNeck(nn.Module):
 
 
     def forward(self, x):
-        assert len(x) == len(self.in_channels)
         for resample in self.resample.values():
             x.append(resample(x[-1]))
         out = self.cell(x)
