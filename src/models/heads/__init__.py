@@ -12,6 +12,8 @@ from .efficient_dehead import EfficientDeHead
 from .efficientdet_head import EfficientdetHead
 from .fastestdet_head import FastestDetHead
 from .fcos_head import FCOSHead
+from .gflv2_head import GFocalHeadV2
+from .lspnet_head import LSPNetHead
 from .nanodet_head import NanoDetHead
 from .nanodetplus_aux_head import NanoDetPlusAuxHead
 from .nanodetplus_head import NanoDetPlusHead
@@ -21,7 +23,6 @@ from .regseg_head import RegSegHead
 from .sgcpnet_head import SGCPNetHead
 from .stdc_head import StdcHead
 from .topformer_head import TopFormerHead
-from .yolo_fastestv2_head import YOLOFastestv2Head
 from .yolop_head import YOLOPHead
 from .yolov5_head import YOLOv5Head
 from .yolov7_head import YOLOv7Head
@@ -34,8 +35,8 @@ __all__ = [
     'NanoDetHead',
     'NanoDetPlusHead',
     'NanoDetPlusAuxHead',
-    'YOLOFastestv2Head',
     'YOLOPHead',
+    'GFocalHeadV2',
     'FCOSHead',
     'EfficientdetHead',
     'EfficientDeHead',
@@ -43,6 +44,7 @@ __all__ = [
     'Deeplabv3Head',
     'Deeplabv3PlusHead',
     'StdcHead',
+    'LSPNetHead',
     'RegSegHead',
     'OpenPoseHead',
     'SGCPNetHead',
@@ -69,8 +71,8 @@ def build_head(cfg):
         return NanoDetPlusHead(**head_cfg)
     elif name == 'NanoDetPlusAuxHead':
         return NanoDetPlusAuxHead(**head_cfg)
-    elif name == 'YOLOFastestv2Head':
-        return YOLOFastestv2Head(**head_cfg)
+    elif name == 'GFocalHeadV2':
+        return GFocalHeadV2(**head_cfg)
     elif name == 'YOLOPHead':
         return YOLOPHead(**head_cfg)
     elif name == 'EfficientdetHead':
@@ -86,6 +88,8 @@ def build_head(cfg):
         return Deeplabv3PlusHead(**head_cfg)
     elif name == 'StdcHead':
         return StdcHead(**head_cfg)
+    elif name == 'LSPNetHead':
+        return LSPNetHead(**head_cfg)
     elif name == 'PPLiteSegHead':
         return PPLiteSegHead(**head_cfg)
     elif name == 'RegSegHead':
