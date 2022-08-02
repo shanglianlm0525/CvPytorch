@@ -247,7 +247,7 @@ class NanoDetPlusHead(nn.Module):
         device = cls_preds.device
         labels, label_scores, bbox_targets, dist_targets, num_pos = assign
         num_total_samples = max(
-            reduce_mean(torch.tensor(sum(num_pos)).to(device)).item(), 1.0
+            reduce_mean(torch.from_numpy(sum(num_pos)).to(device)).item(), 1.0
         )
 
         labels = torch.cat(labels, dim=0)
