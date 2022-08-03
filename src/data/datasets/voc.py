@@ -39,7 +39,7 @@ class VOCDetection(Dataset):
         self.use_difficult = False
 
         self._imgs = list()
-        self._labels = list()
+        self._targets = list()
         if self.stage == 'infer':
             if data_cfg.INDICES is not None:
                 with open(data_cfg.INDICES, 'r') as fd:
@@ -56,8 +56,8 @@ class VOCDetection(Dataset):
             for line in open(data_cfg.INDICES):
                 imgpath, labelpath = line.strip().split(' ')
                 self._imgs.append(os.path.join(data_cfg.IMG_DIR, imgpath))
-                self._labels.append(os.path.join(data_cfg.LABELS.DET_DIR, labelpath))
-            assert len(self._imgs) == len(self._labels), 'len(self._imgs) should be equals to len(self._labels)'
+                self._targets.append(os.path.join(data_cfg.LABELS.DET_DIR, labelpath))
+            assert len(self._imgs) == len(self._targets), 'len(self._imgs) should be equals to len(self._labels)'
             assert len(self._imgs) > 0, 'Found 0 images in the specified location, pls check it!'
 
 
@@ -100,7 +100,7 @@ class VOCDetection(Dataset):
         target["height"] = torch.tensor(int(height))
         target["width"] = torch.tensor(int(width))
         target["boxes"] = boxes
-        target["labels"] = torch.tensor(labels, dtype=torch.int64)
+        target["labels"] = torch.tensor(labels)
         return target
 
     def __getitem__(self, idx):
@@ -111,7 +111,7 @@ class VOCDetection(Dataset):
             return self.transform(sample), img_id
         else:
             _img = cv2.imread(self._imgs[idx])
-            _target = self._parse_xml(self._labels[idx])
+            _target = self._parse_xml(self._targets[idx])
 
             sample = {'image': _img, 'target': _target}
             sample = self.transform(sample)

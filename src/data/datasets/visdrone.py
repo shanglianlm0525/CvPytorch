@@ -98,7 +98,7 @@ class VisDroneDetection(Dataset):
         target["height"] = torch.tensor(int(height))
         target["width"] = torch.tensor(int(width))
         target["boxes"] = boxes
-        target["labels"] = torch.tensor(labels, dtype=torch.int64)
+        target["labels"] = torch.tensor(labels)
         return target
 
 

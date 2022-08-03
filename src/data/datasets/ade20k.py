@@ -28,8 +28,8 @@ class ADE20KSegmentation(Dataset):
 
         self.num_classes = len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
-        self.name2id = dict(zip(self.category, range(self.num_classes)))
-        self.id2name = {v: k for k, v in self.name2id.items()}
+        self.category2id = dict(zip(self.category, range(self.num_classes)))
+        self.id2category = {v: k for k, v in self.category2id.items()}
         self.palette = palette.ADE20K_palette
 
         self._imgs = []

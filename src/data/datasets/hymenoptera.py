@@ -10,7 +10,6 @@ import os
 import cv2
 from glob2 import glob
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
 
@@ -19,6 +18,7 @@ import numpy as np
     https://download.pytorch.org/tutorial/hymenoptera_data.zip
 """
 
+# @accelerate_dataset()
 class HymenopteraClassification(Dataset):
     def __init__(self,data_cfg, dictionary=None, transform=None,target_transform=None, stage='train'):
         super(HymenopteraClassification, self).__init__()
