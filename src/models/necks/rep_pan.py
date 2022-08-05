@@ -14,20 +14,12 @@ class RepPAN(nn.Module):
     EfficientRep is the default backbone of this model.
     RepPANNeck has the balance of feature fusion ability and hardware efficiency.
     """
-    cfg = {"nano": [0.33, 0.25],
-            "tiny": [0.33, 0.375],
-            "s": [0.33, 0.5],
-            "m": [0.67, 0.75],
-            "l": [1.0, 1.0],
-            "x": [1.33, 1.25]}
-    def __init__(self, subtype='yolov6_s', in_channels=[256, 512, 1024], out_channels=[128, 256, 512], layers = [12, 12, 12, 12]):
+    def __init__(self, subtype='yolov6_s', in_channels=[256, 512, 1024], mid_channels = [128, 128, 256], out_channels=[128, 256, 512], layers=[12, 12, 12, 12], depth_mul=1.0, width_mul=1.0):
         super().__init__()
         self.subtype = subtype
         assert in_channels is not None
         assert layers is not None
-        mid_channels = [128, 128, 256]
 
-        depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
         layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
         in_channels = list(map(lambda x: int(x * width_mul), in_channels))
         out_channels = list(map(lambda x: int(x * width_mul), out_channels))

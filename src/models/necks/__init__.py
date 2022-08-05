@@ -11,15 +11,15 @@ from .fastestdet_neck import FastestDetNeck
 from .fcos_fpn import FCOSFPN
 from .fpn import FPN
 from .ghost_pan import GhostPAN
+from .giraffeneck import GiraffeNeck
 from .lfd_neck import LFDNeck
 from .rep_pan import RepPAN
-from .tph_yolov5_neck import TPH_YOLOv5Neck
-from .yolofastestv2_neck import YoloFastestv2Neck
 from .pan import PAN
 from .tan import TAN
 from .yolop_neck import YOLOPNeck
 from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
+from .yolov7_neck import YOLOv7Neck
 from .yolox_neck import YOLOXNeck
 
 __all__ = [
@@ -27,17 +27,17 @@ __all__ = [
     'PAN',
     'TAN',
     'BiFPN',
-    'YoloFastestv2Neck',
     'YOLOXNeck',
     'YOLOv3Neck',
     'YOLOv5Neck',
-    'TPH_YOLOv5Neck',
+    'YOLOv7Neck',
     'YOLOPNeck',
     'GhostPAN',
     'FCOSFPN',
     'LFDNeck',
     'RepPAN',
-    'FastestDetNeck'
+    'FastestDetNeck',
+    'GiraffeNeck'
 ]
 
 def build_neck(cfg):
@@ -51,16 +51,14 @@ def build_neck(cfg):
         return TAN(**neck_cfg)
     elif name == 'BiFPN':
         return BiFPN(**neck_cfg)
-    elif name == 'YoloFastestv2Neck':
-        return YoloFastestv2Neck(**neck_cfg)
     elif name == 'YOLOXNeck':
         return YOLOXNeck(**neck_cfg)
     elif name == 'YOLOv3Neck':
         return YOLOv3Neck(**neck_cfg)
     elif name == 'YOLOv5Neck':
         return YOLOv5Neck(**neck_cfg)
-    elif name == 'TPH_YOLOv5Neck':
-        return TPH_YOLOv5Neck(**neck_cfg)
+    elif name == 'YOLOv7Neck':
+        return YOLOv7Neck(**neck_cfg)
     elif name == 'YOLOPNeck':
         return YOLOPNeck(**neck_cfg)
     elif name == 'GhostPAN':
@@ -71,6 +69,8 @@ def build_neck(cfg):
         return RepPAN(**neck_cfg)
     elif name == 'FastestDetNeck':
         return FastestDetNeck(**neck_cfg)
+    elif name == 'GiraffeNeck':
+        return GiraffeNeck(**neck_cfg)
     elif name == 'LFDNeck':
         return LFDNeck(**neck_cfg)
     else:
