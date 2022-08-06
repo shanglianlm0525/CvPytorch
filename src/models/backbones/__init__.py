@@ -13,13 +13,13 @@ from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
 from .efficientrep import EfficientRep
 from .lfd_resnet import LFDResNet
+from .lspnet_backbone import LSPNetBackbone
 from .mobilenet_v3 import MobileNetV3
 from .regnet import RegNet
 from .regseg_backbone import RegSegBackbone
 from .repvgg import RepVGG
 from .sgcpnet_backbone import SGCPNetBackbone
 from .topformer_backbone import TopFormerBackbone
-from .tph_yolov5_backbone import TPH_YOLOv5Backbone
 from .vgg import VGG
 from .resnet import ResNet
 from .resnext import ResNeXt
@@ -37,10 +37,8 @@ from .yolov7_backbone import YOLOv7Backbone
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
             'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet',
 
-           'YOLOv5Backbone', 'YOLOv7Backbone', 'TPH_YOLOv5Backbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
-           'CspDarkNet', 'RegNet', 'LFDResNet', 'EfficientRep']
-
-
+           'YOLOv5Backbone', 'YOLOv7Backbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
+           'CspDarkNet', 'RegNet', 'LFDResNet', 'EfficientRep', 'LSPNetBackbone']
 
 
 def build_backbone(cfg):
@@ -76,6 +74,8 @@ def build_backbone(cfg):
     # extra pretrained weight
     elif name == 'STDCNet':
         return STDCNet(**backbone_cfg)
+    elif name == 'LSPNetBackbone':
+        return LSPNetBackbone(**backbone_cfg)
     elif name == 'EfficientNetLite':
         return EfficientNetLite(**backbone_cfg)
     elif name == 'TopFormerBackbone':
@@ -98,8 +98,6 @@ def build_backbone(cfg):
         return YOLOv5Backbone(**backbone_cfg)
     elif name == 'YOLOv7Backbone':
         return YOLOv7Backbone(**backbone_cfg)
-    elif name == 'TPH_YOLOv5Backbone':
-        return TPH_YOLOv5Backbone(**backbone_cfg)
     elif name == 'RepVGG':
         return RepVGG(**backbone_cfg)
     elif name == 'RegSegBackbone':
