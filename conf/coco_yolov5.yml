@@ -17,7 +17,7 @@ DATASET:
     BATCH_SIZE: 64
     NUM_WORKER: 8
     LOAD_NUM: 4
-    CACHE: False
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -44,7 +44,7 @@ DATASET:
     BATCH_SIZE: 8
     NUM_WORKER: 8
     LOAD_NUM: 1
-    CACHE: False
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -64,8 +64,11 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.yolov5.YOLOv5'
-  TYPE: 'yolov5s'
-
+  TYPE: 'yolov5_s'
+  BACKBONE: { 'name': 'YOLOv5Backbone', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': False }
+  NECK: { 'name': 'YOLOv5Neck', 'in_channels': [256, 512, 1024], 'out_channels': [256, 512, 1024] }
+  DETECT: { 'name': 'YOLOv5Detect', 'in_channels': [256, 512, 1024] }
+  LOSS: { 'name': 'YOLOv5Loss' }
 
 EVALUATOR:
   NAME: 'coco_detection'
@@ -78,7 +81,7 @@ EVALUATOR:
 #########################################
 CHECKPOINT_DIR: 'checkpoints'
 N_EPOCHS_TO_SAVE_MODEL: 10
-# PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+# PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
 
 
@@ -94,12 +97,12 @@ SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
   TYPE: 'SGD' # Adam, RMSprop
-  BIAS_PARAMS:
-    momentum: 0.937
-    weight_decay: 0.0005
   WEIGHT_PARAMS:
     momentum: 0.937
     weight_decay: 0.0005
+  BIAS_PARAMS:
+    momentum: 0.937
+    weight_decay: 0.0
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
@@ -115,6 +118,30 @@ WARMUP:
   ITERS: 1000
   FACTOR: 0.1
 
+#########################################
+# AMP Configurations
+#########################################
+AMP: True
+
+#########################################
+# EMA Configurations
+#########################################
+EMA: True
+
+#########################################
+# Gradient Accumulation Configurations
+#########################################
+ACCUMULATE: False
+ACCUMULATE_STEPS: 64
+
+#########################################
+# EarlyStopping Configurations
+#########################################
+PATIENCE: 100
+
+#########################################
+# MULTI_SCALE Configurations
+#########################################
 MULTI_SCALE: True
 SCALE_RANGE: [0.5, 1.5]
 

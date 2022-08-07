@@ -25,7 +25,7 @@ class YOLOv5Head(nn.Module):
         self.num_layers = len(anchors)  # number of detection layers
         self.num_anchors = len(anchors[0]) // 2  # number of anchors
         self.grid = [torch.zeros(1)] * self.num_layers  # init grid
-        a = torch.tensor(anchors).float().view(self.num_layers, -1, 2)
+        a = torch.from_numpy(anchors).float().view(self.num_layers, -1, 2)
         self.register_buffer('anchors', a)  # shape(nl,na,2)
         self.register_buffer('anchor_grid', a.clone().view(self.num_layers, 1, -1, 1, 1, 2))  # shape(nl,1,na,1,1,2)
         self.convs = nn.ModuleList(nn.Conv2d(x, self.num_outputs * self.num_anchors, 1) for x in self.channels)  # output conv
@@ -64,5 +64,5 @@ class YOLOv5Head(nn.Module):
 
     @staticmethod
     def _make_grid(nx=20, ny=20):
-        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
+        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing='ij')
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
