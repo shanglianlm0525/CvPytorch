@@ -111,7 +111,7 @@ class ShuffleNetV2(nn.Module):
 
 
 if __name__=="__main__":
-    model =ShuffleNetV2('shufflenetv2_x1.0', classifier=True)
+    model =ShuffleNetV2('shufflenetv2_x0.5', classifier=True)
     print(model)
 
     input = torch.randn(1, 3, 224, 224)

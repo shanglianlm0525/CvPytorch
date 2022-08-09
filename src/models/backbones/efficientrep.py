@@ -12,14 +12,8 @@ from src.models.modules.yolov6_modules import RepVGGBlock, RepBlock, SimSPPF
 
 
 class EfficientRep(nn.Module):
-    cfg = {"nano": [0.33, 0.25],
-            "tiny": [0.33, 0.375],
-            "s": [0.33, 0.5],
-            "m": [0.67, 0.75],
-            "l": [1.0, 1.0],
-            "x": [1.33, 1.25]}
     def __init__(self, subtype='yolov6_s', out_stages=[2, 3, 4], output_stride=16, classifier=False, num_classes=1000,
-                     pretrained=True, backbone_path=None):
+                     pretrained=False, backbone_path=None, depth_mul=1.0, width_mul=1.0):
         super(EfficientRep, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
@@ -29,7 +23,6 @@ class EfficientRep(nn.Module):
         self.pretrained = pretrained
         self.backbone_path = backbone_path
 
-        depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
         layers = [6, 12, 18, 6]
         out_channels = [64, 128, 256, 512, 1024]
         layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
