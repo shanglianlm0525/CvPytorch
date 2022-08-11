@@ -20,19 +20,16 @@ def get_current_lr(optimizer):
 
 def build_optimizer(cfg, model):
     '''
-        g0, g1, g2 = [], [], []  # optimizer parameter groups
-        for v in model_ft.modules():
-            if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):  # bias
-                g2.append(v.bias)
-            if isinstance(v, nn.BatchNorm2d):  # weight with decay
-                g0.append(v.weight)
-            elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):  # weight without decay
-                g1.append(v.weight)
-
-        optimizer_ft = torch.optim.SGD(g0, lr=0.01, momentum=0.937, nesterov=True)
-        optimizer_ft.add_param_group({'params': g1, 'weight_decay': 0.0005})  # add g1 with weight_decay
-        optimizer_ft.add_param_group({'params': g2})  # add g2 (biases)
-        del g0, g1, g2
+    # params = [p for p in model.parameters() if p.requires_grad]
+    _params = []
+    # filter(lambda p: p.requires_grad, model.parameters())
+    for n, p in dict(model.named_parameters()).items():
+        if p.requires_grad:
+            _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS if "bias" in n else cfg.OPTIMIZER.WEIGHT_PARAMS)
+            _args.pop("data")
+            _params += [{"params": [p], "lr": cfg.BACKBONE_LR if 'backbone' in n and cfg.BACKBONE_LR is not None else cfg.INIT_LR, **_args}]
+            if "bias" in n:
+                _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
     '''
 
     # params = [p for p in model.parameters() if p.requires_grad]
