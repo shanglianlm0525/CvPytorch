@@ -132,10 +132,10 @@ class QFocalLoss(nn.Module):
             return loss
 
 
-class Yolov5Loss:
+class YOLOv5Loss:
     # Compute losses
     def __init__(self, num_classes, stride=[ 8., 16., 32.], anchors=(), device = 'cuda:0', autobalance=False):
-        super(Yolov5Loss, self).__init__()
+        super(YOLOv5Loss, self).__init__()
         self.sort_obj_iou = False
         self.num_classes = num_classes
         self.num_layers = len(anchors)  # number of detection layers
