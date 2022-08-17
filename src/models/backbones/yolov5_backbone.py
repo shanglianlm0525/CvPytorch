@@ -18,8 +18,8 @@ class YOLOv5Backbone(nn.Module):
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
-        out_channels = [64, 128, 256, 512, 1024]
         layers = [3, 6, 9, 3]
+        out_channels = [64, 128, 256, 512, 1024]
         self.out_channels = in_places = list(map(lambda x: int(x * width_mul), out_channels))
         layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
 
@@ -34,7 +34,6 @@ class YOLOv5Backbone(nn.Module):
                                     C3(in_places[4], in_places[4], layers[3]),
                                     SPPF(in_places[4], in_places[4], 5))
 
-        self.out_channels = [int(otc * width_mul) for otc in self.out_channels]
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
 
         self.init_weights()
