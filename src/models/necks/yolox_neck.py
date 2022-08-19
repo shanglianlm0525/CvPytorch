@@ -11,13 +11,7 @@ from src.models.modules.yolox_modules import BaseConv, CSPLayer
 
 
 class YOLOXNeck(nn.Module):
-    cfg = {"nano": [0.33, 0.25],
-            "tiny": [0.33, 0.375],
-            "s": [0.33, 0.5],
-            "m": [0.67, 0.75],
-            "l": [1.0, 1.0],
-            "x": [1.33, 1.25]}
-    def __init__(self, subtype='yolox_s', channels=[256, 512, 1024]):
+    def __init__(self, subtype='yolox_s', channels=[256, 512, 1024], depth_mul=1.0, width_mul=1.0):
         super(YOLOXNeck, self).__init__()
         assert isinstance(channels, list)
         self.subtype = subtype
@@ -25,7 +19,7 @@ class YOLOXNeck(nn.Module):
         self.num_ins = len(channels)
 
         act = "silu"
-        depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
+        # depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
         channels = list(map(lambda x: max(round(x * width_mul), 1), channels))
         layers = list(map(lambda x: max(round(x * depth_mul), 1), [3, 3, 3, 3]))
 
