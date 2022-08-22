@@ -71,6 +71,12 @@ def yolox_post_process(outputs, down_strides, num_classes, conf_thre, nms_thre):
 
 
 class YOLOX(nn.Module):
+    cfg = {"nano": [0.33, 0.25],
+            "tiny": [0.33, 0.375],
+            "s": [0.33, 0.5],
+            "m": [0.67, 0.75],
+            "l": [1.0, 1.0],
+            "x": [1.33, 1.25]}
     def __init__(self, dictionary=None, model_cfg=None):
         super(YOLOX, self).__init__()
         self.dictionary = dictionary
@@ -81,6 +87,7 @@ class YOLOX(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
+        self.depth_mul, self.width_mul = self.cfg[self.model_cfg.TYPE.split("_")[1]]
         self.setup_extra_params()
         self.backbone = build_backbone(self.model_cfg.BACKBONE)
         self.neck = build_neck(self.model_cfg.NECK)
@@ -90,10 +97,16 @@ class YOLOX(nn.Module):
 
         self.stride = [8, 16, 32]
         self.conf_thr = 0.001
-        self.nms_thr = 0.65
+        self.nms_thr = 0.7 # 0.65
 
 
     def setup_extra_params(self):
+        self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.BACKBONE.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.NECK.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.NECK.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.HEAD.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.HEAD.__setitem__('width_mul', self.width_mul)
         self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
 
 
@@ -166,7 +179,7 @@ class YOLOX(nn.Module):
                         bboxes_np[:, [0, 2]] = bboxes_np[:, [0, 2]].clip(0, width)
                         bboxes_np[:, [1, 3]] = bboxes_np[:, [1, 3]].clip(0, height)
                         outputs.append(
-                            {"boxes": torch.tensor(bboxes_np), "labels": predict[:, 6], "scores": predict[:, 4] * predict[:, 5]})
+                            {"boxes": torch.from_numpy(bboxes_np), "labels": predict[:, 6], "scores": predict[:, 4] * predict[:, 5]})
                     else:
                         outputs.append(
                             {"boxes": torch.empty((0, 4)), "labels": torch.empty((0, 1)), "scores": torch.empty((0, 1))})
