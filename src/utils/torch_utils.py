@@ -5,6 +5,8 @@
 # @File : torch_utils.py
 
 import os
+import time
+
 import numpy as np
 import random
 import torch
@@ -38,3 +40,10 @@ def fix_bn(model):
     for m in model.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.eval()
+
+
+def time_synchronized():
+    # pytorch-accurate time
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    return time.time()
