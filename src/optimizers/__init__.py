@@ -31,16 +31,28 @@ def build_optimizer(cfg, model):
             if "bias" in n:
                 _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
     '''
-
     # params = [p for p in model.parameters() if p.requires_grad]
     _params = []
     # filter(lambda p: p.requires_grad, model.parameters())
-    for n, p in dict(model.named_parameters()).items():
-        if p.requires_grad:
-            _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS if "bias" in n else cfg.OPTIMIZER.WEIGHT_PARAMS)
+    bn = tuple(v for k, v in nn.__dict__.items() if 'Norm' in k)  # normalization layers, i.e. BatchNorm2d()
+    for k, v in model.named_modules():
+        if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):  # bias
+            _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS)
             _args.pop("data")
-            _params += [{"params": [p], "lr": cfg.BACKBONE_LR if 'backbone' in n and cfg.BACKBONE_LR is not None else cfg.INIT_LR, **_args}]
-            if "bias" in n:
+            _params += [{"params": [v.bias], "lr": cfg.BACKBONE_LR if 'backbone' in k and cfg.BACKBONE_LR is not None else cfg.INIT_LR, **_args}]
+            if hasattr(v, 'bias'):
+                _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
+        if isinstance(v, bn):  # weight (no decay)
+            _args = deepcopy(cfg.OPTIMIZER.BIAS_PARAMS)
+            _args.pop("data")
+            _params += [{"params": [v.weight], "lr": cfg.BACKBONE_LR if 'backbone' in k and cfg.BACKBONE_LR is not None else cfg.INIT_LR, **_args}]
+            if hasattr(v, 'bias'):
+                _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
+        elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):  # weight (with decay)
+            _args = deepcopy(cfg.OPTIMIZER.WEIGHT_PARAMS)
+            _args.pop("data")
+            _params += [{"params": [v.weight], "lr": cfg.BACKBONE_LR if 'backbone' in k and cfg.BACKBONE_LR is not None else cfg.INIT_LR, **_args}]
+            if hasattr(v, 'bias'):
                 _params[-1]["lr"] *= cfg.OPTIMIZER.BIAS_LR_MULTIPLIER or 1.0
 
     opt_type = cfg.OPTIMIZER.TYPE.lower()
