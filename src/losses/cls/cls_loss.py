@@ -112,6 +112,21 @@ class PolyLoss(_Loss):
         return (polyl)
 
 
+class LogitNormLoss(nn.Module):
+    """
+        Mitigating Neural Network Overconfidence with Logit Normalization
+        https://arxiv.org/abs/2205.09310
+    """
+    def __init__(self, tau=0.01):
+        super(LogitNormLoss, self).__init__()
+        self.tau = tau
+
+    def forward(self, x, target):
+        norms = torch.norm(x, p=2, dim=-1, keepdim=True) + 1e-7
+        logit_norm = torch.div(x, norms) / self.tau
+        return F.cross_entropy(logit_norm, target)
+
+
 if __name__ == '__main__':
 
     # Example of target in one-hot encoded format
