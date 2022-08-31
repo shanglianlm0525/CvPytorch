@@ -5,6 +5,8 @@
 # @File : __init__.py
 
 import math
+
+import torch
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, ExponentialLR, ReduceLROnPlateau, CosineAnnealingLR, CosineAnnealingWarmRestarts, LambdaLR
 from src.lr_schedulers.poly_lr import PolyLR
 
