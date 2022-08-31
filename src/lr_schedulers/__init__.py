@@ -7,11 +7,12 @@
 import math
 
 import torch
-from torch.optim.lr_scheduler import StepLR, MultiStepLR, ExponentialLR, ReduceLROnPlateau, CosineAnnealingLR, CosineAnnealingWarmRestarts, LambdaLR
+from torch.optim.lr_scheduler import StepLR, MultiStepLR, ExponentialLR, ReduceLROnPlateau, CyclicLR, OneCycleLR, \
+    CosineAnnealingLR, CosineAnnealingWarmRestarts, LambdaLR
 from src.lr_schedulers.poly_lr import PolyLR
 
-__all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts','ExponentialLR', 'PolyLR']
-
+__all__ = ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau', 'CyclicLR', 'OneCycleLR',
+           'CosineAnnealingLR', 'CosineAnnealingWarmRestarts','ExponentialLR', 'PolyLR']
 
 
 '''
@@ -39,6 +40,18 @@ def build_lr_scheduler(cfg, iters_per_epoch, optimizer):
     elif cfg.LR_SCHEDULER.TYPE == "ReduceLROnPlateau":
         lr_scheduler_ft = ReduceLROnPlateau(
             optimizer, factor=cfg.LR_SCHEDULER.GAMMA or 0.1, patience=cfg.LR_SCHEDULER.STEP
+        )
+    elif cfg.LR_SCHEDULER.TYPE == "CyclicLR":
+        """torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.01, max_lr=0.1)"""
+        lr_scheduler_ft = CyclicLR(
+            optimizer, base_lr=cfg.LR_SCHEDULER.MIN_LR if cfg.LR_SCHEDULER.MIN_LR is not None else 0.01,
+            max_lr=cfg.LR_SCHEDULER.MAX_LR if cfg.LR_SCHEDULER.MAX_LR is not None else 0.1
+        )
+    elif cfg.LR_SCHEDULER.TYPE == "OneCycleLR":
+        """torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.01, steps_per_epoch=len(data_loader), epochs=10)"""
+        lr_scheduler_ft = OneCycleLR(
+            optimizer, max_lr=cfg.LR_SCHEDULER.MAX_LR if cfg.LR_SCHEDULER.MAX_LR is not None else 0.1,
+            steps_per_epoch= iters_per_epoch, epochs= cfg.N_MAX_EPOCHS
         )
     elif cfg.LR_SCHEDULER.TYPE == "CosineAnnealingLR":
         """
