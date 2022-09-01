@@ -11,21 +11,18 @@ from src.models.modules.yolov7_modules import Conv, EELAN, DownA, SPPCSPC
 
 
 class YOLOv7Backbone(nn.Module):
-    def __init__(self, subtype='yolov7s', out_stages=[3, 4, 5], output_stride=32, layers=[3, 6, 9, 3], depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='yolov7s', out_stages=[3, 4, 5], output_stride=32, depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
         super(YOLOv7Backbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride
-        self.width_mul = width_mul
-        self.depth_mul = depth_mul
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
         in_places = [32, 64, 128, 256, 512, 1024]
         out_channels = [32, 64, 256, 512, 1024, 512]
-        in_places = list(map(lambda x: int(x * self.width_mul), in_places))
-        self.out_channels = list(map(lambda x: int(x * self.width_mul), out_channels))
-        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), layers))
+        in_places = list(map(lambda x: int(x * width_mul), in_places))
+        self.out_channels = list(map(lambda x: int(x * width_mul), out_channels))
 
         self.stem = Conv(3, in_places[0], k=3, s=1, p=1)  # 0
         self.layer1 = nn.Sequential(Conv(in_places[0], in_places[1], 3, 2),
@@ -40,8 +37,7 @@ class YOLOv7Backbone(nn.Module):
                                     EELAN(in_places[4], in_places[3], in_places[5]))
 
         self.layer5 = nn.Sequential(DownA(in_places[5], in_places[4]),
-                                    EELAN(in_places[5], in_places[3], in_places[5]),
-                                    SPPCSPC(in_places[5], in_places[4]))
+                                    EELAN(in_places[5], in_places[3], in_places[5]))
 
         self.out_channels = [int(otc * width_mul) for otc in self.out_channels]
         self.out_channels = self.out_channels[self.out_stages[0]:self.out_stages[-1] + 1]
