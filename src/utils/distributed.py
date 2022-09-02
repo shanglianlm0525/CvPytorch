@@ -294,28 +294,3 @@ class LossLogger(object):
     def reset(self):
         self.meters = defaultdict(SmoothedValue)
 
-
-class MetricLogger(object):
-    'Using adapter design patterns'
-    def __init__(self, cfg, dictionary):
-        self.cfg = cfg
-        self.type = self.cfg.EVAL_FUNC
-        self.dictionary = dictionary
-
-        if self.type == 'segmentation':
-            self._evaluator = SegmentationEvaluator(self.dictionary)
-        elif self.type == 'voc_detection':
-            self._evaluator = VOCEvaluator(self.dictionary)
-        elif self.type == 'coco_detection':
-            self._evaluator = COCOEvaluator(self.dictionary)
-        elif self.type == 'topformer':
-            self._evaluator = ClassificationEvaluator(self.dictionary)
-        else:
-            raise NotImplementedError
-
-    def update(self, *kwargs):
-        self._evaluator.add_batch(*kwargs)
-
-    def evaluate(self):
-        return self._evaluator.evaluate()
-
