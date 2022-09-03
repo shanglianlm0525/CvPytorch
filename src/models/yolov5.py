@@ -12,8 +12,13 @@ import torch.nn.functional as F
 import numpy as np
 from torchvision.ops import nms
 
-from src.losses import Yolov5Loss
-from src.models.modules.yolov5_modules import Conv, C3, C3TR, SPPF, SPP, CBAM, Detect
+
+from src.models.backbones import build_backbone
+from src.models.modules.yolo_modules import SPPF, C3, Conv
+from src.models.necks import build_neck
+from src.models.heads import build_head
+from src.models.detects import build_detect, YOLOv5Detect
+from src.losses import build_loss, YOLOv5Loss
 
 """
     https://github.com/ultralytics/yolov5
@@ -153,6 +158,12 @@ class YOLOv5(nn.Module):
     anchors = [[[ 1.25000,  1.62500], [ 2.00000,  3.75000], [ 4.12500,  2.87500]],
         [[ 1.87500,  3.81250],[ 3.87500,  2.81250], [ 3.68750,  7.43750]],
         [[ 3.62500,  2.81250], [ 4.87500,  6.18750], [11.65625, 10.18750]]]
+    cfg = {"nano": [0.33, 0.25],
+            "tiny": [0.33, 0.375],
+            "s": [0.33, 0.5],
+            "m": [0.67, 0.75],
+            "l": [1.0, 1.0],
+            "x": [1.33, 1.25]}
     def __init__(self, dictionary=None, model_cfg=None):
         super(YOLOv5, self).__init__()
         self.dictionary = dictionary
@@ -163,58 +174,22 @@ class YOLOv5(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        if self.model_cfg.TYPE == 'yolov5s':
-            self.depth_mul = 0.33  # model depth multiple
-            self.width_mul = 0.50  # layer channel multiple
-        elif self.model_cfg.TYPE == 'yolov5m':
-            self.depth_mul = 0.67  # model depth multiple
-            self.width_mul = 0.75  # layer channel multiple
-        elif self.model_cfg.TYPE == 'yolov5l':
-            self.depth_mul = 1.0  # model depth multiple
-            self.width_mul = 1.0  # layer channel multiple
-        elif self.model_cfg.TYPE == 'yolov5x':
-            self.depth_mul = 1.33  # model depth multiple
-            self.width_mul = 1.25  # layer channel multiple
-        else:
-            raise NotImplementedError
-
-        stride = [8., 16., 32.]
-        layers = [3, 6, 9, 3, 3, 3, 3, 3]
-        out_channels = [64, 128, 256, 512, 1024]
-        in_places = list(map(lambda x: int(x * self.width_mul), out_channels))
-        layers = list(map(lambda x: max(round(x * self.depth_mul), 1), layers))
-
+        self.depth_mul, self.width_mul = self.cfg[self.model_cfg.TYPE.split("_")[1]]
         self.setup_extra_params()
-        self.backbone_conv1 = Conv(3, in_places[0], k=(6, 6), s=(2, 2), p=(2, 2))  # 0
-        self.backbone_layer1 = nn.Sequential(Conv(in_places[0], in_places[1], 3, 2),
-                                             C3(in_places[1], in_places[1], layers[0]))  # 2
-        self.backbone_layer2 = nn.Sequential(Conv(in_places[1], in_places[2], 3, 2),
-                                             C3(in_places[2], in_places[2], layers[1]))
-        self.backbone_layer3 = nn.Sequential(Conv(in_places[2], in_places[3], 3, 2),  # 4
-                                             C3(in_places[3], in_places[3], layers[2]))
-        self.backbone_layer4 = nn.Sequential(Conv(in_places[3], in_places[4], 3, 2),  # 6
-                                             C3(in_places[4], in_places[4], layers[3]),
-                                             SPPF(in_places[4], in_places[4], 5))  # 9
-
-        self.head_up_1_conv = Conv(in_places[4], in_places[3], 1, 1)  # 10
-        self.head_up_1 = C3(in_places[3] * 2, in_places[3], layers[4], False)  # 13
-
-        self.head_up_2_conv = Conv(in_places[3], in_places[2], 1, 1)  # 14
-        self.head_up_2 = C3(in_places[2] * 2, in_places[2], layers[5], False)  # 17
-
-        self.head_down_1_conv = Conv(in_places[2], in_places[2], 3, 2)       # 18
-        self.head_down_1 = C3(in_places[3], in_places[3], layers[6], False)  # 20
-
-        self.head_down_2_conv = Conv(in_places[3], in_places[3], 3, 2)         # 21
-        self.head_down_2 = C3(in_places[4], in_places[4], layers[7], False)  # 33
-
-        # nc=80, stride=[4.,  8., 16., 32.], anchors=(), ch=()
-        self.detect = Detect(num_classes=self.num_classes, stride=stride, anchors=self.anchors, ch=in_places[2:])
-
-        self.loss = Yolov5Loss(self.num_classes, anchors=self.anchors)
+        # backbone
+        self.backbone = build_backbone(self.model_cfg.BACKBONE)
+        # neck
+        self.neck = build_neck(self.model_cfg.NECK)
+        # head
+        # self.head = build_head(self.model_cfg.HEAD)
+        # detect
+        self.detect = build_detect(self.model_cfg.DETECT)
+        # loss
+        self.loss = build_loss(self.model_cfg.LOSS)
 
         self.conf_thres = 0.001  # confidence threshold
         self.iou_thres = 0.6  # NMS IoU threshold
+        # self.iou_thres = 0.7  # NMS IoU threshold when infer
 
         self.init_weights()
 
@@ -230,7 +205,16 @@ class YOLOv5(nn.Module):
                 m.inplace = True
 
     def setup_extra_params(self):
-        pass
+        self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.BACKBONE.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.NECK.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.NECK.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.DETECT.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.DETECT.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.DETECT.__setitem__('anchors', self.anchors)
+        self.model_cfg.DETECT.__setitem__('num_classes', self.num_classes)
+        self.model_cfg.LOSS.__setitem__('anchors', self.anchors)
+        self.model_cfg.LOSS.__setitem__('num_classes', self.num_classes)
 
     def trans_specific_format(self, imgs, targets):
         new_gts = []
@@ -270,24 +254,9 @@ class YOLOv5(nn.Module):
             # imgs 2 x 3 x 640 x 640
             # targets [15.00000, 55.00000, 0.38317, 0.30502, 0.59623, 0.46391]
             losses = {}
-            out2 = self.backbone_layer1(self.backbone_conv1(imgs))
-            out4 = self.backbone_layer2(out2)
-            out6 = self.backbone_layer3(out4)
-            out9 = self.backbone_layer4(out6)
+            out, train_out = self.detect(self.neck(self.backbone(imgs)))
 
-            # up
-            out10 = self.head_up_1_conv(out9)
-            out13 = self.head_up_1(torch.cat([F.interpolate(out10, scale_factor=2, mode="nearest"), out6], dim=1))
-            out14 = self.head_up_2_conv(out13)
-            out17 = self.head_up_2(torch.cat([F.interpolate(out14, scale_factor=2, mode="nearest"), out4], dim=1))
-
-            # down
-            out20 = self.head_down_1(torch.cat([self.head_down_1_conv(out17), out14], dim=1))
-            out23 = self.head_down_2(torch.cat([self.head_down_2_conv(out20), out10], dim=1))
-
-            out, train_out = self.detect([out17, out20, out23])
             losses['loss'], loss_states = self.loss(train_out, targets["gts"])
-
             losses['box_loss'] = loss_states[0]
             losses['obj_loss'] = loss_states[1]
             losses['cls_loss'] = loss_states[2]
@@ -314,7 +283,6 @@ class YOLOv5(nn.Module):
                         bboxes_np[:, [0, 2]] = bboxes_np[:, [0, 2]].clip(0, width)
                         bboxes_np[:, [1, 3]] = bboxes_np[:, [1, 3]].clip(0, height)
                         outputs.append({"boxes": torch.tensor(bboxes_np), "labels": pred[:, 5], "scores": pred[:, 4]})
-                        # outputs.append({"boxes": pred[:, :4], "labels": pred[:, 5], "scores": pred[:, 4]})
                 return losses, outputs
             else:
                 return losses
