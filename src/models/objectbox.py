@@ -178,7 +178,7 @@ class ObjectBox(nn.Module):
 
 
         self.conf_thres = 0.001  # confidence threshold
-        self.iou_thres = 0.7  # NMS IoU threshold
+        self.iou_thres = 0.6  # NMS IoU threshold
 
         self.init_weights()
 
@@ -246,6 +246,10 @@ class ObjectBox(nn.Module):
             out, train_out = self.detect(features)
             losses['loss'], loss_states = self.loss(train_out, targets["gts"])
 
+            losses['box_loss'] = loss_states[0]
+            losses['obj_loss'] = loss_states[1]
+            losses['cls_loss'] = loss_states[2]
+
             if mode == 'val':
                 outputs = []
                 if out is not None:
@@ -271,10 +275,4 @@ class ObjectBox(nn.Module):
                         # outputs.append({"boxes": pred[:, :4], "labels": pred[:, 5], "scores": pred[:, 4]})
                 return losses, outputs
             else:
-                train_out = self.head(features, targets["boxes"], targets["labels"], imgs)
-                losses['loss'], loss_states = self.loss(train_out, targets["gts"])
-
-                losses['box_loss'] = loss_states[0]
-                losses['obj_loss'] = loss_states[1]
-                losses['cls_loss'] = loss_states[2]
                 return losses
