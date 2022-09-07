@@ -27,11 +27,13 @@ from .yolop_head import YOLOPHead
 from .yolov5_head import YOLOv5Head
 from .yolov7_head import YOLOv7Head
 from .yolox_head import YOLOXHead
+from .tood_head import TOODHead
 
 __all__ = [
     'YOLOv5Head',
     'YOLOXHead',
     'YOLOv7Head',
+    'TOODHead',
     'NanoDetHead',
     'NanoDetPlusHead',
     'NanoDetPlusAuxHead',
@@ -63,6 +65,8 @@ def build_head(cfg):
         return YOLOXHead(**head_cfg)
     elif name == 'YOLOv7Head':
         return YOLOv7Head(**head_cfg)
+    elif name == 'TOODHead':
+        return TOODHead(**head_cfg)
     elif name == 'FCOSHead':
         return FCOSHead(**head_cfg)
     elif name == 'NanoDetHead':

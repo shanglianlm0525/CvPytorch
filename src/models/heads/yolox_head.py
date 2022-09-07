@@ -8,23 +8,17 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from src.models.modules.yolox_modules import BaseConv
+from src.models.modules.convs import ConvModule
 
 
 class YOLOXHead(nn.Module):
-    cfg = {"nano": [0.33, 0.25],
-            "tiny": [0.33, 0.375],
-            "s": [0.33, 0.5],
-            "m": [0.67, 0.75],
-            "l": [1.0, 1.0],
-            "x": [1.33, 1.25]}
-    def __init__(self, num_classes=80, subtype='yolox_s', in_channels=[256, 512, 1024]):
+    def __init__(self, num_classes=80, subtype='yolox_s', in_channels=[256, 512, 1024], strides = [8, 16, 32], depth_mul=1.0, width_mul=1.0):
         super(YOLOXHead, self).__init__()
         self.num_classes = num_classes  # number of classes
         self.subtype = subtype
+        self.strides = strides
         self.n_anchors = 1
 
-        depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
         in_channels = list(map(lambda x: max(round(x * width_mul), 1), in_channels))
         in_places = int(256 * width_mul)
 
@@ -38,18 +32,18 @@ class YOLOXHead(nn.Module):
 
         for i in range(len(in_channels)):
             self.stems.append(
-                BaseConv(in_channels=in_channels[i], out_channels=in_places, ksize=1, stride=1)
+                ConvModule(in_channels=in_channels[i], out_channels=in_places, kernel_size=1, stride=1, padding=1, activation="SiLU")
             )
             self.cls_convs.append(
                 nn.Sequential(
-                    *[BaseConv(in_channels=in_places, out_channels=in_places, ksize=3, stride=1),
-                    BaseConv(in_channels=in_places, out_channels=in_places, ksize=3, stride=1),]
+                    *[ConvModule(in_channels=in_places, out_channels=in_places, kernel_size=3, stride=1, padding=1, activation="SiLU"),
+                    ConvModule(in_channels=in_places, out_channels=in_places, kernel_size=3, stride=1, padding=1, activation="SiLU"),]
                 )
             )
             self.reg_convs.append(
                 nn.Sequential(
-                    *[BaseConv(in_channels=in_places, out_channels=in_places, ksize=3, stride=1),
-                    BaseConv(in_channels=in_places, out_channels=in_places, ksize=3, stride=1),]
+                    *[ConvModule(in_channels=in_places, out_channels=in_places, kernel_size=3, stride=1, padding=1, activation="SiLU"),
+                    ConvModule(in_channels=in_places, out_channels=in_places, kernel_size=3, stride=1, padding=1, activation="SiLU"),]
                 )
             )
             self.cls_preds.append(nn.Conv2d(in_places, self.n_anchors * self.num_classes, 1, 1, 0))
