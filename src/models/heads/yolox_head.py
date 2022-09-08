@@ -69,17 +69,17 @@ class YOLOXHead(nn.Module):
             b.data.fill_(-np.math.log((1 - prior_prob) / prior_prob))
             conv.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
 
-    def forward(self, feats):
+    def forward(self, x):
         outputs = []
-        for k, (cls_conv, reg_conv, x) in enumerate(zip(self.cls_convs, self.reg_convs, feats)):
-            x = self.stems[k](x)
+        for k, (cls_conv, reg_conv, xx) in enumerate(zip(self.cls_convs, self.reg_convs, x)):
+            xx = self.stems[k](xx)
 
             # classify
-            cls_feat = cls_conv(x)
+            cls_feat = cls_conv(xx)
             cls_output = self.cls_preds[k](cls_feat)
 
             # regress, object, (reid)
-            reg_feat = reg_conv(x)
+            reg_feat = reg_conv(xx)
             reg_output = self.reg_preds[k](reg_feat)
             obj_output = self.obj_preds[k](reg_feat)
             output = torch.cat([reg_output, obj_output, cls_output], 1)
