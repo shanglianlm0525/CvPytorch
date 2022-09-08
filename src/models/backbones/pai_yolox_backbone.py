@@ -9,10 +9,10 @@ import torch.nn as nn
 from src.models.modules.yolox_modules import RepVGGBlock, MT_SPPF
 
 
-class PAIYOLOXBackbone(nn.Module):
+class PAI_YOLOXBackbone(nn.Module):
     def __init__(self, subtype='pai_yolox_s', out_stages=[2, 3, 4], output_stride=32, depth_mul=1.0, width_mul=1.0, backbone_path=None,
                  pretrained=False):
-        super(PAIYOLOXBackbone, self).__init__()
+        super(PAI_YOLOXBackbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride
