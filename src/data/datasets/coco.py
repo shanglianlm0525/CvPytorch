@@ -143,12 +143,12 @@ class CocoDetection(Dataset):
         cache = {}  # dict
         NUM_THREADS = 8
         cache_path = (Path(self.data_cfg.IMG_DIR).parent.parent/self.stage).with_suffix('.cache')
-        '''
+
         if cache_path.is_file():
             cache = np.load(cache_path, allow_pickle=True).item()
-            if cache['hash'] == get_hash(self._imgs + self._targets):
+            if cache['hash'] == get_hash(self.imgpaths):
                 return cache
-        '''
+
         desc = f"Scanning '{cache_path.parent / cache_path.stem}' images and labels..."
         with Pool(NUM_THREADS) as pool:
             pbar = tqdm(pool.imap_unordered(load_image_label, zip(self.ids, self.imgpaths, self.anns)), desc=desc, total=self.__len__())
