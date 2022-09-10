@@ -10,6 +10,7 @@ import torch.nn as nn
 import torchvision
 import torch.nn.functional as F
 
+
 from src.losses.seg_loss import CrossEntropyLoss2d
 from src.models.backbones import build_backbone
 
@@ -20,7 +21,6 @@ available_models = ['vgg11_bn','vgg13_bn','vgg16_bn','vgg19_bn'
                     ,'shufflenet_v2_x0_5','shufflenet_v2_x1_0,','shufflenet_v2_x1_5','shufflenet_v2_x2_0'
                     ,'mobilenet_v2'
                     ,'squeezenet1_1']
-
 
 
 class Classification(nn.Module):
