@@ -21,7 +21,7 @@ from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
 from .yolov7_neck import YOLOv7Neck
 from .yolox_neck import YOLOXNeck
-from .pai_yolox_neck import PAIYOLOXNeck
+from .pai_yolox_neck import PAI_YOLOXNeck
 
 __all__ = [
     'FPN',
@@ -29,7 +29,7 @@ __all__ = [
     'TAN',
     'BiFPN',
     'YOLOXNeck',
-    'PAIYOLOXNeck',
+    'PAI_YOLOXNeck',
     'YOLOv3Neck',
     'YOLOv5Neck',
     'YOLOv7Neck',
@@ -55,8 +55,8 @@ def build_neck(cfg):
         return BiFPN(**neck_cfg)
     elif name == 'YOLOXNeck':
         return YOLOXNeck(**neck_cfg)
-    elif name == 'PAIYOLOXNeck':
-        return PAIYOLOXNeck(**neck_cfg)
+    elif name == 'PAI_YOLOXNeck':
+        return PAI_YOLOXNeck(**neck_cfg)
     elif name == 'YOLOv3Neck':
         return YOLOv3Neck(**neck_cfg)
     elif name == 'YOLOv5Neck':

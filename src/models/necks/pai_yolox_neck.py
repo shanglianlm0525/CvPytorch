@@ -12,9 +12,9 @@ from src.models.necks import YOLOXNeck
 from src.models.necks.asff import ASFF
 
 
-class PAIYOLOXNeck(YOLOXNeck):
-    def __init__(self, subtype='pai_yolox_s', channels=[256, 512, 1024], asff_channel=2, expand_kernel=3, depth_mul=1.0, width_mul=1.0, act='silu'):
-        super(PAIYOLOXNeck, self).__init__(subtype=subtype, channels=channels, depth_mul=depth_mul, width_mul=width_mul)
+class PAI_YOLOXNeck(YOLOXNeck):
+    def __init__(self, subtype='pai_yolox_s', channels=[256, 512, 1024], asff_channel=2, expand_kernel=3, depth_mul=1.0, width_mul=1.0, act='SiLU'):
+        super(PAI_YOLOXNeck, self).__init__(subtype=subtype, channels=channels, depth_mul=depth_mul, width_mul=width_mul)
         assert isinstance(channels, list)
 
         self.asff_1 = ASFF(level=0,asff_channel=asff_channel,expand_kernel=expand_kernel,multiplier=width_mul,act=act)
@@ -30,7 +30,7 @@ class PAIYOLOXNeck(YOLOXNeck):
                 m.momentum = 0.03
 
     def forward(self, x):
-        outs = super(PAIYOLOXNeck, self).forward(x)
+        outs = super(PAI_YOLOXNeck, self).forward(x)
 
         asff_out0 = self.asff_1(outs)
         asff_out1 = self.asff_2(outs)
