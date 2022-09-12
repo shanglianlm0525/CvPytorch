@@ -126,23 +126,16 @@ $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'co
 
 ### TODO
 - [x] Train Custom Data
-
 - [x] Multi-GPU Training
-
 - [x] Mixed Precision Training
-
 - [x] Warm-Up
-
+- [x] Gradient Accumulation
+- [x] Gradient Checkpoint
 - [ ] Model Pruning/Sparsity
-
 - [ ] Quantization
-
 - [ ] TensorRT Deployment
-
 - [ ] ONNX and TorchScript Export
-
 - [ ] Class Activation Mapping (CAM)
-
 - [ ] Test-Time Augmentation (TTA)
 
 
