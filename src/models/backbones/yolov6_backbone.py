@@ -8,7 +8,7 @@ import math
 import torch
 import torch.nn as nn
 
-from src.models.modules.yolov6_modules import RepVGGBlock, RepBlock, SimSPPF, BepC3
+from src.models.modules.yolov6_modules import RepVGGBlock, RepBlock, SimSPPF, CSPStackRep
 
 
 class YOLOv6Backbone(nn.Module):
@@ -28,7 +28,7 @@ class YOLOv6Backbone(nn.Module):
         layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
         self.out_channels = in_places = list(map(lambda x: int(x * width_mul), out_channels))
 
-        block = BepC3 if depth_mul>0.5 else RepBlock
+        block = CSPStackRep if depth_mul>0.5 else RepBlock
         self.stem = RepVGGBlock(in_channels=3, out_channels=in_places[0], kernel_size=3, stride=2)
         self.stage1 = nn.Sequential(
             RepVGGBlock(in_channels=in_places[0], out_channels=in_places[1], kernel_size=3, stride=2),
