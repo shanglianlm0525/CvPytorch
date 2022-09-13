@@ -13,12 +13,12 @@ from .fpn import FPN
 from .ghost_pan import GhostPAN
 from .giraffeneck import GiraffeNeck
 from .lfd_neck import LFDNeck
-from .rep_pan import RepPAN
 from .pan import PAN
 from .tan import TAN
 from .yolop_neck import YOLOPNeck
 from .yolov3_neck import YOLOv3Neck
 from .yolov5_neck import YOLOv5Neck
+from .yolov6_neck import YOLOv6Neck
 from .yolov7_neck import YOLOv7Neck
 from .yolox_neck import YOLOXNeck
 from .pai_yolox_neck import PAI_YOLOXNeck
@@ -32,12 +32,12 @@ __all__ = [
     'PAI_YOLOXNeck',
     'YOLOv3Neck',
     'YOLOv5Neck',
+    'YOLOv6Neck',
     'YOLOv7Neck',
     'YOLOPNeck',
     'GhostPAN',
     'FCOSFPN',
     'LFDNeck',
-    'RepPAN',
     'FastestDetNeck',
     'GiraffeNeck'
 ]
@@ -69,8 +69,8 @@ def build_neck(cfg):
         return GhostPAN(**neck_cfg)
     elif name == 'FCOSFPN':
         return FCOSFPN(**neck_cfg)
-    elif name == 'RepPAN':
-        return RepPAN(**neck_cfg)
+    elif name == 'YOLOv6Neck':
+        return YOLOv6Neck(**neck_cfg)
     elif name == 'FastestDetNeck':
         return FastestDetNeck(**neck_cfg)
     elif name == 'GiraffeNeck':
