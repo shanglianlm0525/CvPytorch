@@ -24,8 +24,8 @@ class Deeplabv3PlusHead(nn.Module):
         self.classifier = nn.Sequential(nn.Conv2d(project_channels+mid_channels, mid_channels, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(mid_channels),
                                        nn.ReLU(inplace=True),
-                                       nn.Conv2d(mid_channels, num_classes, kernel_size=1, stride=1))
-        self._init_weight()
+                                       nn.Conv2d(mid_channels, num_classes, kernel_size=1, stride=1, bias=True))
+        self.init_weight()
 
     def forward(self, x, low_level_feat):
         low_level_feat = self.project(low_level_feat)
@@ -33,7 +33,7 @@ class Deeplabv3PlusHead(nn.Module):
         x = F.interpolate(x, size=low_level_feat.size()[2:], mode='bilinear', align_corners=True)
         return self.classifier(torch.cat((x, low_level_feat), dim=1))
 
-    def _init_weight(self):
+    def init_weight(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight)

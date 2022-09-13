@@ -17,7 +17,7 @@ class Deeplabv3Head(nn.Module):
         self.classifier = nn.Sequential(nn.Conv2d(mid_channels, mid_channels, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(mid_channels),
                                        nn.ReLU(inplace=True),
-                                       nn.Conv2d(mid_channels, num_classes, kernel_size=1, stride=1))
+                                       nn.Conv2d(mid_channels, num_classes, kernel_size=1, stride=1, bias=True))
         self._init_weight()
 
     def forward(self, x):
