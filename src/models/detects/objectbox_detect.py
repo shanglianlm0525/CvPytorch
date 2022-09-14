@@ -21,21 +21,22 @@ def xyxy2xywh(x):
 
 
 class ObjectBoxDetect(nn.Module):
-    det_layers = [[8, 8, 16, 16, 32, 32, 64, 64, 128, 128],  # P3/8
-                  [8, 8, 16, 16, 32, 32, 64, 64, 128, 128],  # P4/16
-                  [8, 8, 16, 16, 32, 32, 64, 64, 128, 128]]  # P5/32
+    det_layers_t = [[[1.0000, 1.0000]],
+            [[0.5000, 0.5000]],
+            [[0.2500, 0.2500]]]
     def __init__(self, num_classes=80, in_channels=[256, 512, 1024], stride=[8, 16, 32], depth_mul=1.0, width_mul=1.0):  # detection layer
         super().__init__()
         self.num_classes = num_classes  # number of classes
         self.num_outputs = num_classes + 5  # number of outputs per detection layers
-        self.num_layers = len(self.det_layers)  # number of detection layers
+        self.num_layers = len(self.det_layers_t)  # number of detection layers
         self.stride = stride
         self.num_anchors = 1
         self.in_channels = list(map(lambda x: max(round(x * width_mul), 1), in_channels))
 
         self.grid = [torch.zeros(1)] * self.num_layers  # init grid
-        a = torch.tensor(self.det_layers).float().view(self.num_layers, -1, 2)[:, :self.num_anchors, :]
-        a /= torch.tensor(self.stride).view(-1, 1, 1)
+        # a = torch.tensor(self.det_layers1).float().view(self.num_layers, -1, 2)[:, :self.num_anchors, :]
+        # a /= torch.tensor(self.stride).view(-1, 1, 1)
+        a = torch.tensor(self.det_layers_t)
         self.register_buffer('det_layers', a)  # shape(nl,na,2)
         self.register_buffer('det_layers_grid', a.clone().view(self.num_layers, 1, -1, 1, 1, 2))  # shape(nl,1,na,1,1,2)
         self.m = nn.ModuleList(nn.Conv2d(x, self.num_outputs * self.num_anchors, 1) for x in self.in_channels)  # output conv
@@ -89,7 +90,7 @@ class ObjectBoxDetect(nn.Module):
                 pred = y.view(bs, -1, self.num_outputs)
                 z.append(pred)
 
-        return x if self.training else (torch.cat(z, 1), x)
+        return (None, x) if self.training else (torch.cat(z, 1), x)
 
     @staticmethod
     def _make_grid(nx=20, ny=20):
