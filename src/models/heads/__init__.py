@@ -8,7 +8,6 @@ from copy import deepcopy
 
 from .deeplabv3_head import Deeplabv3Head
 from .deeplabv3plus_head import Deeplabv3PlusHead
-from .efficient_dehead import EfficientDeHead
 from .efficientdet_head import EfficientdetHead
 from .fastestdet_head import FastestDetHead
 from .fcos_head import FCOSHead
@@ -25,6 +24,7 @@ from .stdc_head import StdcHead
 from .topformer_head import TopFormerHead
 from .yolop_head import YOLOPHead
 from .yolov5_head import YOLOv5Head
+from .yolov6_head import YOLOv6Head
 from .yolov7_head import YOLOv7Head
 from .yolox_head import YOLOXHead
 from .tood_head import TOODHead
@@ -40,7 +40,7 @@ __all__ = [
     'YOLOPHead',
     'GFocalHeadV2',
     'FCOSHead',
-    'EfficientdetHead',
+    'YOLOv6Head',
     'EfficientDeHead',
     'FastestDetHead',
     'Deeplabv3Head',
@@ -81,8 +81,8 @@ def build_head(cfg):
         return YOLOPHead(**head_cfg)
     elif name == 'EfficientdetHead':
         return EfficientdetHead(**head_cfg)
-    elif name == 'EfficientDeHead':
-        return EfficientDeHead(**head_cfg)
+    elif name == 'YOLOv6Head':
+        return YOLOv6Head(**head_cfg)
     elif name == 'FastestDetHead':
         return FastestDetHead(**head_cfg)
 

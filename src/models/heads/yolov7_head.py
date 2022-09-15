@@ -6,7 +6,7 @@
 
 import torch
 import torch.nn as nn
-from src.models.modules.yolov7_modules import RepConv
+from src.models.modules.yolov7_modules import RepConv, Conv
 
 
 class YOLOv7Head(nn.Module):
