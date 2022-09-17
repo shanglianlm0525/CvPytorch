@@ -305,7 +305,7 @@ class Resize(object):
         """
         img, target = sample['image'], sample['target']
         if self.keep_ratio:
-            w, h = F._get_image_size(img)
+            w, h = F.get_image_size(img)
             # random scale (short edge)
             scale = min(self.size[0] / h, self.size[1] / w)
             oh, ow = int(round(h * scale)), int(round(w * scale))
@@ -335,7 +335,7 @@ class Resize(object):
         return self.__class__.__name__ + '(size={0}, interpolation={1})'.format(self.size, interpolate_str)
 
 
-class RandomScaleCrop(object):
+class RandomScaleCrop1(object):
     def __init__(self, size, scale=(0.08, 1.0), keep_ratio=True, fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if isinstance(size, numbers.Number):
@@ -367,7 +367,7 @@ class RandomScaleCrop(object):
             PIL Image or Tensor: Randomly cropped and resized image.
         """
         img, target = sample['image'], sample['target']
-        w, h = F._get_image_size(img)
+        w, h = F.get_image_size(img)
         if self.keep_ratio:
             base_size = min(w, h)
             # random scale (short edge)
@@ -416,6 +416,73 @@ class RandomScaleCrop(object):
             target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
 
         return { 'image': img, 'target': target }
+
+    def __repr__(self):
+        interpolate_str = _pil_interpolation_to_str[self.interpolation]
+        format_string = self.__class__.__name__ + '(size={0}'.format(self.size)
+        format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
+        format_string += ', interpolation={0})'.format(interpolate_str)
+        return format_string
+
+
+
+class RandomScaleCrop(object):
+    def __init__(self, size, scale=(0.08, 1.0), fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+        super().__init__()
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        elif isinstance(size, Sequence) and len(size) == 1:
+            self.size = (size[0], size[0])
+        else:
+            if len(size) != 2:
+                raise ValueError("Please provide only two dimensions (h, w) for size.")
+            self.size = size
+
+        if not isinstance(scale, Sequence):
+            raise TypeError("Scale should be a sequence")
+
+        self.scale = scale
+        self.fill = fill
+        self.ignore_label = ignore_label
+        self.padding_mode = padding_mode
+        self.interpolation = interpolation
+
+
+    def __call__(self, sample):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be cropped and resized.
+        Returns:
+            PIL Image or Tensor: Randomly cropped and resized image.
+        """
+        img, target = sample['image'], sample['target']
+        w, h = F.get_image_size(img)
+        base_size = min(w, h)
+        # random scale (short edge)
+        short_size = random.randint(int(base_size * self.scale[0]), int(base_size * self.scale[1]))
+        if h > w:
+            ow = short_size
+            oh = int(1.0 * h * ow / w)
+        else:
+            oh = short_size
+            ow = int(1.0 * w * oh / h)
+        img = F.resize(img, [oh, ow], self.interpolation)
+        target = F.resize(target, [oh, ow], InterpolationMode.NEAREST)
+        # pad crop
+        if short_size < min(self.size):
+            padh = self.size[0] - oh if oh < self.size[0] else 0
+            padw = self.size[1] - ow if ow < self.size[1] else 0
+            # left, top, right and bottom
+            img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
+            target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
+
+        # random crop crop_size
+        w, h = F.get_image_size(img)
+        x1 = random.randint(0, w - self.size[1])
+        y1 = random.randint(0, h - self.size[0])
+        # top, left, height, width
+        return {'image': F.crop(img, y1, x1, self.size[0], self.size[1]),
+                'target': F.crop(target, y1, x1, self.size[0], self.size[1])}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -482,7 +549,7 @@ class RandomResizedCrop(object):
             tuple: params (i, j, h, w) to be passed to ``crop`` for a random
             sized crop.
         """
-        width, height = F._get_image_size(img)
+        width, height = F.get_image_size(img)
         area = height * width
 
         log_ratio = torch.log(torch.tensor(ratio))
@@ -525,7 +592,7 @@ class RandomResizedCrop(object):
             PIL Image or Tensor: Randomly cropped and resized image.
         """
         img, target = sample['image'], sample['target']
-        width, height = F._get_image_size(img)
+        width, height = F.get_image_size(img)
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
 
         return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation),
@@ -872,7 +939,7 @@ class RandomPerspective(object):
         """
         img, target = sample['image'], sample['target']
         if torch.rand(1) < self.p:
-            width, height = F._get_image_size(img)
+            width, height = F.get_image_size(img)
             startpoints, endpoints = self.get_params(width, height, self.distortion_scale)
             return {'image': F.perspective(img, startpoints, endpoints, self.interpolation, self.fill),
              'target': F.perspective(img, startpoints, endpoints, InterpolationMode.NEAREST, self.ignore_label)}

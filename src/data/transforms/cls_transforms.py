@@ -4,22 +4,43 @@
 # @Author : liumin
 # @File : cls_transforms.py
 
+import warnings
+import math
 import random
 from numbers import Number
 import cv2
 import torch
 from PIL import Image
-from torchvision import transforms as T
-from torchvision.transforms import functional as F
+import torchvision.transforms as T
+import torchvision.transforms.functional as F
 import numpy as np
+from collections.abc import Sequence
 
 
-__all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip',
+__all__ = ['RandomHorizontalFlip', 'RandomVerticalFlip', 'RandomResizedCrop',
         'Resize', 'RandomScale', 'RandomCrop', 'CenterCrop',
         'RandomRotate', 'RandomTranslation',
         'ColorJitter', 'RandomGaussianBlur',
         'Normalize', 'DeNormalize', 'ToTensor',
         'RGB2BGR', 'BGR2RGB']
+
+
+def clip_boxes_to_image(boxes, size):
+    """
+    Clip boxes so that they lie inside an image of size `size`.
+
+    Args:
+        boxes (array[N, 4]): boxes in ``(x1, y1, x2, y2)`` format
+            with ``0 <= x1 < x2`` and ``0 <= y1 < y2``.
+        size (Tuple or List[height, width]): size of the image
+
+    Returns:
+        array[N, 4]: clipped boxes
+    """
+    height, width = size
+    boxes[..., 0::2] = boxes[..., 0::2].clip(min=0, max=width-1)
+    boxes[..., 1::2] = boxes[..., 1::2].clip(min=0, max=height-1)
+    return boxes
 
 
 class Compose(object):
@@ -82,6 +103,126 @@ class Resize(object):
         img, target = sample['image'], sample['target']
         img = cv2.resize(img, tuple(self.size[::-1]), interpolation=cv2.INTER_LINEAR)
         return {'image': img,'target': target}
+
+
+class RandomResizedCrop(object):
+    """Crop a random portion of image and resize it to a given size.
+
+    If the image is torch Tensor, it is expected
+    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
+
+    A crop of the original image is made: the crop has a random area (H * W)
+    and a random aspect ratio. This crop is finally resized to the given
+    size. This is popularly used to train the Inception networks.
+
+    Args:
+        size (int or sequence): expected output size of the crop, for each edge. If size is an
+            int instead of sequence like (h, w), a square output size ``(size, size)`` is
+            made. If provided a sequence of length 1, it will be interpreted as (size[0], size[0]).
+
+            .. note::
+                In torchscript mode size as single int is not supported, use a sequence of length 1: ``[size, ]``.
+        scale (tuple of float): Specifies the lower and upper bounds for the random area of the crop,
+            before resizing. The scale is defined with respect to the area of the original image.
+        ratio (tuple of float): lower and upper bounds for the random aspect ratio of the crop, before
+            resizing.
+        interpolation (InterpolationMode): Desired interpolation enum defined by
+            :class:`torchvision.transforms.InterpolationMode`. Default is ``InterpolationMode.BILINEAR``.
+            If input is Tensor, only ``InterpolationMode.NEAREST``, ``InterpolationMode.BILINEAR`` and
+            ``InterpolationMode.BICUBIC`` are supported.
+            For backward compatibility integer values (e.g. ``PIL.Image.NEAREST``) are still acceptable.
+
+    """
+
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), keep_ratio=True, fill=[0, 0, 0], min_size = 3):
+        super().__init__()
+        self.size = size
+        if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
+            warnings.warn("Scale and ratio should be of kind (min, max)")
+
+        self.scale = scale
+        self.ratio = ratio
+        self.keep_ratio = keep_ratio
+        self.fill = fill
+        self.min_size = min_size
+
+    @staticmethod
+    def get_params(img, scale, ratio):
+        """Get parameters for ``crop`` for a random sized crop.
+
+        Args:
+            img (PIL Image or Tensor): Input image.
+            scale (list): range of scale of the origin size cropped
+            ratio (list): range of aspect ratio of the origin aspect ratio cropped
+
+        Returns:
+            tuple: params (i, j, h, w) to be passed to ``crop`` for a random
+            sized crop.
+        """
+        height, width, _ = img.shape
+        area = height * width
+
+        log_ratio = torch.log(torch.tensor(ratio))
+        for _ in range(10):
+            target_area = area * torch.empty(1).uniform_(scale[0], scale[1]).item()
+            aspect_ratio = torch.exp(torch.empty(1).uniform_(log_ratio[0], log_ratio[1])).item()
+
+            w = int(round(math.sqrt(target_area * aspect_ratio)))
+            h = int(round(math.sqrt(target_area / aspect_ratio)))
+
+            if 0 < w <= width and 0 < h <= height:
+                i = torch.randint(0, height - h + 1, size=(1,)).item()
+                j = torch.randint(0, width - w + 1, size=(1,)).item()
+                return i, j, h, w
+
+        # Fallback to central crop
+        in_ratio = float(width) / float(height)
+        if in_ratio < min(ratio):
+            w = width
+            h = int(round(w / min(ratio)))
+        elif in_ratio > max(ratio):
+            h = height
+            w = int(round(h * max(ratio)))
+        else:  # whole image
+            w = width
+            h = height
+        i = (height - h) // 2
+        j = (width - w) // 2
+        return i, j, h, w
+
+    def __call__(self, sample):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be cropped and resized.
+
+        Returns:
+            PIL Image or Tensor: Randomly cropped and resized image.
+        """
+        img, target = sample['image'], sample['target']
+        # height, width, _ = img.shape
+        i, j, h, w = self.get_params(img, self.scale, self.ratio)
+
+        # crop (top, left, height, width)
+        img = img[i:(i + h), j:(j + w), :]
+        if self.keep_ratio:
+            # resize
+            scale = min(self.size[0] / h, self.size[1] / w)
+            oh, ow = int(round(h * scale)), int(round(w * scale))
+            padh, padw = self.size[0] - oh, self.size[1] - ow  # wh padding
+            padh /= 2
+            padw /= 2  # divide padding into 2 sides
+
+            if (h != oh) or (w != ow):
+                img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
+            top, bottom = int(round(padh - 0.1)), int(round(padh + 0.1))
+            left, right = int(round(padw - 0.1)), int(round(padw + 0.1))
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=self.fill)  # add border
+            return {'image': img, 'target': target }
+        else:
+            # resize
+            img = cv2.resize(img, self.size[::-1], interpolation=cv2.INTER_LINEAR)
+            return {'image': img, 'target': target }
 
 
 class RandomHorizontalFlip(object):
@@ -208,7 +349,8 @@ class CenterCrop(object):
 
 
 class ColorJitter(object):
-    def __init__(self, brightness=0, contrast=0, saturation=0, hue=0):
+    def __init__(self, p=0.5, brightness=0, contrast=0, saturation=0, hue=0):
+        self.p = p
         self.brightness = brightness
         self.contrast = contrast
         self.saturation = saturation
@@ -216,9 +358,10 @@ class ColorJitter(object):
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
-        img = Image.fromarray(img)
-        img = T.ColorJitter(self.brightness, self.contrast, self.saturation,self.hue)(img)
-        img = np.asarray(img, dtype=np.int32)
+        if random.random() < self.p:
+            img = Image.fromarray(img)
+            img = T.ColorJitter(self.brightness, self.contrast, self.saturation,self.hue)(img)
+            img = np.asarray(img, dtype=np.int32)
         return {'image': img, 'target': target}
 
 
