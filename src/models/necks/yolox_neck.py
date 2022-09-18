@@ -48,9 +48,9 @@ class YOLOXNeck(nn.Module):
                 m.eps = 1e-3
                 m.momentum = 0.03
 
-    def forward(self, blocks):
-        assert len(blocks) == len(self.channels)
-        [x2, x1, x0] = blocks
+    def forward(self, x):
+        assert len(x) == len(self.channels)
+        [x2, x1, x0] = x
 
         fpn_out0 = self.lateral_conv0(x0)  # 1024->512/32
         f_out0 = self.upsample(fpn_out0)  # 512/16
