@@ -6,6 +6,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- [2022.09.18] Release **YOLO7** models with yolov7-l on [COCO](http://mscoco.org/) (**45.26mAP**).
 - [2022.09.12] Release **ObjectBox** models with objectbox-m on [COCO](http://mscoco.org/) (**36.41mAP**).
 - [2022.08.03] Release **LPSNet** models with lpsnet_s on [Cityscapes](https://www.cityscapes-dataset.com/) (**56.66mIoU**).
 - [2022.07.17] Release **FastestDet** models on [COCO](http://mscoco.org/) (**11.42mAP**).
