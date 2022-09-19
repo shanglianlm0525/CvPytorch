@@ -10,11 +10,13 @@ from src.models.modules.yolo_modules import Conv, C3, SPPF, SPP
 
 
 class YOLOv5Backbone(nn.Module):
-    def __init__(self, subtype='yolov5s', out_stages=[2, 3, 4], output_stride=32, depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
+    def __init__(self, subtype='yolov5_s', out_stages=[2, 3, 4], output_stride=32, classifier=False, num_classes=1000, depth_mul=1.0, width_mul=1.0, backbone_path=None, pretrained = False):
         super(YOLOv5Backbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
         self.output_stride = output_stride
+        self.classifier = classifier
+        self.num_classes = num_classes
         self.backbone_path = backbone_path
         self.pretrained = pretrained
 
@@ -55,9 +57,9 @@ class YOLOv5Backbone(nn.Module):
         for i in range(1, 5):
             res_layer = getattr(self, 'layer{}'.format(i))
             x = res_layer(x)
-            if i in self.out_stages:
+            if i in self.out_stages and not self.classifier:
                 output.append(x)
-        return output
+        return output if len(self.out_stages) > 1 else output[0]
 
 
 if __name__ == "__main__":
