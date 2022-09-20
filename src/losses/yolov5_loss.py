@@ -134,7 +134,7 @@ class QFocalLoss(nn.Module):
 
 class YOLOv5Loss:
     # Compute losses
-    def __init__(self, num_classes, stride=[ 8., 16., 32.], anchors=(), device = 'cuda:0', autobalance=False):
+    def __init__(self, num_classes, stride=[ 8., 16., 32.], anchors=(), hyp_box=0.05, hyp_obj=1.0, hyp_cls=0.5, device = 'cuda:0', autobalance=False):
         super(YOLOv5Loss, self).__init__()
         self.sort_obj_iou = False
         self.num_classes = num_classes
@@ -146,9 +146,9 @@ class YOLOv5Loss:
         self.stride = torch.tensor(stride, device=self.device).view(-1, 1, 1)
 
         self.hyp_anchor_t = 4.0
-        self.hyp_box = 0.05
-        self.hyp_obj = 1.0
-        self.hyp_cls = 0.5
+        self.hyp_box = hyp_box
+        self.hyp_obj = hyp_obj
+        self.hyp_cls = hyp_cls
 
         # anchors = torch.tensor(anchors, device=self.device).view(len(anchors), 3, -1)
         # stride = torch.tensor(stride, device=self.device).view(-1, 1, 1)
