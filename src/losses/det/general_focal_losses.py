@@ -11,7 +11,7 @@ from .det_loss_utils import weighted_loss
 
 
 @weighted_loss
-def quality_focal_loss(pred, target, beta=2.0):
+def quality_focal_loss(pred, target, beta=2.0, use_sigmoid=True):
     r"""Quality Focal Loss (QFL) is from `Generalized Focal Loss: Learning
     Qualified and Distributed Bounding Boxes for Dense Object Detection
     <https://arxiv.org/abs/2006.04388>`_.
@@ -32,12 +32,15 @@ def quality_focal_loss(pred, target, beta=2.0):
         including category label and quality label, respectively"""
     # label denotes the category id, score denotes the quality score
     label, score = target
-
+    if use_sigmoid:
+        func = F.binary_cross_entropy_with_logits
+    else:
+        func = F.binary_cross_entropy
     # negatives are supervised by 0 quality score
     pred_sigmoid = pred.sigmoid()
     scale_factor = pred_sigmoid
     zerolabel = scale_factor.new_zeros(pred.shape)
-    loss = F.binary_cross_entropy_with_logits(
+    loss = func(
         pred, zerolabel, reduction='none') * scale_factor.pow(beta)
 
     # FG cat_id: [0, num_classes -1], BG cat_id: num_classes
@@ -46,7 +49,7 @@ def quality_focal_loss(pred, target, beta=2.0):
     pos_label = label[pos].long()
     # positives are supervised by bbox quality (IoU) score
     scale_factor = score[pos] - pred_sigmoid[pos, pos_label]
-    loss[pos, pos_label] = F.binary_cross_entropy_with_logits(
+    loss[pos, pos_label] = func(
         pred[pos, pos_label], score[pos],
         reduction='none') * scale_factor.abs().pow(beta)
 
@@ -91,8 +94,9 @@ class QualityFocalLoss(nn.Module):
         loss_weight (float): Loss weight of current loss.
     """
 
-    def __init__(self, beta=2.0,reduction='mean',loss_weight=1.0):
+    def __init__(self, use_sigmoid=True,beta=2.0,reduction='mean',loss_weight=1.0):
         super(QualityFocalLoss, self).__init__()
+        self.use_sigmoid = use_sigmoid
         self.beta = beta
         self.reduction = reduction
         self.loss_weight = loss_weight
@@ -123,13 +127,15 @@ class QualityFocalLoss(nn.Module):
         reduction = (
             reduction_override if reduction_override else self.reduction)
 
-        loss_cls = self.loss_weight * quality_focal_loss(
-            pred,
-            target,
-            weight,
-            beta=self.beta,
-            reduction=reduction,
-            avg_factor=avg_factor)
+        with torch.cuda.amp.autocast(enabled=False):
+            loss_cls = self.loss_weight * quality_focal_loss(
+                pred,
+                target,
+                weight,
+                beta=self.beta,
+                use_sigmoid=self.use_sigmoid,
+                reduction=reduction,
+                avg_factor=avg_factor)
         return loss_cls
 
 
