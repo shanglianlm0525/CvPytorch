@@ -13,7 +13,7 @@ from src.models.modules.yolov6_modules import RepVGGBlock, RepBlock, SimSPPF, CS
 
 class YOLOv6Backbone(nn.Module):
     def __init__(self, subtype='yolov6_s', out_stages=[2, 3, 4], output_stride=32, classifier=False, num_classes=1000,
-                 depth_mul=1.0, width_mul=1.0, csp_e=0.6, backbone_path=None, pretrained = False):
+                 depth_mul=1.0, width_mul=1.0, csp_e=None, backbone_path=None, pretrained = False):
         super(YOLOv6Backbone, self).__init__()
         self.subtype = subtype
         self.out_stages = out_stages
@@ -28,7 +28,7 @@ class YOLOv6Backbone(nn.Module):
         layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
         self.out_channels = in_places = list(map(lambda x: int(x * width_mul), out_channels))
 
-        block = CSPStackRep if depth_mul>0.5 else RepBlock
+        block = CSPStackRep if depth_mul > 0.5 else RepBlock
         self.stem = RepVGGBlock(in_channels=3, out_channels=in_places[0], kernel_size=3, stride=2)
         self.stage1 = nn.Sequential(
             RepVGGBlock(in_channels=in_places[0], out_channels=in_places[1], kernel_size=3, stride=2),
