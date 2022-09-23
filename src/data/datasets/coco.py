@@ -6,13 +6,11 @@
 import hashlib
 import os
 import random
-from itertools import repeat
 from multiprocessing.pool import Pool
 from pathlib import Path
 
 import cv2
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
 from pycocotools.coco import COCO
 import numpy as np
@@ -22,6 +20,17 @@ from tqdm import tqdm
     MS Coco Detection
     http://mscoco.org/dataset/#detections-challenge2016
 """
+
+
+def random_pick(org_load_num):
+    x = random.uniform(0,1)
+    cum_prob = 0.0
+    item = 1
+    for item, prob in org_load_num.items():
+         cum_prob += float(prob)
+         if x < cum_prob:
+            break
+    return int(item)
 
 class CocoDetection(Dataset):
     def __init__(self, data_cfg, dictionary=None, transform=None, target_transform=None, stage='train'):
@@ -61,7 +70,7 @@ class CocoDetection(Dataset):
             self.cache = self.cache_data()
 
     def _filter_invalid_annotation(self):
-        # check annos, filtering invalid data
+        # check annotations, filtering invalid data
         valid_ids = []
         for id in self.ids:
             ann_id = self.coco.getAnnIds(imgIds=id, iscrowd=None)
@@ -78,40 +87,36 @@ class CocoDetection(Dataset):
             return False
         return True
 
+    def _load_image(self, img_id):
+        if self.is_cache:
+            sample = self.cache[img_id]
+        else:
+            ann_ids = self.coco.getAnnIds(imgIds=img_id)
+            ann = self.coco.loadAnns(ann_ids)
+
+            path = self.coco.loadImgs(img_id)[0]['file_name']
+            assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
+                os.path.join(self.data_cfg.IMG_DIR, path))
+
+            _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
+            _target = dict(image_id=img_id, annotations=ann)
+            sample = {'image': _img, 'target': _target}
+        return sample
+
     def __getitem__(self, idx):
+        if not isinstance(self.load_num, int):
+            self.load_num = random_pick(self.load_num)
+
+        assert isinstance(self.load_num, int), 'load_num {} must be int'.format(self.load_num)
         if self.load_num > 1:
             img_ids = [self.ids[idx]] + random.choices(self.ids, k=self.load_num - 1)
             sample = []
             for img_id in img_ids:
-                if self.is_cache:
-                    s = self.cache[img_id]
-                else:
-                    ann_ids = self.coco.getAnnIds(imgIds=img_id)
-                    ann = self.coco.loadAnns(ann_ids)
-
-                    path = self.coco.loadImgs(img_id)[0]['file_name']
-                    assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
-                        os.path.join(self.data_cfg.IMG_DIR, path))
-
-                    _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
-                    _target = self.encode_map(ann, img_id)
-                    s = {'image': _img, 'target': _target}
+                s = self._load_image(img_id)
                 sample.append(s)
         else:
-            if self.is_cache:
-                sample = self.cache[self.ids[idx]]
-            else:
-                img_id = self.ids[idx]
-                ann_ids = self.coco.getAnnIds(imgIds=img_id)
-                ann = self.coco.loadAnns(ann_ids)
-
-                path = self.coco.loadImgs(img_id)[0]['file_name']
-                assert os.path.exists(os.path.join(self.data_cfg.IMG_DIR, path)), 'Image path does not exist: {}'.format(
-                    os.path.join(self.data_cfg.IMG_DIR, path))
-
-                _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
-                _target = self.encode_map(ann, img_id)
-                sample = {'image': _img, 'target': _target}
+            img_id = self.ids[idx]
+            sample = self._load_image(img_id)
 
         sample = self.transform(sample)
 
@@ -119,10 +124,6 @@ class CocoDetection(Dataset):
             return self.target_transform(sample)
         else:
             return sample
-
-    def encode_map(self, ann, img_id):
-        target = dict(image_id=img_id, annotations=ann)
-        return target
 
     def __len__(self):
         return len(self.ids)
@@ -147,13 +148,14 @@ class CocoDetection(Dataset):
         if cache_path.is_file():
             cache = np.load(cache_path, allow_pickle=True).item()
             if cache['hash'] == get_hash(self.imgpaths):
+                print(f'{self.stage}: Cache directory {cache_path} is loaded.')
                 return cache
 
         desc = f"Scanning '{cache_path.parent / cache_path.stem}' images and labels..."
         with Pool(NUM_THREADS) as pool:
             pbar = tqdm(pool.imap_unordered(load_image_label, zip(self.ids, self.imgpaths, self.anns)), desc=desc, total=self.__len__())
             for img_id, _img, ann in pbar:
-                _target = self.encode_map(ann, img_id)
+                _target = dict(image_id=img_id, annotations=ann)
                 sample = {'image': _img, 'target': _target}
                 cache[img_id] = sample
             pbar.close()
@@ -222,7 +224,7 @@ class CocoKeypoint(Dataset):
 
         # _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
         _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
-        _target = self.encode_map(ann, idx)
+        _target = dict(image_id=img_id, annotations=ann)
         sample = {'image': _img, 'target': _target}
         sample =  self.transform(sample)
 
@@ -230,11 +232,6 @@ class CocoKeypoint(Dataset):
             return self.target_transform(sample)
         else:
             return sample
-
-    def encode_map(self, ann, idx):
-        img_id = self.ids[idx]
-        target = dict(image_id=img_id, annotations=ann)
-        return target
 
     def __len__(self):
         return len(self.ids)
@@ -301,14 +298,10 @@ class CocoSegmentation(Dataset):
 
         # _img = Image.open(os.path.join(self.data_cfg.IMG_DIR, path)).convert('RGB')
         _img = cv2.imread(os.path.join(self.data_cfg.IMG_DIR, path))
-        _target = self.encode_map(ann, idx)
+        _target = dict(image_id=img_id, annotations=ann)
         sample = {'image': _img, 'target': _target}
         return self.transform(sample)
 
-    def encode_map(self, ann, idx):
-        img_id = self.ids[idx]
-        target = dict(image_id=img_id, annotations=ann)
-        return target
 
     def __len__(self):
         return len(self.ids)
