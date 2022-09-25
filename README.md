@@ -6,14 +6,15 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
-- [2022.09.21] Release **YOLOX-PAI ** models with *yolox-pai-s* on [COCO](http://mscoco.org/) (**41.06mAP**), refer to [conf/coco_pai_yolox_s.yml](conf/coco_pai_yolox_s.yml).
+- [2022.09.25] Release **ObjectBox** models with objectbox-l on [COCO](http://mscoco.org/) (**38.38mAP**).
+- [2022.09.21] Release **YOLOX-PAI** models with *yolox-pai-s* on [COCO](http://mscoco.org/) (**41.06mAP**), pls refer to [conf/coco_pai_yolox_s.yml](conf/coco_pai_yolox_s.yml).
 - [2022.09.18] Release **YOLO7** models with yolov7-l on [COCO](http://mscoco.org/) (**45.26mAP**).
 - [2022.09.12] Release **ObjectBox** models with objectbox-m on [COCO](http://mscoco.org/) (**36.41mAP**).
 - [2022.08.03] Release **LPSNet** models with lpsnet_s on [Cityscapes](https://www.cityscapes-dataset.com/) (**56.66mIoU**).
 - [2022.07.17] Release **FastestDet** models on [COCO](http://mscoco.org/) (**11.42mAP**).
 - [2022.07.10] Release **YOLO6** models with yolov6-s on [COCO](http://mscoco.org/) (**32.14mAP**).
 - [2022.06.11] Release **YOLOX** models with yolox-s on [COCO](http://mscoco.org/) (**38.36mAP**).
-- [2022.05.31] Release **YOLOv5** models with *yolov5-s* on [COCO](http://mscoco.org/) (**36.10mAP**), refer to [conf/coco_yolov5_s.yml](conf/coco_yolov5_s.yml).
+- [2022.05.31] Release **YOLOv5** models with *yolov5-s* on [COCO](http://mscoco.org/) (**36.10mAP**), pls refer to [conf/coco_yolov5_s.yml](conf/coco_yolov5_s.yml).
 - [2022.05.19] Release **EfficientNet** models with *efficientnet_b0*, *efficientnet_b1*, *efficientnet_b2*, *efficientnet_b3*, *efficientnet_b4*, *efficientnet_b5*, *efficientnet_b6* and *efficientnet_b7*  on [Mini-ImageNet](http://image-net.org)  (**85.08,  85.60,  85.74,  86.06,  88.69, 85.62,  85.76 and  85.54 mAcc**).
 - [2022.05.16] Release **ConvNeXt** models with *convnext_tiny*, *convnext_small*, *convnext_base* and *convnext_large*  on [Mini-ImageNet](http://image-net.org)  (**83.45,  83.97,  85.32 and 85.90 mAcc**).
 - [2022.05.14] Release **VGG** models with *vgg11*, *vgg13*, *vgg16* and *vgg19*  on [Mini-ImageNet](http://image-net.org)  (**58.52, 62.32, 56.45  and 50.36 mIoU**).
