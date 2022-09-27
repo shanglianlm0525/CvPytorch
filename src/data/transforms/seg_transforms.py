@@ -7,33 +7,33 @@ import copy
 import warnings
 
 import math
+
+import cv2
 import torch
 from torch import Tensor
-import torchvision
-from typing import Tuple, List, Optional
+from typing import List
 from torchvision import transforms as T
 import torchvision.transforms.functional as F
 from pycocotools import mask as coco_mask
 import random
 import numbers
 import numpy as np
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+from PIL import Image, ImageOps, ImageEnhance
 import collections
 from collections.abc import Sequence
 from torchvision.transforms.functional import InterpolationMode, _interpolation_modes_from_int
 from torchvision.transforms.transforms import _setup_angle, _check_sequence_input, _setup_size
 
 __all__ = ['Compose', 'ToTensor', 'Normalize',
-        'RandomHorizontalFlip', 'RandomVerticalFlip',
-        'Resize',
-        'RandomResizedCrop', 'RandomScaleCrop',
-        'RandomCrop', 'CenterCrop',
-        'RandomRotation', 'RandomPerspective',
-        'ColorJitter', 'GaussianBlur',
-        'Pad', 'Lambda', 'Encrypt',
-        'RandAugment',
-        'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
-
+           'RandomHorizontalFlip', 'RandomVerticalFlip',
+           'Resize',
+           'RandomResizedCrop', 'RandomScaleCrop',
+           'RandomCrop', 'CenterCrop',
+           'RandomRotation', 'RandomPerspective',
+           'ColorJitter', 'PhotoMetricDistortion', 'GaussianBlur',
+           'Pad', 'Lambda', 'Encrypt',
+           'RandAugment',
+           'FilterAndRemapCocoCategories', 'ConvertCocoPolysToMask']
 
 _pil_interpolation_to_str = {
     InterpolationMode.NEAREST: 'InterpolationMode.NEAREST',
@@ -76,6 +76,7 @@ class ToTensor(object):
     Converts a PIL Image or numpy.ndarray (H x W x C) in the range
     [0, 255] to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0].
     """
+
     def __init__(self, normalize=True, target_type='uint8'):
         self.normalize = normalize
         self.target_type = target_type
@@ -91,14 +92,13 @@ class ToTensor(object):
         """
         img, target = sample['image'], sample['target']
         if self.normalize:
-            return {'image': F.to_tensor(img), 'target': torch.from_numpy( np.array( target, dtype=self.target_type) )}
+            return {'image': F.to_tensor(img), 'target': torch.from_numpy(np.array(target, dtype=self.target_type))}
         else:
-            return {'image': torch.from_numpy( np.array(img, dtype=np.float32).transpose(2, 0, 1) ),
-                    'target': torch.from_numpy( np.array( target, dtype=self.target_type) )}
+            return {'image': torch.from_numpy(np.array(img, dtype=np.float32).transpose(2, 0, 1)),
+                    'target': torch.from_numpy(np.array(target, dtype=self.target_type))}
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
-
 
 
 class Normalize(object):
@@ -125,7 +125,7 @@ class Normalize(object):
             Tensor: Unchanged Tensor label
         """
         img, target = sample['image'], sample['target']
-        return {'image': F.normalize(img, self.mean, self.std),'target': target}
+        return {'image': F.normalize(img, self.mean, self.std), 'target': target}
 
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
@@ -149,7 +149,6 @@ class RandomHorizontalFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
-
 
 
 class RandomVerticalFlip(object):
@@ -270,7 +269,6 @@ class RandomCrop(object):
         i, j, h, w = self.get_params(img, self.size)
         return {'image': F.crop(img, j, i, h, w), 'target': F.crop(target, j, i, h, w)}
 
-
     def __repr__(self):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
@@ -287,11 +285,12 @@ class Resize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, keep_ratio= False, fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, keep_ratio=False, fill=0, ignore_label=255, padding_mode='constant',
+                 interpolation=InterpolationMode.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
         self.size = size
         self.keep_ratio = keep_ratio
-        self.fill=fill
+        self.fill = fill
         self.ignore_label = ignore_label
         self.padding_mode = padding_mode
         self.interpolation = interpolation
@@ -325,7 +324,7 @@ class Resize(object):
                 img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
                 target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
 
-            return { 'image': img, 'target': target }
+            return {'image': img, 'target': target}
         else:
             return {'image': F.resize(img, self.size, self.interpolation),
                     'target': F.resize(target, self.size, InterpolationMode.NEAREST)}
@@ -336,7 +335,8 @@ class Resize(object):
 
 
 class RandomScaleCrop1(object):
-    def __init__(self, size, scale=(0.08, 1.0), keep_ratio=True, fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), keep_ratio=True, fill=0, ignore_label=255, padding_mode='constant',
+                 interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
@@ -356,7 +356,6 @@ class RandomScaleCrop1(object):
         self.ignore_label = ignore_label
         self.padding_mode = padding_mode
         self.interpolation = interpolation
-
 
     def __call__(self, sample):
         """
@@ -415,7 +414,7 @@ class RandomScaleCrop1(object):
             img = F.pad(img, [0, 0, padw, padh], self.fill, self.padding_mode)
             target = F.pad(target, [0, 0, padw, padh], self.ignore_label, self.padding_mode)
 
-        return { 'image': img, 'target': target }
+        return {'image': img, 'target': target}
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -425,9 +424,9 @@ class RandomScaleCrop1(object):
         return format_string
 
 
-
 class RandomScaleCrop(object):
-    def __init__(self, size, scale=(0.08, 1.0), fill=0, ignore_label=255, padding_mode='constant', interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), fill=0, ignore_label=255, padding_mode='constant',
+                 interpolation=InterpolationMode.BILINEAR):
         super().__init__()
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
@@ -446,7 +445,6 @@ class RandomScaleCrop(object):
         self.ignore_label = ignore_label
         self.padding_mode = padding_mode
         self.interpolation = interpolation
-
 
     def __call__(self, sample):
         """
@@ -582,7 +580,6 @@ class RandomResizedCrop(object):
         j = (width - w) // 2
         return i, j, h, w
 
-
     def __call__(self, sample):
         """
         Args:
@@ -597,7 +594,6 @@ class RandomResizedCrop(object):
 
         return {'image': F.resized_crop(img, i, j, h, w, self.size, self.interpolation),
                 'target': F.resized_crop(target, i, j, h, w, self.size, InterpolationMode.NEAREST)}
-
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -637,7 +633,8 @@ class RandomRotation(torch.nn.Module):
     """
 
     def __init__(
-        self, degrees, interpolation=InterpolationMode.NEAREST, expand=False, center=None, fill=0, ignore_label=255, resample=None
+            self, degrees, interpolation=InterpolationMode.NEAREST, expand=False, center=None, fill=0, ignore_label=255,
+            resample=None
     ):
         super().__init__()
         if resample is not None:
@@ -654,10 +651,10 @@ class RandomRotation(torch.nn.Module):
             )
             interpolation = _interpolation_modes_from_int(interpolation)
 
-        self.degrees = _setup_angle(degrees, name="degrees", req_sizes=(2, ))
+        self.degrees = _setup_angle(degrees, name="degrees", req_sizes=(2,))
 
         if center is not None:
-            _check_sequence_input(center, "center", req_sizes=(2, ))
+            _check_sequence_input(center, "center", req_sizes=(2,))
 
         self.center = center
 
@@ -702,7 +699,6 @@ class RandomRotation(torch.nn.Module):
         return {'image': F.rotate(img, angle, self.resample, self.expand, self.center, fill),
                 'target': F.rotate(target, angle, self.resample, self.expand, self.center, self.ignore_label)}
 
-
     def __repr__(self):
         interpolate_str = self.interpolation.value
         format_string = self.__class__.__name__ + '(degrees={0}'.format(self.degrees)
@@ -714,6 +710,110 @@ class RandomRotation(torch.nn.Module):
             format_string += ', fill={0}'.format(self.fill)
         format_string += ')'
         return format_string
+
+
+class PhotoMetricDistortion(object):
+    """Apply photometric distortion to image sequentially, every transformation
+    is applied with a probability of 0.5. The position of random contrast is in
+    second or second to last.
+
+    1. random brightness
+    2. random contrast (mode 0)
+    3. convert color from BGR to HSV
+    4. random saturation
+    5. random hue
+    6. convert color from HSV to BGR
+    7. random contrast (mode 1)
+
+    Args:
+        brightness_delta (int): delta of brightness.
+        contrast_range (tuple): range of contrast.
+        saturation_range (tuple): range of saturation.
+        hue_delta (int): delta of hue.
+    """
+
+    def __init__(self, brightness_delta=32, contrast_range=(0.5, 1.5), saturation_range=(0.5, 1.5), hue_delta=18):
+        self.brightness_delta = brightness_delta
+        self.contrast_lower, self.contrast_upper = contrast_range
+        self.saturation_lower, self.saturation_upper = saturation_range
+        self.hue_delta = hue_delta
+
+    def convert(self, img, alpha=1, beta=0):
+        """Multiple with alpha and add beat with clip."""
+        img = img.astype(np.float32) * alpha + beta
+        img = np.clip(img, 0, 255)
+        return img.astype(np.uint8)
+
+    def brightness(self, img):
+        """Brightness distortion."""
+        if random.randint(0, 1):
+            return self.convert(img, beta=random.uniform(-self.brightness_delta, self.brightness_delta))
+        return img
+
+    def contrast(self, img):
+        """Contrast distortion."""
+        if random.randint(0, 1):
+            return self.convert(img, alpha=random.uniform(self.contrast_lower, self.contrast_upper))
+        return img
+
+    def saturation(self, img):
+        """Saturation distortion."""
+        if random.randint(0, 1):
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            img[:, :, 1] = self.convert(
+                img[:, :, 1],
+                alpha=random.uniform(self.saturation_lower,
+                                     self.saturation_upper))
+
+            img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+        return img
+
+    def hue(self, img):
+        """Hue distortion."""
+        if random.randint(0, 1):
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            img[:, :,
+            0] = (img[:, :, 0].astype(int) +
+                  random.randint(-self.hue_delta, self.hue_delta)) % 180
+            img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+        return img
+
+    def __call__(self, sample):
+        """Call function to perform photometric distortion on images."""
+        img, target = sample['image'], sample['target']
+        img = np.asarray(img)
+
+        # random brightness
+        img = self.brightness(img)
+
+        # mode == 0 --> do random contrast first
+        # mode == 1 --> do random contrast last
+        mode = random.randint(0, 1)
+        if mode == 1:
+            img = self.contrast(img)
+
+        # random saturation
+        img = self.saturation(img)
+
+        # random hue
+        img = self.hue(img)
+
+        # random contrast
+        if mode == 0:
+            img = self.contrast(img)
+
+        img = Image.fromarray(img.astype(np.uint8))
+        return {'image': img, 'target': target}
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += (f'(brightness_delta={self.brightness_delta}, '
+                     f'contrast_range=({self.contrast_lower}, '
+                     f'{self.contrast_upper}), '
+                     f'saturation_range=({self.saturation_lower}, '
+                     f'{self.saturation_upper}), '
+                     f'hue_delta={self.hue_delta})')
+        return repr_str
 
 
 class ColorJitter(object):
@@ -733,6 +833,7 @@ class ColorJitter(object):
             hue_factor is chosen uniformly from [-hue, hue] or the given [min, max].
             Should have 0<= hue <= 0.5 or -0.5 <= min <= max <= 0.5.
     """
+
     def __init__(self, p=0.5, brightness=0, contrast=0, saturation=0, hue=0):
         self.p = p
         self.brightness = self._check_input(brightness, 'brightness')
@@ -770,9 +871,9 @@ class ColorJitter(object):
         """
         img, target = sample['image'], sample['target']
         if random.random() < self.p:
-            return {'image': T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)(img), 'target': target}
+            return {'image': T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)(img),
+                    'target': target}
         return {'image': img, 'target': target}
-
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
@@ -881,7 +982,6 @@ class GaussianBlur(object):
         """
         return torch.empty(1).uniform_(sigma_min, sigma_max).item()
 
-
     def __call__(self, sample):
         """
         Args:
@@ -895,7 +995,6 @@ class GaussianBlur(object):
             sigma = self.get_params(self.sigma[0], self.sigma[1])
             return {'image': F.gaussian_blur(img, self.kernel_size, [sigma, sigma]), 'target': target}
         return {'image': img, 'target': target}
-
 
     def __repr__(self):
         s = '(kernel_size={}, '.format(self.kernel_size)
@@ -942,8 +1041,8 @@ class RandomPerspective(object):
             width, height = F.get_image_size(img)
             startpoints, endpoints = self.get_params(width, height, self.distortion_scale)
             return {'image': F.perspective(img, startpoints, endpoints, self.interpolation, self.fill),
-             'target': F.perspective(img, startpoints, endpoints, InterpolationMode.NEAREST, self.ignore_label)}
-        return {'image': img,'target': target}
+                    'target': F.perspective(img, startpoints, endpoints, InterpolationMode.NEAREST, self.ignore_label)}
+        return {'image': img, 'target': target}
 
     @staticmethod
     def get_params(width: int, height: int, distortion_scale: float):
@@ -961,20 +1060,20 @@ class RandomPerspective(object):
         half_height = height // 2
         half_width = width // 2
         topleft = [
-            int(torch.randint(0, int(distortion_scale * half_width) + 1, size=(1, )).item()),
-            int(torch.randint(0, int(distortion_scale * half_height) + 1, size=(1, )).item())
+            int(torch.randint(0, int(distortion_scale * half_width) + 1, size=(1,)).item()),
+            int(torch.randint(0, int(distortion_scale * half_height) + 1, size=(1,)).item())
         ]
         topright = [
-            int(torch.randint(width - int(distortion_scale * half_width) - 1, width, size=(1, )).item()),
-            int(torch.randint(0, int(distortion_scale * half_height) + 1, size=(1, )).item())
+            int(torch.randint(width - int(distortion_scale * half_width) - 1, width, size=(1,)).item()),
+            int(torch.randint(0, int(distortion_scale * half_height) + 1, size=(1,)).item())
         ]
         botright = [
-            int(torch.randint(width - int(distortion_scale * half_width) - 1, width, size=(1, )).item()),
-            int(torch.randint(height - int(distortion_scale * half_height) - 1, height, size=(1, )).item())
+            int(torch.randint(width - int(distortion_scale * half_width) - 1, width, size=(1,)).item()),
+            int(torch.randint(height - int(distortion_scale * half_height) - 1, height, size=(1,)).item())
         ]
         botleft = [
-            int(torch.randint(0, int(distortion_scale * half_width) + 1, size=(1, )).item()),
-            int(torch.randint(height - int(distortion_scale * half_height) - 1, height, size=(1, )).item())
+            int(torch.randint(0, int(distortion_scale * half_width) + 1, size=(1,)).item()),
+            int(torch.randint(height - int(distortion_scale * half_height) - 1, height, size=(1,)).item())
         ]
         startpoints = [[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]]
         endpoints = [topleft, topright, botright, botleft]
@@ -990,9 +1089,11 @@ POSTERIZE_MIN = 1
 # Parameters for affine warping and rotation
 WARP_PARAMS = {"fillcolor": (128, 128, 128), "resample": Image.BILINEAR}
 
+
 def affine_warp(im, data):
     """Applies affine transform to image."""
     return im.transform(im.size, Image.AFFINE, data, **WARP_PARAMS)
+
 
 OP_FUNCTIONS = {
     # Each op takes an image x and a level v and returns an augmented image.
@@ -1019,8 +1120,8 @@ OP_FUNCTIONS = {
     "trans_y": lambda x, v: affine_warp(x, (1, 0, 0, 0, 1, v * x.size[1])),
 }
 
-affine_ops=[
-    "rotate","shear_x","shear_y","trans_x","trans_y"
+affine_ops = [
+    "rotate", "shear_x", "shear_y", "trans_x", "trans_y"
 ]
 
 OP_RANGES = {
@@ -1052,7 +1153,7 @@ RANDAUG_OPS = [
     # RandAugment list of operations using "increasing" transforms.
     "auto_contrast",
     "equalize",
-    #"invert",
+    # "invert",
     "rotate",
     "posterize_inc",
     "solarize_inc",
@@ -1077,12 +1178,14 @@ RANDAUG_OPS_REDUCED = [
     "sharpness_inc",
 ]
 
+
 class RandAugment(object):
     """
         RandAugment: Practical automated data augmentation with a reduced search space
         https://arxiv.org/pdf/1909.13719.pdf
     """
-    def __init__(self, p, n_ops, magnitude, ops="reduced", fill=(128,128,128), ignore_value=255):
+
+    def __init__(self, p, n_ops, magnitude, ops="reduced", fill=(128, 128, 128), ignore_value=255):
         super(RandAugment, self).__init__()
         assert 0 <= magnitude <= 1
         self.p = p
@@ -1119,16 +1222,15 @@ class RandAugment(object):
         return {'image': img, 'target': target}
 
 
-
 class Encrypt(object):
-    def __init__(self, down_size): # size: (h, w)
+    def __init__(self, down_size):  # size: (h, w)
         self.down_size = (down_size, down_size) if isinstance(down_size, int) else down_size
 
     def __call__(self, sample):
         img, target = sample['image'], sample['target']
         h, w, _ = img.shape
         target = target.resize((w // self.down_size[1], h // self.down_size[0]))
-        return {'image': img,'target': target}
+        return {'image': img, 'target': target}
 
 
 class Lambda(object):
