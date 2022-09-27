@@ -16,7 +16,6 @@ class LSPNetHead(nn.Module):
         self.channels = channels
 
         self.classifier = nn.Conv2d(self.channels[-1] * 2, self.num_classes, 1, 1, 0, bias=True)
-
         self.init_weight()
 
     def init_weight(self):

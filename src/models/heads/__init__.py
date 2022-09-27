@@ -12,6 +12,7 @@ from .efficientdet_head import EfficientdetHead
 from .fastestdet_head import FastestDetHead
 from .fcos_head import FCOSHead
 from .gflv2_head import GFocalHeadV2
+from src.models.heads.seg.lightham_head import LightHamHead
 from .lspnet_head import LSPNetHead
 from .nanodet_head import NanoDetHead
 from .nanodetplus_aux_head import NanoDetPlusAuxHead
@@ -41,11 +42,11 @@ __all__ = [
     'GFocalHeadV2',
     'FCOSHead',
     'YOLOv6Head',
-    'EfficientDeHead',
     'FastestDetHead',
     'Deeplabv3Head',
     'Deeplabv3PlusHead',
     'StdcHead',
+    'LightHamHead',
     'LSPNetHead',
     'RegSegHead',
     'OpenPoseHead',
@@ -92,6 +93,8 @@ def build_head(cfg):
         return Deeplabv3PlusHead(**head_cfg)
     elif name == 'StdcHead':
         return StdcHead(**head_cfg)
+    elif name == 'LightHamHead':
+        return LightHamHead(**head_cfg)
     elif name == 'LSPNetHead':
         return LSPNetHead(**head_cfg)
     elif name == 'PPLiteSegHead':
