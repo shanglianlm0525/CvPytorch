@@ -75,7 +75,8 @@ class CityscapesSegmentation(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            _img = Image.open(self._imgs[idx]).convert('RGB')
+            # _img = Image.open(self._imgs[idx]).convert('RGB')
+            _img = Image.open(self._imgs[idx])
             img_id = os.path.basename(os.path.basename(self._imgs[idx]))
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
@@ -83,7 +84,8 @@ class CityscapesSegmentation(Dataset):
             if self.is_cache:
                 sample = self.cache[self._imgs[idx]]
             else:
-                _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+                # _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
+                _img, _target = Image.open(self._imgs[idx]), Image.open(self._targets[idx])
                 _target = self.encode_target(_target)
                 sample = {'image': _img, 'target': _target}
             return self.transform(sample)
