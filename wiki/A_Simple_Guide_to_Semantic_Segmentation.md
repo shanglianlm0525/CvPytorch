@@ -237,6 +237,29 @@ validation: 1024x2048
  DeepLabV3Plus-ResNet101   |  0.7475  |    /[Download]() | 
 
 
+
+## [SegNeXt](https://arxiv.org/pdf/2209.08575.pdf)
+
+### ADE20K
+
+| Method  | Backbone | Pretrained  | mIoU | Params | FLOPs |                            Config                            |   Download   |
+| :-----: | :------: | :---------: | :--: | :----: | :---: | :----------------------------------------------------------: | :----------: |
+| SegNeXt | MSCAN-T  | ImageNet-1K |      |   4M   |  7G   | [config](local_configs/segnext/tiny/segnext.tiny.512x512.ade.160k.py) | [Link](link) |
+| SegNeXt | MSCAN-S  | ImageNet-1K |      |  14M   |  16G  | [config](local_configs/segnext/small/segnext.small.512x512.ade.160k.py) | [Link](link) |
+| SegNeXt | MSCAN-B  | ImageNet-1K |      |  28M   |  35G  | [config](local_configs/segnext/base/segnext.base.512x512.ade.160k.py) | [Link](link) |
+| SegNeXt | MSCAN-L  | ImageNet-1K |      |  49M   |  70G  | [config](local_configs/segnext/large/segnext.large.512x512.ade.160k.py) | [Link](link) |
+
+### Cityscapes
+
+| Method  | Backbone | Pretrained  | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :-----: | :------: | :---------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| SegNeXt | MSCAN-T  | ImageNet-1K | 78.52 |   4M   |  56G  | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| SegNeXt | MSCAN-S  | ImageNet-1K | 79.68 |  14M   | 125G  | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegNeXt | MSCAN-B  | ImageNet-1K | 81.02 |  28M   | 276G  | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
+| SegNeXt | MSCAN-L  | ImageNet-1K |       |  49M   | 578G  | [config](conf/seg/cityscapes_segnext_l.yml) | [Link](link) |
+
+**Notes**: In this scheme, The number of FLOPs (G) is calculated on the input size of 512 $\times$ 512 for ADE20K, 2048 $\times$ 1024 for Cityscapes by [torchprofile](https://github.com/zhijian-liu/torchprofile) (recommended, highly accurate and automatic MACs/FLOPs statistics).
+
 ## REFERENCES
 
 [1] A survey of loss functions for semantic segmentation, 2020, https://arxiv.org/pdf/2006.14822v1.pdf
