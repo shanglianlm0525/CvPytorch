@@ -69,6 +69,10 @@ def yolox_post_process(outputs, down_strides, num_classes, conf_thre, nms_thre):
         detections_list.append(detections)
     return detections_list
 
+"""
+    YOLOX-PAI: An Improved YOLOX, Stronger and Faster than YOLOv6
+    https://arxiv.org/pdf/2208.13040.pdf
+"""
 
 class PAI_YOLOX(nn.Module):
     cfg = {"nano": [0.33, 0.25],
