@@ -4,8 +4,8 @@ from typing import Union
 import torch
 from torch import nn
 
-from ..utils import constant_init, kaiming_init
 from .registry import PLUGIN_LAYERS
+from ..init import constant_init, kaiming_init
 
 
 def last_zero_init(m: Union[nn.Module, nn.Sequential]) -> None:

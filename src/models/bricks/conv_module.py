@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 
 from mmcv.utils import _BatchNorm, _InstanceNorm
-from ..utils import constant_init, kaiming_init
 from .activation import build_activation_layer
 from .conv import build_conv_layer
 from .norm import build_norm_layer
 from .padding import build_padding_layer
 from .registry import PLUGIN_LAYERS
+from ..init import constant_init, kaiming_init
 
 
 @PLUGIN_LAYERS.register_module()

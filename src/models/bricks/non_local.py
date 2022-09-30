@@ -5,7 +5,7 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 
-from ..utils import constant_init, normal_init
+from ..init import constant_init, normal_init
 from .conv_module import ConvModule
 from .registry import PLUGIN_LAYERS
 
