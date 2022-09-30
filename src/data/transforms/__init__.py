@@ -35,6 +35,8 @@ def build_transforms(dict_name, cfg, mode='train'):
     transform_cfg = copy.deepcopy(cfg)
     for t, v in transform_cfg.items():
         t = getattr(trans, t)(**v) if v is not None else getattr(trans, t)()
+        if hasattr(t, 'set_load_image_func'):
+            t.set_load_image_func()
         _params.append(t)
     return trans.Compose(_params)
 
