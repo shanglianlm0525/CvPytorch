@@ -73,12 +73,12 @@ class Configuration(UserDict):
         try:
             assert pathlib.Path(path).exists()  # TypeError if path is None; AssertionError if path not exist.
         except (TypeError, AssertionError):
-            raise ConfigurationCreationError('Invalid path provided when calling from_yaml. path: {}'.format(path))
+            raise warnings.warn('Invalid path provided when calling from_yaml. path: {}'.format(path))
 
     @staticmethod
     def validate_dict(d):
         if d is None or not (isinstance(d, dict) or isinstance(d, Configuration)):
-            raise ConfigurationCreationError('Invalid input provided when calling from_dict. input: {}'.format(d))
+            raise warnings.warn('Invalid input provided when calling from_dict. input: {}'.format(d))
 
     def print(self):
         """

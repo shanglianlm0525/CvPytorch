@@ -206,6 +206,7 @@ class LossLogger(object):
     def __init__(self, delimiter="\t"):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
+        self.count = 0
 
     def update(self, **kwargs):
         for k, v in kwargs.items():
@@ -213,6 +214,7 @@ class LossLogger(object):
                 v = v.item()
             assert isinstance(v, (float, int))
             self.meters[k].update(v)
+        self.count += 1
 
     def __getattr__(self, attr):
         if attr in self.meters:
@@ -293,4 +295,5 @@ class LossLogger(object):
 
     def reset(self):
         self.meters = defaultdict(SmoothedValue)
+        self.count = 0
 
