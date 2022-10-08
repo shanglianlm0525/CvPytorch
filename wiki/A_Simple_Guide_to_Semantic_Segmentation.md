@@ -1,4 +1,4 @@
-# A Simple Guide to Semantic Segmentation
+ResolutionA Simple Guide to Semantic Segmentation
 
 **Semantic  Segmentation：** Given an input image, assign a label to every pixel (e.g., background, bottle, hand, sky, etc.).
 
@@ -238,11 +238,36 @@ validation: 1024x2048
 
 
 
-## [SegNeXt](https://arxiv.org/pdf/2209.08575.pdf)
+## STDC
+
+#### Cityscapes
+
+| Method | Backbone | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :----: | :------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| STDC1  |  stdc1   | 512 × 1024 | 73.55 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| STDC1  |  stdc1   | 512 × 1024 | 74.76 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| STDC2  |  stdc2   | 768 × 1536 |       |        |       | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
+| STDC2  |  stdc2   | 768 × 1536 |       |        |       | [config](conf/seg/cityscapes_segnext_l.yml) | [Link](link) |
+
+
+
+## TopFormer
+
+#### Cityscapes
+
+|   Method    |  Backbone   | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :---------: | :---------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| TopFormer-t | topformer-t | 512 × 1024 | 69.88 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| TopFormer-s | topformer-s | 512 × 1024 | 73.09 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| TopFormer-b | topformer-b | 512 × 1024 | 74.12 |        |       | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
+
+
+
+## SegNeXt
 
 ### ADE20K
 
-| Method  | Backbone | Pretrained  | mIoU | Params | FLOPs |                            Config                            |   Download   |
+| Method  | Backbone | Resolution  | mIoU | Params | FLOPs |                            Config                            |   Download   |
 | :-----: | :------: | :---------: | :--: | :----: | :---: | :----------------------------------------------------------: | :----------: |
 | SegNeXt | MSCAN-T  | ImageNet-1K |      |   4M   |  7G   | [config](local_configs/segnext/tiny/segnext.tiny.512x512.ade.160k.py) | [Link](link) |
 | SegNeXt | MSCAN-S  | ImageNet-1K |      |  14M   |  16G  | [config](local_configs/segnext/small/segnext.small.512x512.ade.160k.py) | [Link](link) |
@@ -251,12 +276,12 @@ validation: 1024x2048
 
 ### Cityscapes
 
-| Method  | Backbone | Pretrained  | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| Method  | Backbone | Resolution  | mIoU  | Params | FLOPs |                   Config                    |   Download   |
 | :-----: | :------: | :---------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
-| SegNeXt | MSCAN-T  | ImageNet-1K | 78.52 |   4M   |  56G  | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
-| SegNeXt | MSCAN-S  | ImageNet-1K | 79.68 |  14M   | 125G  | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SegNeXt | MSCAN-B  | ImageNet-1K | 81.02 |  28M   | 276G  | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
-| SegNeXt | MSCAN-L  | ImageNet-1K |       |  49M   | 578G  | [config](conf/seg/cityscapes_segnext_l.yml) | [Link](link) |
+| SegNeXt | MSCAN-T  | 1024 x 2048 | 79.83 |   4M   |  56G  | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| SegNeXt | MSCAN-S  | 1024 x 2048 |       |  14M   | 125G  | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegNeXt | MSCAN-B  | 1024 x 2048 |       |  28M   | 276G  | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
+| SegNeXt | MSCAN-L  | 1024 x 2048 |       |  49M   | 578G  | [config](conf/seg/cityscapes_segnext_l.yml) | [Link](link) |
 
 **Notes**: In this scheme, The number of FLOPs (G) is calculated on the input size of 512 $\times$ 512 for ADE20K, 2048 $\times$ 1024 for Cityscapes by [torchprofile](https://github.com/zhijian-liu/torchprofile) (recommended, highly accurate and automatic MACs/FLOPs statistics).
 
