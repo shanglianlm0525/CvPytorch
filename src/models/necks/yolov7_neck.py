@@ -7,19 +7,18 @@
 import torch
 import torch.nn as nn
 
-from src.models.modules.yolov7_modules import UpSampling, FeatureFusion, DownB
+from src.models.modules.yolov7_modules import UpSampling, FeatureFusion, DownB, SPPCSPC
 
 
 class YOLOv7Neck(nn.Module):
-    def __init__(self, in_channels=[512, 1024, 512], out_channels=[128, 256, 512], layers=[3, 3, 3], depth_mul=1.0, width_mul=1.0):
+    def __init__(self, in_channels=[512, 1024, 1024], out_channels=[128, 256, 512], depth_mul=1.0, width_mul=1.0):
         super(YOLOv7Neck, self).__init__()
         assert isinstance(in_channels, list)
-        self.in_channels = list(map(lambda x: max(round(x * width_mul), 1), in_channels))
-        self.out_channels = list(map(lambda x: max(round(x * width_mul), 1), out_channels))
-        self.num_ins = len(in_channels)
-        self.layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
+        in_channels = list(map(lambda x: max(round(x * width_mul), 1), in_channels))
+        out_channels = list(map(lambda x: max(round(x * width_mul), 1), out_channels))
 
-        self.up1_1 = UpSampling(in_channels[2], in_channels[1], out_channels[1])
+        self.spp = SPPCSPC(in_channels[2], in_channels[0])
+        self.up1_1 = UpSampling(in_channels[0], in_channels[1], out_channels[1])
         self.featurefusion1_1 = FeatureFusion(out_channels[1]*2, out_channels[1])
 
         self.up1_2 = UpSampling(out_channels[1], in_channels[0], out_channels[0])
@@ -45,8 +44,8 @@ class YOLOv7Neck(nn.Module):
                 m.inplace = True
 
     def forward(self, x):
-        assert len(x) == len(self.in_channels)
         x3, x4, x5 = x
+        x5 = self.spp(x5)
         # up
         x4_up = self.featurefusion1_1(self.up1_1(x5, x4))
         x3_up = self.featurefusion1_2(self.up1_2(x4_up, x3))

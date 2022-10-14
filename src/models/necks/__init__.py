@@ -14,6 +14,7 @@ from .ghost_pan import GhostPAN
 from .giraffeneck import GiraffeNeck
 from .lfd_neck import LFDNeck
 from .pan import PAN
+from .seg.stdc_neck import STDCNeck
 from .tan import TAN
 from .yolop_neck import YOLOPNeck
 from .yolov3_neck import YOLOv3Neck
@@ -39,7 +40,8 @@ __all__ = [
     'FCOSFPN',
     'LFDNeck',
     'FastestDetNeck',
-    'GiraffeNeck'
+    'GiraffeNeck',
+    'STDCNeck',
 ]
 
 def build_neck(cfg):
@@ -77,5 +79,7 @@ def build_neck(cfg):
         return GiraffeNeck(**neck_cfg)
     elif name == 'LFDNeck':
         return LFDNeck(**neck_cfg)
+    elif name == 'STDCNeck':
+        return STDCNeck(**neck_cfg)
     else:
         raise NotImplementedError

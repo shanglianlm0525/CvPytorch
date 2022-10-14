@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..modules.yolov5_modules import C3, Conv
+from ..modules.yolo_modules import C3, Conv
 
 
 class YOLOPNeck(nn.Module):

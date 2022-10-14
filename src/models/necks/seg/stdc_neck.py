@@ -27,7 +27,7 @@ class AttentionRefinementModule(BaseModule):
                  in_channels,
                  out_channel,
                  conv_cfg=None,
-                 norm_cfg=dict(type='BN'),
+                 norm_cfg=dict(type='BN', requires_grad=True),
                  act_cfg=dict(type='ReLU'),
                  init_cfg=None):
         super(AttentionRefinementModule, self).__init__(init_cfg=init_cfg)
