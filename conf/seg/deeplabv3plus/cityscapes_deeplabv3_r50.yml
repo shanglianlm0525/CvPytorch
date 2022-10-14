@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Cityscapes_SegNeXt_b'
+EXPERIMENT_NAME: 'Cityscapes_Deeplabv3plus_r50'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -14,8 +14,8 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    BATCH_SIZE: 24
+    NUM_WORKER: 8
     LOAD_NUM: 1
     CACHE: True
     LABELS:
@@ -57,9 +57,11 @@ DATASET:
 USE_MODEL:
   # CLASS: 'src.models.segmentors.segnext.SegNeXt'
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  TYPE: 'segnext_b'
-  BACKBONE: { 'name': 'MSCAN', 'out_channels': [64, 128, 320, 512], 'layers': [3, 3, 12, 3], 'drop_rate': 0.0, 'drop_path_rate': 0.2, 'out_stages': [2, 3, 4], 'pretrained': True, 'backbone_path': './weights/mscan/mscan_b.pth' }
-  HEAD: { 'name': 'LightHamHead', 'num_classes': 19, 'in_channels': [128, 320, 512], 'channels': 512, 'ham_channels': 512, 'dropout_ratio': 0.1, 'ham_kwargs': { } }
+  TYPE: 'segnext_t'
+  BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50', 'out_channels': [32, 64, 160, 256], 'out_stages': [1, 4], 'output_stride': 16, 'pretrained': True }
+  # BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet101', 'out_channels': [32, 64, 160, 256], 'out_stages': [1, 4], 'output_stride': 16, 'pretrained': True }
+  HEAD: { 'name': 'LightHamHead', 'num_classes': 19, 'in_channels': [64, 160, 256], 'channels': 256, 'ham_channels': 256, 'dropout_ratio': 0.1, 'ham_kwargs': { 'MD_R': 16 } }
+  HEAD: { 'name': 'Deeplabv3PlusHead', 'num_classes': 19, 'low_level_channels': 256, 'in_channels': 2048, 'dilations': [6, 12, 18] }
   LOSS: { 'name': 'CrossEntropyLoss2d' }
 
 EVALUATOR:
@@ -80,18 +82,18 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
-N_MAX_EPOCHS: 430
+GPU_IDS: [3]
+N_MAX_EPOCHS: 400
 
-INIT_LR: 0.0006
-BACKBONE_LR: 0.00006
+INIT_LR: 0.2
+BACKBONE_LR: 0.02
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
-  TYPE: 'AdamW' # Adam, RMSprop
+  TYPE: 'SGD' # Adam, RMSprop
   WEIGHT_PARAMS:
     momentum: 0.9
-    weight_decay: 0.01
+    weight_decay: 0.0001
     nesterov: True
   BIAS_PARAMS:
     momentum: 0.9

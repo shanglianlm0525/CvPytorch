@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Cityscapes_SegNeXt_b'
+EXPERIMENT_NAME: 'Cityscapes_TopFormer_t'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -14,8 +14,8 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
     LOAD_NUM: 1
     CACHE: True
     LABELS:
@@ -24,10 +24,10 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      RandomScaleCrop: { size: [1024, 1024], scale: [0.5, 2.0] }
+      RandomScaleCrop: { size: [512, 1024], scale: [0.5, 2.0] }
       RandomHorizontalFlip: { p: 0.5 }
       PhotoMetricDistortion:
-      Pad: { size: [1024, 1024] }
+      Pad: { size: [512, 1024] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -55,12 +55,13 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  # CLASS: 'src.models.segmentors.segnext.SegNeXt'
+  # CLASS: 'src.models.segmentors.topformer.TopFormer'
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  TYPE: 'segnext_b'
-  BACKBONE: { 'name': 'MSCAN', 'out_channels': [64, 128, 320, 512], 'layers': [3, 3, 12, 3], 'drop_rate': 0.0, 'drop_path_rate': 0.2, 'out_stages': [2, 3, 4], 'pretrained': True, 'backbone_path': './weights/mscan/mscan_b.pth' }
-  HEAD: { 'name': 'LightHamHead', 'num_classes': 19, 'in_channels': [128, 320, 512], 'channels': 512, 'ham_channels': 512, 'dropout_ratio': 0.1, 'ham_kwargs': { } }
+  TYPE: 'topformer_t'
+  BACKBONE: { 'name': 'TopFormerBackbone', 'subtype': 'topformer_t', 'out_stages': [1, 2, 3], 'pretrained': True, 'backbone_path': './weights/topformer/topformer-T-224-66.2.pth' }
+  HEAD: { 'name': 'TopFormerHead', 'num_classes': 19, 'in_channels': 128, 'channels': 128, 'is_depthwise': True }
   LOSS: { 'name': 'CrossEntropyLoss2d' }
+
 
 EVALUATOR:
   NAME: 'segmentation'
@@ -81,10 +82,10 @@ RESUME: False
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
 GPU_IDS: [1]
-N_MAX_EPOCHS: 430
+N_MAX_EPOCHS: 350
 
-INIT_LR: 0.0006
-BACKBONE_LR: 0.00006
+INIT_LR: 0.003
+BACKBONE_LR: 0.0003
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
@@ -106,7 +107,7 @@ LR_SCHEDULER:
   MIN_LR: 0.0
   GAMMA: 0.1
   POWER: 1.0
-  STEP: 10
+  STEP: 300
 
 WARMUP:
   NAME: 'linear'
@@ -152,7 +153,7 @@ GRAD_CLIP:
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 100
+N_ITERS_TO_DISPLAY_STATUS: 10
 
 ## TENSORBOARD
 TENSORBOARD: True

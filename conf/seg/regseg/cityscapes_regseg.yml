@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Cityscapes_SegNeXt_b'
+EXPERIMENT_NAME: 'Cityscapes_RegSeg'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -14,8 +14,8 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
     LOAD_NUM: 1
     CACHE: True
     LABELS:
@@ -24,10 +24,10 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      RandomScaleCrop: { size: [1024, 1024], scale: [0.5, 2.0] }
+      RandomScaleCrop: { size: [768, 768], scale: [0.4, 1.6], keep_ratio: False }
       RandomHorizontalFlip: { p: 0.5 }
-      PhotoMetricDistortion:
-      Pad: { size: [1024, 1024] }
+      RandAugment: { p: 1.0, n_ops: 2, magnitude: 0.2, ops: "reduced" }
+      Pad: { size: [768, 768] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -46,7 +46,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      # Resize: { size: [1024, 2048] }
+      Resize: { size: [1024, 1024], keep_ratio: False }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
@@ -55,11 +55,9 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  # CLASS: 'src.models.segmentors.segnext.SegNeXt'
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  TYPE: 'segnext_b'
-  BACKBONE: { 'name': 'MSCAN', 'out_channels': [64, 128, 320, 512], 'layers': [3, 3, 12, 3], 'drop_rate': 0.0, 'drop_path_rate': 0.2, 'out_stages': [2, 3, 4], 'pretrained': True, 'backbone_path': './weights/mscan/mscan_b.pth' }
-  HEAD: { 'name': 'LightHamHead', 'num_classes': 19, 'in_channels': [128, 320, 512], 'channels': 512, 'ham_channels': 512, 'dropout_ratio': 0.1, 'ham_kwargs': { } }
+  BACKBONE: { 'name': 'RegSegBackbone', 'out_channels': [32, 48, 128, 320], 'out_stages': [1, 2, 3] }
+  HEAD: { 'name': 'RegSegHead', 'num_classes': 19, 'in_channels': [48, 128, 320], 'channels': 64, 'mid_channels': [8, 128] }
   LOSS: { 'name': 'CrossEntropyLoss2d' }
 
 EVALUATOR:
@@ -80,18 +78,18 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
-N_MAX_EPOCHS: 430
+GPU_IDS: [2]
+N_MAX_EPOCHS: 1000
 
-INIT_LR: 0.0006
-BACKBONE_LR: 0.00006
+INIT_LR: 0.05
+BACKBONE_LR: 0.05
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
-  TYPE: 'AdamW' # Adam, RMSprop
+  TYPE: 'SGD' # Adam, RMSprop
   WEIGHT_PARAMS:
     momentum: 0.9
-    weight_decay: 0.01
+    weight_decay: 0.0001
     nesterov: True
   BIAS_PARAMS:
     momentum: 0.9
@@ -105,13 +103,13 @@ LR_SCHEDULER:
   MAX_LR: 0.1
   MIN_LR: 0.0
   GAMMA: 0.1
-  POWER: 1.0
-  STEP: 10
+  POWER: 0.9
+  STEP: 300
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 1500
-  FACTOR: 0.000001
+  ITERS: 3000
+  FACTOR: 0.1
 
 
 #########################################
@@ -152,7 +150,7 @@ GRAD_CLIP:
 #########################################
 # Logging / Visualization Configurations
 #########################################
-N_ITERS_TO_DISPLAY_STATUS: 100
+N_ITERS_TO_DISPLAY_STATUS: 10
 
 ## TENSORBOARD
 TENSORBOARD: True

@@ -80,7 +80,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [3]
+GPU_IDS: [2]
 N_MAX_EPOCHS: 430
 
 INIT_LR: 0.0006
