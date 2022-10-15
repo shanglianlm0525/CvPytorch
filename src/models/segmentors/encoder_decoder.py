@@ -95,12 +95,13 @@ class EncoderDecoder(BaseSegmentor):
             f'targets must be Tensor type, and ndim == 3, but got {type(targets)} and {targets.ndim}'
         losses = dict()
         preds = F.interpolate(preds, size=targets.shape[-2:], mode='bilinear', align_corners=False)
+        if not isinstance(loss, (list, nn.ModuleList)):
+            loss = [loss]
         for l in loss:
             if l.loss_name not in losses:
                 losses[l.loss_name] = l(preds, targets)
             else:
                 losses[l.loss_name] += l(preds, targets)
-        losses['loss'] = sum(losses.values())
         return losses
 
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
@@ -117,22 +118,32 @@ class EncoderDecoder(BaseSegmentor):
         feats = self.backbone(imgs)
         if self.with_neck:
             feats = self.neck(feats)
+            if isinstance(feats, tuple):
+                feats, aux_feats = feats
         preds = self.head(feats)
 
         if mode == 'infer':
 
             return torch.argmax(feats, dim=1)
         else:
-            losses = self.loss_forward(preds, targets, self.loss)
-
-            if self.with_auxiliary_head:
-                for i, (aux_head, auxiliary_loss) in enumerate(zip(self.auxiliary_head, self.auxiliary_loss)):
-                    aux_pred = aux_head(feats)
-                    aux_losses = self.loss_forward(aux_pred, targets, auxiliary_loss)
-                    losses.update(add_prefix(aux_losses, 'aux'+str(i)))
-
             if mode == 'val':
-                return losses, torch.argmax(preds, dim=1)
+                outputs = F.interpolate(preds, size=targets.shape[-2:], mode='bilinear', align_corners=False)
+                return torch.argmax(outputs, dim=1)
             else:
+                losses = self.loss_forward(preds, targets, self.loss)
+
+                if self.with_auxiliary_head:
+                    if aux_feats is not None:
+                        for i, (aux_head, aux_feat, auxiliary_loss) in enumerate(zip(self.auxiliary_head, aux_feats, self.auxiliary_loss)):
+                            aux_pred = aux_head(aux_feat)
+                            aux_losses = self.loss_forward(aux_pred, targets, auxiliary_loss)
+                            losses.update(add_prefix(aux_losses, 'aux' + str(i)))
+                    else:
+                        for i, (aux_head, auxiliary_loss) in enumerate(zip(self.auxiliary_head, self.auxiliary_loss)):
+                            aux_pred = aux_head(feats)
+                            aux_losses = self.loss_forward(aux_pred, targets, auxiliary_loss)
+                            losses.update(add_prefix(aux_losses, 'aux' + str(i)))
+
+                losses['loss'] = sum(losses.values())
                 return losses
 
