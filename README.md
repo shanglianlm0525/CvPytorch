@@ -6,6 +6,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ## What's New!!!
 
+- [2022.10.16] Release **SegNeXt** models with *segnext_s*, *segnext_b*, *segnext_l* on [Cityscapes](https://www.cityscapes-dataset.com/) (**81.22** ,  **82.49**， **82.57** **mIoU**).
 - [2022.10.04] Release **SegNeXt** models with *segnext_t* on [Cityscapes](https://www.cityscapes-dataset.com/) (**79.83mIoU**).
 - [2022.09.25] Release **ObjectBox** models with objectbox-l on [COCO](http://mscoco.org/) (**38.38mAP**).
 - [2022.09.21] Release **YOLOX-PAI** models with *yolox-pai-s* on [COCO](http://mscoco.org/) (**41.06mAP**), pls refer to [conf/coco_pai_yolox_s.yml](conf/coco_pai_yolox_s.yml).
@@ -29,7 +30,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 - [2022.04.24] Release **TopFormer** models with *topformer_small* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**72.86mIoU**).
 - [2022.04.22] Release **TopFormer** models with *topformer_base* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**74.60mIoU**).
 - [2022.04.20] Release **SGCPNet** models with *mobilenet v3* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**56.47mIoU**).
-- [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.15mIoU**).
+- [2022.03.03] Release **RegSeg** models with *exp48_decoder26* on  [Cityscapes](https://www.cityscapes-dataset.com/) (**73.76mIoU**).
 - [2022.01.06] Release **FCOS**  models with resnet50 backbone for 800x800 image on [COCO](http://mscoco.org/) (**36.88mAP**).
 - [2021.07.23] Release **NanoDet** models with RepVGG backbone on [COCO](http://mscoco.org/) (**27.16mAP**).
 - [2021.07.23] Release **NanoDet-g** models with cspnet backbone on [COCO](http://mscoco.org/) (**23.54mAP**).
