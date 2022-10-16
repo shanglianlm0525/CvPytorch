@@ -251,6 +251,17 @@ validation: 1024x2048
 
 
 
+## RegSeg
+
+#### Cityscapes
+
+| Method |    Backbone     | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :----: | :-------------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| RegSeg | exp48_decoder26 | 768 × 768  | 73.76 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| RegSeg | exp48_decoder26 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+
+
+
 ## TopFormer
 
 #### Cityscapes
@@ -276,12 +287,12 @@ validation: 1024x2048
 
 ### Cityscapes
 
-| Method  | Backbone | Resolution  | mIoU  | Params | FLOPs |                   Config                    |   Download   |
-| :-----: | :------: | :---------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
-| SegNeXt | MSCAN-T  | 1024 x 2048 | 79.83 |   4M   |  56G  | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
-| SegNeXt | MSCAN-S  | 1024 x 2048 |       |  14M   | 125G  | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SegNeXt | MSCAN-B  | 1024 x 2048 |       |  28M   | 276G  | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
-| SegNeXt | MSCAN-L  | 1024 x 2048 |       |  49M   | 578G  | [config](conf/seg/cityscapes_segnext_l.yml) | [Link](link) |
+| Method  | Backbone | Resolution  | mIoU  | Params | FLOPs |                       Config                        |   Download   |
+| :-----: | :------: | :---------: | :---: | :----: | :---: | :-------------------------------------------------: | :----------: |
+| SegNeXt | MSCAN-T  | 1024 x 2048 | 79.83 |   4M   |  56G  | [config](conf/seg/segnext/cityscapes_segnext_t.yml) | [Link](link) |
+| SegNeXt | MSCAN-S  | 1024 x 2048 | 81.22 |  14M   | 125G  | [config](conf/seg/segnext/cityscapes_segnext_s.yml) | [Link](link) |
+| SegNeXt | MSCAN-B  | 1024 x 2048 | 82.49 |  28M   | 276G  | [config](conf/seg/segnext/cityscapes_segnext_b.yml) | [Link](link) |
+| SegNeXt | MSCAN-L  | 1024 x 2048 | 82.57 |  49M   | 578G  | [config](conf/seg/segnext/cityscapes_segnext_l.yml) | [Link](link) |
 
 **Notes**: In this scheme, The number of FLOPs (G) is calculated on the input size of 512 $\times$ 512 for ADE20K, 2048 $\times$ 1024 for Cityscapes by [torchprofile](https://github.com/zhijian-liu/torchprofile) (recommended, highly accurate and automatic MACs/FLOPs statistics).
 
