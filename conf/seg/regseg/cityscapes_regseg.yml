@@ -14,7 +14,7 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 8
+    BATCH_SIZE: 24
     NUM_WORKER: 8
     LOAD_NUM: 1
     CACHE: True
@@ -24,7 +24,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      RandomScaleCrop: { size: [768, 768], scale: [0.4, 1.6], keep_ratio: False }
+      RandomScaleCrop: { size: [768, 768], scale: [0.4, 1.6] }
       RandomHorizontalFlip: { p: 0.5 }
       RandAugment: { p: 1.0, n_ops: 2, magnitude: 0.2, ops: "reduced" }
       Pad: { size: [768, 768] }
@@ -46,7 +46,7 @@ DATASET:
       SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
       SEG_SUFFIX: '*_gtFine_labelIds.png'
     TRANSFORMS:
-      Resize: { size: [1024, 1024], keep_ratio: False }
+      # Resize: { size: [1024, 2048] }
       ToTensor:
       Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
 
