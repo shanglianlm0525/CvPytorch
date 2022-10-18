@@ -43,21 +43,23 @@ class EncoderDecoder(BaseSegmentor):
         if self.model_cfg.AUX_HEAD is not None:
             assert self.model_cfg.AUX_LOSS is not None, f'{self.model_cfg.AUX_LOSS} must not be None'
             assert type(self.model_cfg.AUX_HEAD) == type(self.model_cfg.AUX_LOSS)
-            assert isinstance(self.model_cfg.AUX_HEAD, (list, tuple)) and len(self.model_cfg.AUX_HEAD) == len(self.model_cfg.AUX_LOSS)
+            assert (isinstance(self.model_cfg.AUX_HEAD, (list, tuple)) and len(self.model_cfg.AUX_HEAD) == len(self.model_cfg.AUX_LOSS)) \
+            or (not isinstance(self.model_cfg.AUX_HEAD, (list, tuple)))
+
+            self.auxiliary_head = nn.ModuleList()
             if isinstance(self.model_cfg.AUX_HEAD, (dict, CommonConfiguration)):
-                self.auxiliary_head = [build_head(self.model_cfg.AUX_HEAD)]
+                self.auxiliary_head.append(build_head(self.model_cfg.AUX_HEAD))
             elif isinstance(self.model_cfg.AUX_HEAD, (list, tuple)):
-                self.auxiliary_head = nn.ModuleList()
                 for head_cfg in self.model_cfg.AUX_HEAD:
                     self.auxiliary_head.append(build_head(head_cfg))
             else:
                 raise TypeError(f'self.model_cfg.AUX_HEAD must be a dict or sequence of dict,\
                                        but got {type(self.model_cfg.AUX_HEAD)}')
         # LOSS
+        self.loss = nn.ModuleList()
         if isinstance(self.model_cfg.LOSS, (dict, CommonConfiguration)):
-            self.loss = [build_loss(self.model_cfg.LOSS)]
+            self.loss.append(build_loss(self.model_cfg.LOSS))
         elif isinstance(self.model_cfg.LOSS, (list, tuple)):
-            self.loss = nn.ModuleList()
             for loss_cfg in self.model_cfg.LOSS:
                 self.loss.append(build_loss(loss_cfg))
         else:
@@ -66,10 +68,10 @@ class EncoderDecoder(BaseSegmentor):
 
         # AUX_LOSS
         if self.model_cfg.AUX_LOSS is not None:
+            self.auxiliary_loss = nn.ModuleList()
             if isinstance(self.model_cfg.AUX_LOSS, (dict, CommonConfiguration)):
-                self.auxiliary_loss = [build_loss(self.model_cfg.AUX_LOSS)]
+                self.auxiliary_loss.append(build_loss(self.model_cfg.AUX_LOSS))
             elif isinstance(self.model_cfg.AUX_LOSS, (list, tuple)):
-                self.auxiliary_loss = nn.ModuleList()
                 for loss_cfg in self.model_cfg.AUX_LOSS:
                     self.auxiliary_loss.append(build_loss(loss_cfg))
             else:
