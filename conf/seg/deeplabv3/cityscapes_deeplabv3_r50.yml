@@ -56,7 +56,6 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  TYPE: 'segnext_t'
   BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50v1c', 'out_stages': [4], 'output_stride': 8, 'pretrained': True }
   HEAD: { 'name': 'Deeplabv3Head', 'num_classes': 19, 'in_channels': 2048, 'channels': 512,
           'dilations': [1, 12, 24, 36] }
