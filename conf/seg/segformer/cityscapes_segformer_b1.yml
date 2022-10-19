@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Cityscapes_SegFormer_B0'
+EXPERIMENT_NAME: 'Cityscapes_SegFormer_B1'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -56,10 +56,10 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  BACKBONE: { 'name': 'MixVisionTransformer', 'out_channels': [32, 64, 160, 256], 'num_heads': [1, 2, 5, 8], 'mlp_ratios': [4, 4, 4, 4], 'qkv_bias': True,
+  BACKBONE: { 'name': 'MixVisionTransformer', 'out_channels': [64, 128, 320, 512], 'num_heads': [1, 2, 5, 8], 'mlp_ratios': [4, 4, 4, 4], 'qkv_bias': True,
               'depths': [2, 2, 2, 2], 'sr_ratios': [8, 4, 2, 1], 'drop_rate': 0.0, 'drop_path_rate': 0.1,
-              'out_stages': [1, 2, 3, 4], 'pretrained': True, 'backbone_path': './weights/segformer/mit_b0.pth' }
-  HEAD: { 'name': 'SegFormerHead', 'num_classes': 19, 'in_channels': [32, 64, 160, 256], 'channels': 256, 'strides': [4, 8, 16, 32] }
+              'out_stages': [1, 2, 3, 4], 'pretrained': True, 'backbone_path': './weights/segformer/mit_b1.pth' }
+  HEAD: { 'name': 'SegFormerHead', 'num_classes': 19, 'in_channels': [64, 128, 320, 512], 'channels': 256, 'strides': [4, 8, 16, 32] }
   LOSS: { 'name': 'CrossEntropyLoss2d' }
 
 EVALUATOR:
