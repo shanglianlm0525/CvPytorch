@@ -169,20 +169,13 @@ class Block(nn.Module):
 
 
 class OverlapPatchEmbed(nn.Module):
-    """ Image to Patch Embedding
-    """
-
-    def __init__(self, img_size=224, patch_size=7, stride=4, in_chans=3, embed_dim=768):
+    """ Image to Patch Embedding"""
+    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768):
         super().__init__()
-        if isinstance(img_size, numbers.Number):
-            img_size = (img_size, img_size)
         if isinstance(patch_size, numbers.Number):
             patch_size = (patch_size, patch_size)
 
-        self.img_size = img_size
         self.patch_size = patch_size
-        self.H, self.W = img_size[0] // patch_size[0], img_size[1] // patch_size[1]
-        self.num_patches = self.H * self.W
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
                               padding=(patch_size[0] // 2, patch_size[1] // 2))
         self.norm = nn.LayerNorm(embed_dim)
@@ -215,8 +208,7 @@ class OverlapPatchEmbed(nn.Module):
 
 
 class MixVisionTransformer(nn.Module):
-    def __init__(self, subtype='mit_b0',
-                 img_size=224, out_channels=[64, 128, 320, 512],
+    def __init__(self, subtype='mit_b0', out_channels=[64, 128, 320, 512],
                  num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=False, qk_scale=None,
                  depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1], drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
                  norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -232,13 +224,13 @@ class MixVisionTransformer(nn.Module):
         self.pretrained = pretrained
 
         # patch_embed
-        self.patch_embed1 = OverlapPatchEmbed(img_size=img_size, patch_size=7, stride=4, in_chans=3,
+        self.patch_embed1 = OverlapPatchEmbed(patch_size=7, stride=4, in_chans=3,
                                               embed_dim=self.out_channels[0])
-        self.patch_embed2 = OverlapPatchEmbed(img_size=img_size // 4, patch_size=3, stride=2, in_chans=self.out_channels[0],
+        self.patch_embed2 = OverlapPatchEmbed(patch_size=3, stride=2, in_chans=self.out_channels[0],
                                               embed_dim=self.out_channels[1])
-        self.patch_embed3 = OverlapPatchEmbed(img_size=img_size // 8, patch_size=3, stride=2, in_chans=self.out_channels[1],
+        self.patch_embed3 = OverlapPatchEmbed(patch_size=3, stride=2, in_chans=self.out_channels[1],
                                               embed_dim=self.out_channels[2])
-        self.patch_embed4 = OverlapPatchEmbed(img_size=img_size // 16, patch_size=3, stride=2, in_chans=self.out_channels[2],
+        self.patch_embed4 = OverlapPatchEmbed(patch_size=3, stride=2, in_chans=self.out_channels[2],
                                               embed_dim=self.out_channels[3])
 
         # transformer encoder
@@ -342,7 +334,7 @@ if __name__ == "__main__":
     model = MixVisionTransformer('mit_b0')
     print(model)
 
-    input = torch.randn(1, 3, 224, 224)
+    input = torch.randn(1, 3, 512, 1024)
     out = model(input)
     for o in out:
         print(o.shape)
