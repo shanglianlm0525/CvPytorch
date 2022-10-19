@@ -55,10 +55,8 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  # CLASS: 'src.models.segmentors.stdc.STDC'
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
   BACKBONE: { 'name': 'STDCNet', 'subtype': 'stdc1', 'out_channels': [32, 64, 256, 512, 1024], 'layers': [2, 2, 2], 'out_stages': [2, 3, 4], 'pretrained': True, 'backbone_path': './weights/stdc/STDCNet813M_73.91.tar' }
-  # BACKBONE: { 'name': 'STDCNet', 'subtype': 'stdc2', 'out_channels': [32, 64, 256, 512, 1024], 'layers': [4, 5, 3], 'out_stages': [2, 3, 4], 'pretrained': True, 'backbone_path': './weights/stdc/STDCNet1446_76.47.tar' }
   NECK: { 'name': 'STDCNeck' }
   HEAD: { 'name': 'FCNHead', 'num_classes': 19, 'in_channels': 256, 'channels': 256, 'num_convs': 1, 'is_concat': False }
   AUX_HEAD: [{ 'name': 'STDCHead', 'num_classes': 1, 'in_channels': 256, 'channels': 64, 'num_convs': 1, 'is_concat': False },
