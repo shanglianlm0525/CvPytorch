@@ -9,6 +9,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from src.models.bricks import ConvModule
+from src.models.heads.seg.base_seg_head import BaseSegHead
 from src.models.modules.aspp import ASPP
 
 """
@@ -34,16 +35,6 @@ class _MatrixDecomposition2DBase(nn.Module):
         self.eta = args.setdefault('ETA', 0.9)
 
         self.rand_init = args.setdefault('RAND_INIT', True)
-
-        print('spatial', self.spatial)
-        print('S', self.S)
-        print('D', self.D)
-        print('R', self.R)
-        print('train_steps', self.train_steps)
-        print('eval_steps', self.eval_steps)
-        print('inv_t', self.inv_t)
-        print('eta', self.eta)
-        print('rand_init', self.rand_init)
 
     def _build_bases(self, B, S, D, R, cuda=False):
         raise NotImplementedError
@@ -175,16 +166,14 @@ class Hamburger(nn.Module):
         return ham
 
 
-class LightHamHead(nn.Module):
+class LightHamHead(BaseSegHead):
     cfg = {"t": ([64, 160, 256], 256, 256, 0.1),
            "s": ([128, 320, 512], 256, 256, 0.1),
            "b": ([128, 320, 512], 512, 512, 0.1),
            "l": ([128, 320, 512], 1024, 1024, 0.1)}
-    def __init__(self, num_classes, in_channels=[64, 160, 256], mid_channels=256, ham_channels=256, dropout_ratio=0.1, ham_kwargs=dict(),
-                 conv_cfg=None, norm_cfg=dict(type='GN', num_groups=32, requires_grad=True), act_cfg=dict(type='ReLU')):
-        super(LightHamHead, self).__init__()
-        self.in_channels = in_channels
-        self.mid_channels = mid_channels
+    def __init__(self, ham_channels=256, dropout_ratio=0.1, ham_kwargs=dict(),
+                 conv_cfg=None, norm_cfg=dict(type='GN', num_groups=32, requires_grad=True), act_cfg=dict(type='ReLU'), **kwargs):
+        super(LightHamHead, self).__init__(**kwargs)
         self.ham_channels = ham_channels
         self.dropout_ratio = dropout_ratio
         self.conv_cfg = conv_cfg
@@ -196,28 +185,21 @@ class LightHamHead(nn.Module):
 
         self.hamburger = Hamburger(self.ham_channels, ham_kwargs, norm_cfg=norm_cfg)
 
-        self.align = ConvModule(self.ham_channels, self.mid_channels, 1,
+        self.align = ConvModule(self.ham_channels, self.channels, 1,
                                 conv_cfg=self.conv_cfg, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg)
 
-        if self.dropout_ratio > 0:
-            self.dropout = nn.Dropout2d(self.dropout_ratio)
-        else:
-            self.dropout = None
-        self.classifier = nn.Conv2d(self.mid_channels, num_classes, kernel_size=1, stride=1, bias=True)
         self.init_weight()
 
     def forward(self, inps):
         h, w = inps[0].shape[2:]
-        feat = [F.interpolate(inp, size=(h, w), mode='bilinear', align_corners=True) for inp in inps]
+        feat = [F.interpolate(inp, size=(h, w), mode='bilinear', align_corners=False) for inp in inps]
 
         feat = torch.cat(feat, dim=1)
         feat = self.squeeze(feat)
         feat = self.hamburger(feat)
         feat = self.align(feat)
 
-        if self.dropout is not None:
-            feat = self.dropout(feat)
-        return self.classifier(feat)
+        return self.classify(feat)
 
 
     def init_weight(self):
@@ -230,3 +212,6 @@ class LightHamHead(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+if __name__ == '__main__':
+    model = LightHamHead(num_classes=19, in_channels=[64, 160, 256], channels=256)
+    print(model)
