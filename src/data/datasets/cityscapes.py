@@ -9,6 +9,7 @@ import hashlib
 from multiprocessing.pool import Pool
 from pathlib import Path
 
+import cv2
 from glob2 import glob
 import numpy as np
 from PIL import Image
@@ -75,8 +76,7 @@ class CityscapesSegmentation(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            # _img = Image.open(self._imgs[idx]).convert('RGB')
-            _img = Image.open(self._imgs[idx])
+            _img = cv2.imread(self._imgs[idx])
             img_id = os.path.basename(os.path.basename(self._imgs[idx]))
             sample = {'image': _img, 'mask': None}
             return self.transform(sample), img_id
@@ -84,22 +84,19 @@ class CityscapesSegmentation(Dataset):
             if self.is_cache:
                 sample = self.cache[self._imgs[idx]]
             else:
-                # _img, _target = Image.open(self._imgs[idx]).convert('RGB'), Image.open(self._targets[idx])
-                _img, _target = Image.open(self._imgs[idx]), Image.open(self._targets[idx])
+                _img, _target = cv2.imread(self._imgs[idx]), cv2.imread(self._targets[idx], 0)
                 _target = self.encode_target(_target)
                 sample = {'image': _img, 'target': _target}
             return self.transform(sample)
 
     def encode_target(self, target):
         # This is used to convert tags
-        target = np.asarray(target, dtype=np.uint8).copy()
         # Put all void classes to zero
         for _voidc in self.invalid_classes:
             target[target == _voidc] = self.ignore_index
         # index from zero 0:18
         for _validc in self.valid_classes:
             target[target == _validc] = self.class_map[_validc]
-        target = Image.fromarray(target.astype(np.uint8))
         return target
 
     @classmethod
@@ -142,7 +139,7 @@ class CityscapesSegmentation(Dataset):
 
 def load_image_label(args):
     im_file, lb_file = args
-    _img, _target = Image.open(im_file).convert('RGB'), Image.open(lb_file)
+    _img, _target = cv2.imread(im_file), cv2.imread(lb_file, 0)
     return im_file, _img, _target
 
 
