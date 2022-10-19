@@ -16,12 +16,9 @@ from .lspnet_backbone import LSPNetBackbone
 from .mobilenet_v3 import MobileNetV3
 from .pai_yolox_backbone import PAI_YOLOXBackbone
 from .regnet import RegNet
-from .regseg_backbone import RegSegBackbone
 from .repvgg import RepVGG
 from .sgcpnet_backbone import SGCPNetBackbone
-from .topformer_backbone import TopFormerBackbone
 from .vgg import VGG
-from .resnet import ResNet
 from .resnext import ResNeXt
 from .vision_transformer import VisionTransformer
 from .wide_resnet import WideResNet
@@ -29,14 +26,29 @@ from .squeezenet import SqueezeNet
 from .mobilenet_v2 import MobileNetV2
 from .shufflenet_v2 import ShuffleNetV2
 from .densenet import Densenet
-from .stdcnet import STDCNet
+
 # from .ghostnet import GhostNet
 from .yolov5_backbone import YOLOv5Backbone
 from .yolov6_backbone import YOLOv6Backbone
 from .yolov7_backbone import YOLOv7Backbone
 
+
+# Image Classification
+
+
+# Semantic Segmentation
+from .seg import MSCAN
+from .seg import STDCNet
+from .seg import TopFormerBackbone
+from .seg import RegSegBackbone
+from .seg import ResNet
+from .seg import MixVisionTransformer
+
+# Object Detectiton
+
+
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
-            'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet',
+            'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet', 'MSCAN',
 
            'YOLOv5Backbone', 'YOLOv6Backbone', 'YOLOv7Backbone', 'PAI_YOLOXBackbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
            'CspDarkNet', 'RegNet', 'LFDResNet',  'LSPNetBackbone']
@@ -75,12 +87,16 @@ def build_backbone(cfg):
     # extra pretrained weight
     elif name == 'STDCNet':
         return STDCNet(**backbone_cfg)
+    elif name == 'MSCAN':
+        return MSCAN(**backbone_cfg)
     elif name == 'LSPNetBackbone':
         return LSPNetBackbone(**backbone_cfg)
     elif name == 'EfficientNetLite':
         return EfficientNetLite(**backbone_cfg)
     elif name == 'TopFormerBackbone':
         return TopFormerBackbone(**backbone_cfg)
+    elif name == 'MixVisionTransformer':
+        return MixVisionTransformer(**backbone_cfg)
 
     # no pretrained weight
     elif name == 'EfficientNetLite':
