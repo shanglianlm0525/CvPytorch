@@ -1,4 +1,4 @@
-ResolutionA Simple Guide to Semantic Segmentation
+1024ResolutionA Simple Guide to Semantic Segmentation
 
 **Semantic  Segmentation：** Given an input image, assign a label to every pixel (e.g., background, bottle, hand, sky, etc.).
 
@@ -216,25 +216,43 @@ data
 
 ### Deeplab V3
 #### CityScapes
-Training: 768x768 random crop  
-validation: 1024x2048
-
-  Model          |   mIoU        | Config/Weight   |  Remark  |
- :--------        | :--------: | :--------: |  :----:   |
- DeepLabV3-MobileNet   |  0.6806  |    /[Download]() | 
- DeepLabV3-ResNet50   |  0.7153  |    /[Download]() | 
- DeepLabV3-ResNet101   |  0.7283  |    /[Download]() | 
+|   Method   | Backbone  | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :--------: | :-------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| Deeplab V3 | resnet50  | 512 × 1024 | 76.16 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| Deeplab V3 | resnet101 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
 ### Deeplab V3+
 #### CityScapes
-Training: 768x768 random crop  
-validation: 1024x2048
+|   Method    | Backbone  | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :---------: | :-------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| Deeplab V3+ | resnet50  | 512 × 1024 | 76.14 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| Deeplab V3+ | resnet101 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
-  Model          |   mIoU        | Config/Weight   |  Remark  |
- :--------        | :--------: | :--------: |  :----:   |
- DeepLabV3Plus-MobileNet   |  0.7037  |    /[Download]() | 
- DeepLabV3Plus-ResNet50   |  0.7373  |    /[Download]() | 
- DeepLabV3Plus-ResNet101   |  0.7475  |    /[Download]() | 
+
+
+### UPerNet
+
+#### CityScapes
+
+| Method  | Backbone  | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :-----: | :-------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| UPerNet | resnet50  | 512 × 1024 | 76.86 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| UPerNet | resnet101 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+
+
+
+### SegFormer
+
+#### CityScapes
+
+|  Method   | Backbone | Resolution  | mIoU | Params | FLOPs |                   Config                    |   Download   |
+| :-------: | :------: | :---------: | :--: | :----: | :---: | :-----------------------------------------: | :----------: |
+| SegFormer |  MIT-B0  | 1024 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| SegFormer |  MIT-B1  | 1024 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B2  | 1024 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B3  | 1024 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B4  | 1024 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B5  | 1024 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
 
 
@@ -258,7 +276,7 @@ validation: 1024x2048
 | Method |    Backbone     | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
 | :----: | :-------------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
 | RegSeg | exp48_decoder26 | 768 × 768  | 73.76 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
-| RegSeg | exp48_decoder26 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| RegSeg | exp48_decoder26 | 512 × 1024 | 73.10 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
 
 
@@ -292,7 +310,7 @@ validation: 1024x2048
 | SegNeXt | MSCAN-T  | 1024 x 2048 | 79.83 |   4M   |  56G  | [config](conf/seg/segnext/cityscapes_segnext_t.yml) | [Link](link) |
 | SegNeXt | MSCAN-S  | 1024 x 2048 | 81.22 |  14M   | 125G  | [config](conf/seg/segnext/cityscapes_segnext_s.yml) | [Link](link) |
 | SegNeXt | MSCAN-B  | 1024 x 2048 | 82.49 |  28M   | 276G  | [config](conf/seg/segnext/cityscapes_segnext_b.yml) | [Link](link) |
-| SegNeXt | MSCAN-L  | 1024 x 2048 | 82.57 |  49M   | 578G  | [config](conf/seg/segnext/cityscapes_segnext_l.yml) | [Link](link) |
+| SegNeXt | MSCAN-L  | 1024 x 2048 | 82.65 |  49M   | 578G  | [config](conf/seg/segnext/cityscapes_segnext_l.yml) | [Link](link) |
 
 **Notes**: In this scheme, The number of FLOPs (G) is calculated on the input size of 512 $\times$ 512 for ADE20K, 2048 $\times$ 1024 for Cityscapes by [torchprofile](https://github.com/zhijian-liu/torchprofile) (recommended, highly accurate and automatic MACs/FLOPs statistics).
 
