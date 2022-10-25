@@ -56,9 +56,7 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  # CLASS: 'src.models.segmentors.segnext.SegNeXt'
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  TYPE: 'segnext_l'
   BACKBONE: { 'name': 'MSCAN', 'out_channels': [64, 128, 320, 512], 'layers': [3, 5, 27, 3], 'drop_rate': 0.0, 'drop_path_rate': 0.3, 'out_stages': [2, 3, 4], 'pretrained': True, 'backbone_path': './weights/mscan/mscan_l.pth' }
   HEAD: { 'name': 'LightHamHead', 'num_classes': 19, 'in_channels': [128, 320, 512], 'channels': 1024, 'ham_channels': 1024, 'dropout_ratio': 0.1, 'ham_kwargs': { } }
   LOSS: { 'name': 'CrossEntropyLoss2d' }
