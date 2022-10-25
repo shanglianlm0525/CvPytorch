@@ -55,9 +55,7 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  # CLASS: 'src.models.segmentors.topformer.TopFormer'
   CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
-  TYPE: 'topformer_t'
   BACKBONE: { 'name': 'TopFormerBackbone', 'subtype': 'topformer_t', 'out_stages': [1, 2, 3], 'pretrained': True, 'backbone_path': './weights/topformer/topformer-T-224-66.2.pth' }
   HEAD: { 'name': 'TopFormerHead', 'num_classes': 19, 'in_channels': 128, 'channels': 128, 'is_depthwise': True }
   LOSS: { 'name': 'CrossEntropyLoss2d' }
