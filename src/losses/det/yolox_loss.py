@@ -70,7 +70,7 @@ class IOUloss(nn.Module):
 
 
 
-class YoloxLoss(nn.Module):
+class YOLOXLoss(nn.Module):
     def __init__(self, num_classes, reid_dim=0, id_nums=None, strides=[8, 16, 32], in_channels=[256, 512, 1024]):
         super().__init__()
 
@@ -141,7 +141,7 @@ class YoloxLoss(nn.Module):
         batch_size, n_ch, hsize, wsize = p.shape
 
         if grid.shape[2:4] != p.shape[2:4] or grid.device != p.device:
-            yv, xv = torch.meshgrid([torch.arange(hsize), torch.arange(wsize)])
+            yv, xv = torch.meshgrid([torch.arange(hsize), torch.arange(wsize)], indexing='ij')
             grid = torch.stack((xv, yv), 2).view(1, 1, hsize, wsize, 2).type(dtype).to(p.device)
             self.grids[k] = grid
 
