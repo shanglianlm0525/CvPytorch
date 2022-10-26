@@ -4,24 +4,22 @@
 # @Author : liumin
 # @File : base_segmentor.py
 
-import warnings
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 
-import torch.nn as nn
+from src.base.base_module import BaseModule
 
 
-class BaseSegmentor(nn.Module, metaclass=ABCMeta):
+class BaseSegmentor(BaseModule, metaclass=ABCMeta):
     """Base class for seg."""
 
-    def __init__(self):
-        super(BaseSegmentor, self).__init__()
+    def __init__(self, init_cfg=None):
+        super(BaseSegmentor, self).__init__(init_cfg)
 
 
     @property
     def with_backbone(self):
         """bool: whether the segmentor has neck"""
-        return hasattr(self, 'neck') and self.backbone is not None
+        return hasattr(self, 'backbone') and self.backbone is not None
 
     @property
     def with_neck(self):
@@ -40,8 +38,13 @@ class BaseSegmentor(nn.Module, metaclass=ABCMeta):
 
     @property
     def with_loss(self):
-        """bool: whether the segmentor has decode head"""
+        """bool: whether the segmentor has loss"""
         return hasattr(self, 'loss') and self.loss is not None
+
+    @property
+    def with_auxiliary_loss(self):
+        """bool: whether the segmentor has auxiliary loss"""
+        return hasattr(self, 'auxiliary_loss') and self.auxiliary_loss is not None
 
     @abstractmethod
     def forward(self, imgs, targets=None, mode='infer', **kwargs):
