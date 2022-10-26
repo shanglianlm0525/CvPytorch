@@ -58,7 +58,7 @@ class CSPDarknet(nn.Module):
         self.stage1 = nn.Sequential(
             conv(self.out_channels[0], self.out_channels[1], 3, 2, padding=1,
                 conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
-            CSPLayer(self.out_channels[1], self.out_channels[1], n=layers[0], shortcut=True,
+            CSPLayer(self.out_channels[1], self.out_channels[1], n=layers[0], shortcut=True, depthwise=depthwise,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
         )
 
@@ -66,7 +66,7 @@ class CSPDarknet(nn.Module):
         self.stage2 = nn.Sequential(
             conv(self.out_channels[1], self.out_channels[2], 3, 2, padding=1,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
-            CSPLayer(self.out_channels[2], self.out_channels[2], n=layers[1], shortcut=True,
+            CSPLayer(self.out_channels[2], self.out_channels[2], n=layers[1], shortcut=True, depthwise=depthwise,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
         )
 
@@ -74,7 +74,7 @@ class CSPDarknet(nn.Module):
         self.stage3 = nn.Sequential(
             conv(self.out_channels[2], self.out_channels[3], 3, 2, padding=1,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
-            CSPLayer(self.out_channels[3], self.out_channels[3], n=layers[2], shortcut=True,
+            CSPLayer(self.out_channels[3], self.out_channels[3], n=layers[2], shortcut=True, depthwise=depthwise,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
         )
 
@@ -84,7 +84,7 @@ class CSPDarknet(nn.Module):
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
             SPPBottleneck(self.out_channels[4], self.out_channels[4], ksizes=spp_ksizes,
                           conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
-            CSPLayer(self.out_channels[4], self.out_channels[4], n=layers[3], shortcut=False,
+            CSPLayer(self.out_channels[4], self.out_channels[4], n=layers[3], shortcut=False, depthwise=depthwise,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
         )
 
