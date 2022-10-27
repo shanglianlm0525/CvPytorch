@@ -307,7 +307,7 @@ class MixVisionTransformer(nn.Module):
             norm_func = getattr(self, 'norm{}'.format(i))
 
             x, H, W = patch_embed_func(x)
-            for i, blk in enumerate(block_func):
+            for blk in block_func:
                 x = blk(x, H, W)
             x = norm_func(x)
             x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
