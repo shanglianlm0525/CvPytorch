@@ -6,7 +6,7 @@
 
 import torch
 import torch.nn as nn
-from src.models.modules.yolo_modules import Conv, C3, SPPF, SPP
+from src.models.modules.yolo11_modules import Conv, C3, SPPF, SPP
 
 
 class YOLOv5Backbone(nn.Module):

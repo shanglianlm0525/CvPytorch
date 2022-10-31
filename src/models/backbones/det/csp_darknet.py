@@ -11,7 +11,7 @@ import math
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from src.models.bricks import ConvModule, DepthwiseSeparableConvModule
-from src.models.modules.yolo_modules import Focus, CSPLayer, SPPBottleneck
+from src.models.modules.yolo_modules import Focus, CSPLayer, SPPF
 
 """
     YOLOv4: Optimal Speed and Accuracy of Object Detection
@@ -51,7 +51,7 @@ class CSPDarknet(nn.Module):
         layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
 
         # stem
-        self.stem = Focus(3, self.out_channels[0], ksize=3, conv_cfg=conv_cfg,
+        self.stem = Focus(3, self.out_channels[0], kernel_sizes=3, conv_cfg=conv_cfg,
             norm_cfg=norm_cfg, act_cfg=act_cfg)
 
         # dark1
@@ -82,7 +82,7 @@ class CSPDarknet(nn.Module):
         self.stage4 = nn.Sequential(
             conv(self.out_channels[3], self.out_channels[4], 3, 2, padding=1,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
-            SPPBottleneck(self.out_channels[4], self.out_channels[4], ksizes=spp_ksizes,
+            SPPF(self.out_channels[4], self.out_channels[4], kernel_sizes=spp_ksizes,
                           conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg),
             CSPLayer(self.out_channels[4], self.out_channels[4], n=layers[3], shortcut=False, depthwise=depthwise,
                      conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
