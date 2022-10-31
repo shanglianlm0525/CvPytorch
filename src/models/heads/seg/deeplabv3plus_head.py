@@ -64,7 +64,8 @@ class Deeplabv3PlusHead(Deeplabv3Head):
             outs = F.interpolate(outs, size=low_outs.size()[2:], mode='bilinear', align_corners=False)
             outs = torch.cat([outs, low_outs], dim=1)
 
-        return self.classify(self.fuse(outs))
+        outs = self.fuse(outs)
+        return self.classify(outs)
 
 
 if __name__=='__main__':
