@@ -6,35 +6,49 @@
 
 from copy import deepcopy
 
-from .deeplabv3_head import Deeplabv3Head
-from .deeplabv3plus_head import Deeplabv3PlusHead
+
 from .efficientdet_head import EfficientdetHead
 from .fastestdet_head import FastestDetHead
 from .fcos_head import FCOSHead
 from .gflv2_head import GFocalHeadV2
-from src.models.heads.seg.lightham_head import LightHamHead
 from .lspnet_head import LSPNetHead
 from .nanodet_head import NanoDetHead
 from .nanodetplus_aux_head import NanoDetPlusAuxHead
 from .nanodetplus_head import NanoDetPlusHead
 from .openpose_head import OpenPoseHead
 from .ppliteseg_head import PPLiteSegHead
-from .regseg_head import RegSegHead
 from .sgcpnet_head import SGCPNetHead
-from .stdc_head import StdcHead
-from .topformer_head import TopFormerHead
 from .yolop_head import YOLOPHead
 from .yolov5_head import YOLOv5Head
 from .yolov6_head import YOLOv6Head
 from .yolov7_head import YOLOv7Head
-from .yolox_head import YOLOXHead
-from .tood_head import TOODHead
+# from .tood_head import TOODHead
+
+
+# Image Classification
+
+
+# Semantic Segmentation
+from .seg import LightHamHead
+from .seg import STDCHead
+from .seg import FCNHead
+from .seg import TopFormerHead
+from .seg import RegSegHead
+from .seg import Deeplabv3Head
+from .seg import Deeplabv3PlusHead
+from .seg import PSPHead
+from .seg import UPerHead
+from .seg import SegFormerHead
+from .seg import UperNetAlignHead
+
+# Object Detectiton
+from .det import YOLOXHead
 
 __all__ = [
     'YOLOv5Head',
     'YOLOXHead',
     'YOLOv7Head',
-    'TOODHead',
+    # 'TOODHead',
     'NanoDetHead',
     'NanoDetPlusHead',
     'NanoDetPlusAuxHead',
@@ -45,14 +59,17 @@ __all__ = [
     'FastestDetHead',
     'Deeplabv3Head',
     'Deeplabv3PlusHead',
-    'StdcHead',
+    'STDCHead',
     'LightHamHead',
     'LSPNetHead',
     'RegSegHead',
     'OpenPoseHead',
     'SGCPNetHead',
     'PPLiteSegHead',
-    'TopFormerHead'
+    'TopFormerHead',
+    'FCNHead',
+    'PSPHead',
+    'SegFormerHead'
 ]
 
 
@@ -66,8 +83,8 @@ def build_head(cfg):
         return YOLOXHead(**head_cfg)
     elif name == 'YOLOv7Head':
         return YOLOv7Head(**head_cfg)
-    elif name == 'TOODHead':
-        return TOODHead(**head_cfg)
+    # elif name == 'TOODHead':
+    #    return TOODHead(**head_cfg)
     elif name == 'FCOSHead':
         return FCOSHead(**head_cfg)
     elif name == 'NanoDetHead':
@@ -91,8 +108,10 @@ def build_head(cfg):
         return Deeplabv3Head(**head_cfg)
     elif name == 'Deeplabv3PlusHead':
         return Deeplabv3PlusHead(**head_cfg)
-    elif name == 'StdcHead':
-        return StdcHead(**head_cfg)
+    elif name == 'STDCHead':
+        return STDCHead(**head_cfg)
+    elif name == 'FCNHead':
+        return FCNHead(**head_cfg)
     elif name == 'LightHamHead':
         return LightHamHead(**head_cfg)
     elif name == 'LSPNetHead':
@@ -105,8 +124,17 @@ def build_head(cfg):
         return SGCPNetHead(**head_cfg)
     elif name == 'TopFormerHead':
         return TopFormerHead(**head_cfg)
+    elif name == 'PSPHead':
+        return PSPHead(**head_cfg)
+    elif name == 'UPerHead':
+        return UPerHead(**head_cfg)
+    elif name == 'SegFormerHead':
+        return SegFormerHead(**head_cfg)
+    elif name == 'UperNetAlignHead':
+        return UperNetAlignHead(**head_cfg)
+
 
     elif name == 'OpenPoseHead':
         return OpenPoseHead(**head_cfg)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(name)

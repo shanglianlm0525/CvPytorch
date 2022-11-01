@@ -14,3 +14,4 @@ from .deeplabv3plus_head import Deeplabv3PlusHead
 from .psp_head import PSPHead
 from .uper_head import UPerHead
 from .segformer_head import SegFormerHead
+from .uper_align_head import UperNetAlignHead
