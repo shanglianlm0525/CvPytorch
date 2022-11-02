@@ -79,11 +79,11 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [1]
+GPU_IDS: [3]
 N_MAX_EPOCHS: 400
 
 INIT_LR: 0.01
-BACKBONE_LR: 0.01
+BACKBONE_LR: 0.001
 SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
 
 OPTIMIZER:
