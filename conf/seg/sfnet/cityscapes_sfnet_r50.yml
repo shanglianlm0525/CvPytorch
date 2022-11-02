@@ -1,0 +1,161 @@
+EXPERIMENT_NAME: 'Cityscapes_SFNet'
+
+#########################################
+# Dataset / Transforms Configurations
+#########################################
+DATASET:
+  CLASS: 'src.data.datasets.cityscapes.CityscapesSegmentation'
+  DICTIONARY: 'conf/dicts/cityscapes_dict.yml'
+  DICTIONARY_NAME: 'SEG_CLASSES'
+  BACKGROUND_AS_CATEGORY: False
+
+  TRAIN:
+    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+    IMG_SUFFIX: '*.png'
+    INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
+    SHUFFLE: True
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
+    LOAD_NUM: 1
+    CACHE: True
+    LABELS:
+      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      SEG_SUFFIX: '*_gtFine_labelIds.png'
+    TRANSFORMS:
+      RandomScaleCrop: { size: [512, 1024], scale: [0.5, 2.0] }
+      RandomHorizontalFlip: { p: 0.5 }
+      PhotoMetricDistortion:
+      Pad: { size: [512, 1024] }
+      ToTensor:
+      Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
+
+  VAL:
+    IMG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+    IMG_SUFFIX: '*.png'
+    INDICES: '/home/lmin/data/cityscapes/cityscapes/val.txt'
+    SHUFFLE: False
+    BATCH_SIZE: 1
+    NUM_WORKER: 1
+    LOAD_NUM: 1
+    CACHE: True
+    LABELS:
+      DET_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      DET_SUFFIX: '.xml'
+      SEG_DIR: '/home/lmin/data/cityscapes/cityscapes'
+      SEG_SUFFIX: '*_gtFine_labelIds.png'
+    TRANSFORMS:
+      # Resize: { size: [1024, 2048] }
+      ToTensor:
+      Normalize: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] }
+
+
+#########################################
+# Model / Evaluator Configurations
+#########################################
+USE_MODEL:
+  CLASS: 'src.models.segmentors.encoder_decoder.EncoderDecoder'
+  BACKBONE: { 'name': 'ResNet', 'subtype': 'resnet50v1c', 'out_stages': [1, 2, 3, 4], 'output_stride': 8, 'pretrained': True }
+  HEAD: { 'name': 'UperNetAlignHead', 'num_classes': 19, 'in_channels': [256, 512, 1024, 2048], 'channels': 512, 'bins': [1, 2, 3, 6] }
+  LOSS: { 'name': 'CrossEntropyLoss2d' }
+
+
+EVALUATOR:
+  NAME: 'segmentation'
+  EVAL_TYPE: 'mIoU'
+  EVAL_INTERVALS: 2
+
+
+#########################################
+# Checkpoints / Resume Configurations
+#########################################
+CHECKPOINT_DIR: 'checkpoints'
+N_EPOCHS_TO_SAVE_MODEL: 10
+# PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+RESUME: False
+
+
+#########################################
+# Devices / Optimizer / Lr_scheduler / Warmup Configurations
+#########################################
+GPU_IDS: [2]
+N_MAX_EPOCHS: 300
+
+INIT_LR: 0.01
+BACKBONE_LR: 0.01
+SCALE_LR: 0 # 256 # Scale learning rate based on global batch size
+
+OPTIMIZER:
+  TYPE: 'SGD' # Adam, RMSprop
+  BIAS_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0001
+    nesterov: True
+  WEIGHT_PARAMS:
+    momentum: 0.9
+    weight_decay: 0.0
+    nesterov: True
+  BIAS_LR_MULTIPLIER: 1
+
+LR_SCHEDULER:
+  TYPE: 'PolyLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
+  MILESTONES: [20, 40, 60, 80, 120]
+  MAX_LR: 0.1
+  MIN_LR: 0.0001
+  GAMMA: 0.1
+  POWER: 0.9
+  STEP: 300
+
+WARMUP:
+  NAME: 'linear'
+  ITERS: 1000
+  FACTOR: 0.33
+
+
+#########################################
+# AMP Configurations
+#########################################
+AMP: False
+
+#########################################
+# EMA Configurations
+#########################################
+EMA: False
+
+#########################################
+# Gradient Accumulation Configurations
+#########################################
+ACCUMULATE: False
+ACCUMULATE_STEPS: 64
+
+#########################################
+# EarlyStopping Configurations
+#########################################
+PATIENCE: 100
+
+#########################################
+# MULTI_SCALE Configurations
+#########################################
+MULTI_SCALE: False
+SCALE_RANGE: [0.5, 1.5]
+
+#########################################
+# GRAD_CLIP Configurations
+#########################################
+GRAD_CLIP:
+  TYPE: 'norm'
+  VALUE: 0
+
+
+#########################################
+# Logging / Visualization Configurations
+#########################################
+N_ITERS_TO_DISPLAY_STATUS: 10
+
+## TENSORBOARD
+TENSORBOARD: True
+TENSORBOARD_LOG_DIR: 'runs'
+TENSORBOARD_MODEL: False
+TENSORBOARD_WEIGHT: False
+TENSORBOARD_IMAGE: False
