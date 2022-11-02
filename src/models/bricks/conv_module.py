@@ -5,7 +5,8 @@ from typing import Dict, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 
-from mmcv.utils import _BatchNorm, _InstanceNorm
+from torch.nn.modules.batchnorm import _BatchNorm
+
 from .activation import build_activation_layer
 from .conv import build_conv_layer
 from .norm import build_norm_layer

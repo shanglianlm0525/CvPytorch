@@ -4,8 +4,9 @@ from typing import Any, Dict, Optional
 import torch
 import torch.nn as nn
 
-from mmcv import build_from_cfg
+
 from .registry import DROPOUT_LAYERS
+from ...utils.registry import build_from_cfg
 
 
 def drop_path(x: torch.Tensor,

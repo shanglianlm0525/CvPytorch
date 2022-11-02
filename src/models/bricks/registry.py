@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from mmcv.utils import Registry
+from src.utils.registry import Registry
 
 CONV_LAYERS = Registry('conv layer')
 NORM_LAYERS = Registry('norm layer')

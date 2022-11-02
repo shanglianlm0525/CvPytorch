@@ -5,8 +5,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mmcv.utils import TORCH_VERSION, build_from_cfg, digit_version
+
 from .registry import ACTIVATION_LAYERS
+from .wrappers import TORCH_VERSION
+from ...utils.registry import build_from_cfg
+
 
 for module in [
         nn.ReLU, nn.LeakyReLU, nn.PReLU, nn.RReLU, nn.ReLU6, nn.ELU,
@@ -14,8 +17,8 @@ for module in [
 ]:
     ACTIVATION_LAYERS.register_module(module=module)
 
-if digit_version(torch.__version__) >= digit_version('1.7.0'):
-    ACTIVATION_LAYERS.register_module(module=nn.SiLU)
+
+ACTIVATION_LAYERS.register_module(module=nn.SiLU)
 
 
 @ACTIVATION_LAYERS.register_module(name='Clip')
@@ -76,11 +79,8 @@ class GELU(nn.Module):
         return F.gelu(input)
 
 
-if (TORCH_VERSION == 'parrots'
-        or digit_version(TORCH_VERSION) < digit_version('1.4')):
-    ACTIVATION_LAYERS.register_module(module=GELU)
-else:
-    ACTIVATION_LAYERS.register_module(module=nn.GELU)
+
+ACTIVATION_LAYERS.register_module(module=nn.GELU)
 
 
 def build_activation_layer(cfg: Dict) -> nn.Module:

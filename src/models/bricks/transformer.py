@@ -3,36 +3,20 @@ import copy
 import math
 import warnings
 from typing import Sequence
+from addict import Dict
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mmcv.cnn import (Linear, build_activation_layer, build_conv_layer,
-                      build_norm_layer)
-from mmcv.runner.base_module import BaseModule, ModuleList, Sequential
-from mmcv.utils import (ConfigDict, build_from_cfg, deprecated_api_warning,
-                        to_2tuple)
+from . import build_conv_layer, build_norm_layer, build_activation_layer, Linear
+from ...base.base_module import BaseModule, Sequential, ModuleList
+from ...utils.registry import build_from_cfg
+
+
 from .drop import build_dropout
 from .registry import (ATTENTION, FEEDFORWARD_NETWORK, POSITIONAL_ENCODING,
                        TRANSFORMER_LAYER, TRANSFORMER_LAYER_SEQUENCE)
-
-# Avoid BC-breaking of importing MultiScaleDeformableAttention from this file
-try:
-    from mmcv.ops.multi_scale_deform_attn import \
-        MultiScaleDeformableAttention  # noqa F401
-    warnings.warn(
-        ImportWarning(
-            '``MultiScaleDeformableAttention`` has been moved to '
-            '``mmcv.ops.multi_scale_deform_attn``, please change original path '  # noqa E501
-            '``from mmcv.cnn.bricks.transformer import MultiScaleDeformableAttention`` '  # noqa E501
-            'to ``from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention`` '  # noqa E501
-        ))
-
-except ImportError:
-    warnings.warn('Fail to import ``MultiScaleDeformableAttention`` from '
-                  '``mmcv.ops.multi_scale_deform_attn``, '
-                  'You should install ``mmcv-full`` if you need this module. ')
 
 
 def build_positional_encoding(cfg, default_args=None):
@@ -99,9 +83,9 @@ class AdaptivePadding(nn.Module):
         super().__init__()
         assert padding in ('same', 'corner')
 
-        kernel_size = to_2tuple(kernel_size)
-        stride = to_2tuple(stride)
-        dilation = to_2tuple(dilation)
+        kernel_size = (kernel_size, kernel_size)
+        stride = (stride, stride)
+        dilation = (dilation, dilation)
 
         self.padding = padding
         self.kernel_size = kernel_size
@@ -174,7 +158,7 @@ class PatchEmbed(BaseModule):
         input_size (int | tuple | None): The size of input, which will be
             used to calculate the out size. Only works when `dynamic_size`
             is False. Default: None.
-        init_cfg (`mmcv.ConfigDict`, optional): The Config for initialization.
+        init_cfg (`ConfigDict`, optional): The Config for initialization.
             Default: None.
     """
 
@@ -196,9 +180,9 @@ class PatchEmbed(BaseModule):
         if stride is None:
             stride = kernel_size
 
-        kernel_size = to_2tuple(kernel_size)
-        stride = to_2tuple(stride)
-        dilation = to_2tuple(dilation)
+        kernel_size = (kernel_size, kernel_size)
+        stride = (stride, stride)
+        dilation = (dilation, dilation)
 
         if isinstance(padding, str):
             self.adaptive_padding = AdaptivePadding(
@@ -210,7 +194,7 @@ class PatchEmbed(BaseModule):
             padding = 0
         else:
             self.adaptive_padding = None
-        padding = to_2tuple(padding)
+        padding = (padding, padding)
 
         self.projection = build_conv_layer(
             dict(type=conv_type),
@@ -228,7 +212,7 @@ class PatchEmbed(BaseModule):
             self.norm = None
 
         if input_size:
-            input_size = to_2tuple(input_size)
+            input_size = (input_size, input_size)
             # `init_out_size` would be used outside to
             # calculate the num_patches
             # e.g. when `use_abs_pos_embed` outside
@@ -324,9 +308,9 @@ class PatchMerging(BaseModule):
         else:
             stride = kernel_size
 
-        kernel_size = to_2tuple(kernel_size)
-        stride = to_2tuple(stride)
-        dilation = to_2tuple(dilation)
+        kernel_size = (kernel_size, kernel_size)
+        stride = (stride, stride)
+        dilation = (dilation, dilation)
 
         if isinstance(padding, str):
             self.adaptive_padding = AdaptivePadding(
@@ -339,7 +323,7 @@ class PatchMerging(BaseModule):
         else:
             self.adaptive_padding = None
 
-        padding = to_2tuple(padding)
+        padding = (padding, padding)
         self.sampler = nn.Unfold(
             kernel_size=kernel_size,
             dilation=dilation,
@@ -419,7 +403,7 @@ class MultiheadAttention(BaseModule):
             Default: 0.0.
         dropout_layer (obj:`ConfigDict`): The dropout_layer used
             when adding the shortcut.
-        init_cfg (obj:`mmcv.ConfigDict`): The Config for initialization.
+        init_cfg (obj:`ConfigDict`): The Config for initialization.
             Default: None.
         batch_first (bool): When it is True,  Key, Query and Value are shape of
             (batch, n, embed_dim), otherwise (n, batch, embed_dim).
@@ -456,8 +440,7 @@ class MultiheadAttention(BaseModule):
         self.dropout_layer = build_dropout(
             dropout_layer) if dropout_layer else nn.Identity()
 
-    @deprecated_api_warning({'residual': 'identity'},
-                            cls_name='MultiheadAttention')
+
     def forward(self,
                 query,
                 key=None,
@@ -570,16 +553,10 @@ class FFN(BaseModule):
             identity connection. Default: `True`.
         dropout_layer (obj:`ConfigDict`): The dropout_layer used
             when adding the shortcut.
-        init_cfg (obj:`mmcv.ConfigDict`): The Config for initialization.
+        init_cfg (obj:`ConfigDict`): The Config for initialization.
             Default: None.
     """
 
-    @deprecated_api_warning(
-        {
-            'dropout': 'ffn_drop',
-            'add_residual': 'add_identity'
-        },
-        cls_name='FFN')
     def __init__(self,
                  embed_dims=256,
                  feedforward_channels=1024,
@@ -614,7 +591,7 @@ class FFN(BaseModule):
             dropout_layer) if dropout_layer else torch.nn.Identity()
         self.add_identity = add_identity
 
-    @deprecated_api_warning({'residual': 'identity'}, cls_name='FFN')
+
     def forward(self, x, identity=None):
         """Forward function for `FFN`.
 
@@ -632,7 +609,7 @@ class FFN(BaseModule):
 class BaseTransformerLayer(BaseModule):
     """Base `TransformerLayer` for vision transformer.
 
-    It can be built from `mmcv.ConfigDict` and support more flexible
+    It can be built from `ConfigDict` and support more flexible
     customization, for example, using any number of `FFN or LN ` and
     use different kinds of `attention` by specifying a list of `ConfigDict`
     named `attn_cfgs`. It is worth mentioning that it supports `prenorm`
@@ -641,13 +618,13 @@ class BaseTransformerLayer(BaseModule):
     Transformer Architecture <https://arxiv.org/abs/2002.04745>`_ .
 
     Args:
-        attn_cfgs (list[`mmcv.ConfigDict`] | obj:`mmcv.ConfigDict` | None )):
+        attn_cfgs (list[`ConfigDict`] | obj:`ConfigDict` | None )):
             Configs for `self_attention` or `cross_attention` modules,
             The order of the configs in the list should be consistent with
             corresponding attentions in operation_order.
             If it is a dict, all of the attention modules in operation_order
             will be built with this config. Default: None.
-        ffn_cfgs (list[`mmcv.ConfigDict`] | obj:`mmcv.ConfigDict` | None )):
+        ffn_cfgs (list[`ConfigDict`] | obj:`ConfigDict` | None )):
             Configs for FFN, The order of the configs in the list should be
             consistent with corresponding ffn in operation_order.
             If it is a dict, all of the attention modules in operation_order
@@ -658,7 +635,7 @@ class BaseTransformerLayer(BaseModule):
             Default：None.
         norm_cfg (dict): Config dict for normalization layer.
             Default: dict(type='LN').
-        init_cfg (obj:`mmcv.ConfigDict`): The Config for initialization.
+        init_cfg (obj:`ConfigDict`): The Config for initialization.
             Default: None.
         batch_first (bool): Key, Query and Value are shape
             of (batch, n, embed_dim)
@@ -740,7 +717,7 @@ class BaseTransformerLayer(BaseModule):
         self.ffns = ModuleList()
         num_ffns = operation_order.count('ffn')
         if isinstance(ffn_cfgs, dict):
-            ffn_cfgs = ConfigDict(ffn_cfgs)
+            ffn_cfgs = Dict(ffn_cfgs)
         if isinstance(ffn_cfgs, dict):
             ffn_cfgs = [copy.deepcopy(ffn_cfgs) for _ in range(num_ffns)]
         assert len(ffn_cfgs) == num_ffns
@@ -869,13 +846,13 @@ class TransformerLayerSequence(BaseModule):
     of `transformer_layer` in `transformer_coder`.
 
     Args:
-        transformerlayer (list[obj:`mmcv.ConfigDict`] |
-            obj:`mmcv.ConfigDict`): Config of transformerlayer
-            in TransformerCoder. If it is obj:`mmcv.ConfigDict`,
+        transformerlayer (list[obj:`ConfigDict`] |
+            obj:`ConfigDict`): Config of transformerlayer
+            in TransformerCoder. If it is obj:`ConfigDict`,
              it would be repeated `num_layer` times to a
-             list[`mmcv.ConfigDict`]. Default: None.
+             list[`ConfigDict`]. Default: None.
         num_layers (int): The number of `TransformerLayer`. Default: None.
-        init_cfg (obj:`mmcv.ConfigDict`): The Config for initialization.
+        init_cfg (obj:`ConfigDict`): The Config for initialization.
             Default: None.
     """
 

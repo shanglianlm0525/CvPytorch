@@ -4,15 +4,16 @@ from typing import Dict, Tuple, Union
 
 import torch.nn as nn
 
-from mmcv.utils import is_tuple_of
-from mmcv.utils.parrots_wrapper import SyncBatchNorm, _BatchNorm, _InstanceNorm
+from torch.nn.modules.batchnorm import _BatchNorm
+from torch.nn.modules.instancenorm import _InstanceNorm
+
 from .registry import NORM_LAYERS
 
 NORM_LAYERS.register_module('BN', module=nn.BatchNorm2d)
 NORM_LAYERS.register_module('BN1d', module=nn.BatchNorm1d)
 NORM_LAYERS.register_module('BN2d', module=nn.BatchNorm2d)
 NORM_LAYERS.register_module('BN3d', module=nn.BatchNorm3d)
-NORM_LAYERS.register_module('SyncBN', module=SyncBatchNorm)
+NORM_LAYERS.register_module('SyncBN', module=nn.SyncBatchNorm)
 NORM_LAYERS.register_module('GN', module=nn.GroupNorm)
 NORM_LAYERS.register_module('LN', module=nn.LayerNorm)
 NORM_LAYERS.register_module('IN', module=nn.InstanceNorm2d)
@@ -136,7 +137,7 @@ def is_norm(layer: nn.Module,
     if exclude is not None:
         if not isinstance(exclude, tuple):
             exclude = (exclude, )
-        if not is_tuple_of(exclude, type):
+        if not isinstance(exclude, tuple):
             raise TypeError(
                 f'"exclude" must be either None or type or a tuple of types, '
                 f'but got {type(exclude)}: {exclude}')
