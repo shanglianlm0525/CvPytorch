@@ -310,11 +310,11 @@ data
 
 #### Cityscapes
 
-| Method | Backbone  | Resolution | mIoU | Params | FLOPs |                   Config                    |   Download   |
-| :----: | :-------: | :--------: | :--: | :----: | :---: | :-----------------------------------------: | :----------: |
-| SFNet  | resnet18  | 512 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
-| SFNet  | resnet50  | 512 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SFNet  | resnet101 | 512 × 1024 |      |        |       | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
+| Method | Backbone  | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
+| :----: | :-------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
+| SFNet  | resnet18  | 512 × 1024 | 75.46 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
+| SFNet  | resnet50  | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SFNet  | resnet101 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
 
 
 
