@@ -63,7 +63,7 @@ class PAI_YOLOXBackbone(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PAI_YOLOXBackbone('pai_yolox_s')
+    model = PAI_YOLOXBackbone('pai_yolox_s', depth_mul=0.33, width_mul=0.5)
     print(model)
 
     input = torch.randn(1, 3, 640, 640)

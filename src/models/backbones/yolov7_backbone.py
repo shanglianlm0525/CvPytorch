@@ -27,6 +27,7 @@ class YOLOv7Backbone(nn.Module):
         self.stem = Conv(3, in_places[0], k=3, s=1, p=1)  # 0
         self.layer1 = nn.Sequential(Conv(in_places[0], in_places[1], 3, 2),
                                     Conv(in_places[1], in_places[1], 3, 1))
+
         self.layer2 = nn.Sequential(Conv(in_places[1], in_places[2], 3, 2),
                                     EELAN(in_places[2], in_places[1], in_places[3]))
 

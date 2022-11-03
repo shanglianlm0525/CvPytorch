@@ -105,27 +105,17 @@ class ResNet(nn.Module):
             s3, s4, d3, d4 = (1, 1, 2, 4)
 
             for n, m in self.layer3.named_modules():
-                if 'conv1' in n and ('resnet34' in subtype or 'resnet18' in subtype):
+                if 'conv1' in n and 'resnet34' in subtype:
                     m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
-                elif 'conv2' in n:
-                    if n == '0.conv2':
-                        m.dilation, m.padding, m.stride = (d3 // 2, d3 // 2), (d3 // 2, d3 // 2), (s3, s3)
-                    else:
-                        m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
-                elif 'downsample.0' in n:
-                    m.stride = (s3, s3)
+                elif 'conv2' in n and 'resnet18' in subtype:
+                    m.dilation, m.padding, m.stride = (d3, d3), (d3, d3), (s3, s3)
 
         if self.output_stride == 8 or self.output_stride == 16:
             for n, m in self.layer4.named_modules():
-                if 'conv1' in n and ('resnet34' in subtype or 'resnet18' in subtype):
+                if 'conv1' in n and 'resnet34' in subtype:
                     m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
-                elif 'conv2' in n:
-                    if n == '0.conv2':
-                        m.dilation, m.padding, m.stride = (d4 // 2, d4 // 2), (d4 // 2, d4 // 2), (s4, s4)
-                    else:
-                        m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
-                elif 'downsample.0' in n:
-                    m.stride = (s4, s4)
+                elif 'conv2' in n and 'resnet18' in subtype:
+                    m.dilation, m.padding, m.stride = (d4, d4), (d4, d4), (s4, s4)
 
         self.out_channels = [self.out_channels[ost] for ost in self.out_stages]
 
@@ -223,7 +213,7 @@ class ResNet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = ResNet('resnet50v1c', output_stride=32)
+    model = ResNet('resnet18v1c', output_stride=8)
     print(model)
 
     input = torch.randn(1, 3, 224, 224)

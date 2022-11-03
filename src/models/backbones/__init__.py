@@ -7,7 +7,6 @@
 from copy import deepcopy
 
 from .convnext import ConvNeXt
-from .csp_darknet import CspDarkNet
 from .custom_cspnet import CustomCspNet
 from .efficientnet import EfficientNet
 from .efficientnet_lite import EfficientNetLite
@@ -45,13 +44,14 @@ from .seg import ResNet
 from .seg import MixVisionTransformer
 
 # Object Detectiton
+from .det import CSPDarknet
 
 
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
             'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet', 'MSCAN',
 
            'YOLOv5Backbone', 'YOLOv6Backbone', 'YOLOv7Backbone', 'PAI_YOLOXBackbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
-           'CspDarkNet', 'RegNet', 'LFDResNet',  'LSPNetBackbone']
+           'CSPDarknet', 'RegNet', 'LFDResNet',  'LSPNetBackbone']
 
 
 def build_backbone(cfg):
@@ -103,8 +103,8 @@ def build_backbone(cfg):
         return EfficientNetLite(**backbone_cfg)
     elif name == 'CustomCspNet':
         return CustomCspNet(**backbone_cfg)
-    elif name == 'CspDarkNet':
-        return CspDarkNet(**backbone_cfg)
+    elif name == 'CSPDarknet':
+        return CSPDarknet(**backbone_cfg)
     elif name == 'YOLOv6Backbone':
         return YOLOv6Backbone(**backbone_cfg)
     elif name == 'SGCPNetBackbone':

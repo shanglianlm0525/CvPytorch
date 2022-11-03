@@ -77,8 +77,8 @@ class YOLOv6Backbone(nn.Module):
 
 
 if __name__ == "__main__":
-    # model = YOLOv6Backbone(subtype='yolov6_s', depth_mul=0.33, width_mul=0.5)
-    model = YOLOv6Backbone(subtype='yolov6_m', depth_mul=0.6, width_mul=0.75, csp_e=float(2)/3)
+    model = YOLOv6Backbone(subtype='yolov6_s', depth_mul=0.33, width_mul=0.5)
+    # model = YOLOv6Backbone(subtype='yolov6_m', depth_mul=0.6, width_mul=0.75, csp_e=float(2)/3)
     print(model)
 
     input = torch.randn(1, 3, 640, 640)

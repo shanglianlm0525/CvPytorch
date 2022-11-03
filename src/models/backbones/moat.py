@@ -111,6 +111,9 @@ class MOATBlock(nn.Module):
         self.project_conv = ConvModule(mid_channels, out_channels, 1, 1, 0,
                                        conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=None)
 
+        self.layer_normal = nn.LayerNorm(out_channels)
+        self.attention = nn.Transformer()
+
         self.init_weights()
 
     def init_weights(self):
