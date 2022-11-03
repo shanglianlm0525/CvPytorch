@@ -14,8 +14,8 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    BATCH_SIZE: 2
+    NUM_WORKER: 2
     LOAD_NUM: 1
     CACHE: True
     LABELS:
@@ -81,7 +81,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [2]
+GPU_IDS: [1]
 N_MAX_EPOCHS: 430
 
 INIT_LR: 0.0006
