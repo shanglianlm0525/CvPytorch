@@ -14,8 +14,8 @@ DATASET:
     IMG_SUFFIX: '*.png'
     INDICES: '/home/lmin/data/cityscapes/cityscapes/train.txt'
     SHUFFLE: True
-    BATCH_SIZE: 4
-    NUM_WORKER: 4
+    BATCH_SIZE: 8
+    NUM_WORKER: 8
     LOAD_NUM: 1
     CACHE: True
     LABELS:
