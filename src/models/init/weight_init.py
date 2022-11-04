@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from mmcv.utils import Registry, build_from_cfg, get_logger, print_log
+from src.utils.registry import Registry, build_from_cfg
 
 INITIALIZERS = Registry('initializer')
 
@@ -501,27 +501,7 @@ class PretrainedInit:
         self.map_location = map_location
 
     def __call__(self, module: nn.Module) -> None:
-        from mmcv.runner import (_load_checkpoint_with_prefix, load_checkpoint,
-                                 load_state_dict)
-        logger = get_logger('mmcv')
-        if self.prefix is None:
-            print_log(f'load model from: {self.checkpoint}', logger=logger)
-            load_checkpoint(
-                module,
-                self.checkpoint,
-                map_location=self.map_location,
-                strict=False,
-                logger=logger)
-        else:
-            print_log(
-                f'load {self.prefix} in model from: {self.checkpoint}',
-                logger=logger)
-            state_dict = _load_checkpoint_with_prefix(
-                self.prefix, self.checkpoint, map_location=self.map_location)
-            load_state_dict(module, state_dict, strict=False, logger=logger)
-
-        if hasattr(module, '_params_init_info'):
-            update_init_info(module, init_info=self._get_init_info())
+        pass
 
     def _get_init_info(self) -> str:
         info = f'{self.__class__.__name__}: load from {self.checkpoint}'
