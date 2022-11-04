@@ -89,7 +89,7 @@ class ToTensor(object):
     [0, 255] to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0].
     """
 
-    def __init__(self, normalize=True, to_rgb=False, target_type='uint8'):
+    def __init__(self, normalize=True, to_rgb=True, target_type='uint8'):
         self.normalize = normalize
         self.to_rgb = to_rgb
         self.target_type = target_type
@@ -110,6 +110,11 @@ class ToTensor(object):
         else:
             img = img.transpose((2, 0, 1))  # HWC to CHW
         img = np.ascontiguousarray(img)
+
+        '''
+        if len(target.shape) < 3:
+            target = target[None, ...]
+        '''
 
         if self.normalize:
             return {'image': torch.from_numpy(img.astype(np.float32)).div_(255.0),
@@ -894,7 +899,7 @@ class RandAugment(object):
         https://arxiv.org/pdf/1909.13719.pdf
     """
 
-    def __init__(self, p, n_ops, magnitude, ops="reduced", fill=(128, 128, 128), ignore_value=255):
+    def __init__(self, p, n_ops, magnitude, ops="reduced", fill=(0, 0, 0), ignore_value=255):
         super(RandAugment, self).__init__()
         assert 0 <= magnitude <= 1
         self.p = p
@@ -917,9 +922,9 @@ class RandAugment(object):
         for op in random.sample(self.ops, int(self.n_ops)):
             if self.p < 1 and random.random() > self.p:
                 continue
-            # trans Image to numpy
-            img = np.asarray(img)
-            target = np.asarray(target)
+            # trans numpy to Image
+            img = Image.fromarray(img.astype(np.uint8))
+            target = Image.fromarray(target.astype(np.uint8))
 
             min_v, max_v, negate = OP_RANGES[op]
             v = self.magnitude * (max_v - min_v) + min_v
@@ -932,9 +937,9 @@ class RandAugment(object):
                 WARP_PARAMS["resample"] = Image.NEAREST
                 target = OP_FUNCTIONS[op](target, v)
 
-            # trans numpy to Image
-            img = Image.fromarray(img.astype(np.uint8))
-            target = Image.fromarray(target.astype(np.uint8))
+            # trans Image to numpy
+            img = np.asarray(img)
+            target = np.asarray(target)
 
         return {'image': img, 'target': target}
 
