@@ -229,7 +229,7 @@ data
 |   Method    | Backbone  | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
 | :---------: | :-------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
 | Deeplab V3+ | resnet50  | 512 × 1024 | 76.14 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
-| Deeplab V3+ | resnet101 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| Deeplab V3+ | resnet101 | 512 × 1024 | 75.80 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
 
 
@@ -264,7 +264,7 @@ data
 | SegFormer |  MIT-B0  | 1024 × 1024 | 73.41 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
 | SegFormer |  MIT-B1  | 1024 × 1024 | 77.47 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 | SegFormer |  MIT-B2  | 1024 × 1024 | 80.15 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SegFormer |  MIT-B3  | 1024 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B3  | 1024 × 1024 | 80.33 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 | SegFormer |  MIT-B4  | 1024 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 | SegFormer |  MIT-B5  | 1024 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
@@ -313,8 +313,8 @@ data
 | Method | Backbone  | Resolution | mIoU  | Params | FLOPs |                   Config                    |   Download   |
 | :----: | :-------: | :--------: | :---: | :----: | :---: | :-----------------------------------------: | :----------: |
 | SFNet  | resnet18  | 512 × 1024 | 75.46 |        |       | [config](conf/seg/cityscapes_segnext_t.yml) | [Link](link) |
-| SFNet  | resnet50  | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SFNet  | resnet101 | 512 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
+| SFNet  | resnet50  | 512 × 1024 | 77.16 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SFNet  | resnet101 | 512 × 1024 | 77.75 |        |       | [config](conf/seg/cityscapes_segnext_b.yml) | [Link](link) |
 
 
 
