@@ -38,7 +38,7 @@ class PPM(nn.ModuleList):
                 nn.Sequential(
                     nn.AdaptiveAvgPool2d(pool_scale),
                     ConvModule(self.in_channels, self.channels, 1,
-                        conv_cfg=self.conv_cfg, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg,**kwargs)))
+                        conv_cfg=self.conv_cfg, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg)))
 
     def forward(self, x):
         """Forward function."""
