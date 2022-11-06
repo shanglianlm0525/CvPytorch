@@ -201,7 +201,7 @@ class Trainer:
                 scaler.update()
 
                 # zero the parameter gradients
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
 
                 if cfg.EMA:
                     self.ema.update(model)
