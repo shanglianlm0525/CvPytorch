@@ -92,7 +92,7 @@ class SingleStageDetector(BaseDetector):
         assert isinstance(targets, Tensor) and targets.ndim == 3, \
             f'targets must be Tensor type, and ndim == 3, but got {type(targets)} and {targets.ndim}'
         losses = dict()
-        preds = F.interpolate(preds, size=targets.shape[-2:], mode='bilinear', align_corners=False)
+
         if not isinstance(loss, (list, nn.ModuleList)):
             loss = [loss]
         for l in loss:
@@ -126,7 +126,7 @@ class SingleStageDetector(BaseDetector):
             return torch.argmax(feats, dim=1)
         else:
             losses = self.loss_forward(preds, targets["gt"],  self.loss)
-            # print(losses)
+
 
             if mode == 'val':
 

@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 # @Time : 2022/10/26 11:05
 # @Author : liumin
-# @File : yolo_series.py
+# @File : yolo_detector.py
 
 import torch
 import torch.nn as nn
