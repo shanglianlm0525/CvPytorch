@@ -52,12 +52,10 @@ class HymenopteraClassification(Dataset):
 
     def __getitem__(self, idx):
         if self.stage == 'infer':
-            # _img = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32)
             _img = cv2.imread(self._imgs[idx])  # BGR
             sample = {'image': _img, 'target': None}
             return self.transform(sample)
         else:
-            # _img, _target = np.asarray(Image.open(self._imgs[idx]).convert('RGB'), dtype=np.float32), self._targets[idx]
             _img = cv2.imread(self._imgs[idx]) # BGR
             _target = self._targets[idx]
             _target = self.encode_target(_target, idx)
