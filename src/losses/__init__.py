@@ -6,17 +6,33 @@
 
 from copy import deepcopy
 
+from src.losses.fastestdet_loss import FastestDetLoss
 from src.losses.fcos_loss import FCOSLoss
+from src.losses.objectbox_loss import ObjectBoxLoss
+from src.losses.seg import CrossEntropyLoss2d
+from src.losses.seg import OhemCrossEntropyLoss2d
+from src.losses.seg import DetailAggregateLoss
 from src.losses.ssd_loss import SsdLoss
-from src.losses.yolofastestv2_loss import YoloFastestv2Loss
 from src.losses.yolop_loss import YolopLoss
-from src.losses.yolov5_loss import Yolov5Loss
+from src.losses.yolov5_loss import YOLOv5Loss
 from src.losses.efficientdet_loss import EfficientDetLoss
-from src.losses.yolox_loss import YoloxLoss
+from src.losses.yolov6_loss import YOLOv6Loss
+from src.losses.yolov7_loss import YOLOv7Loss
 
 
-__all__ = ['Yolov5Loss', 'EfficientDetLoss', 'YoloFastestv2Loss', 'YoloxLoss', 'SsdLoss',
-           'YolopLoss', 'FCOSLoss']
+
+# Image Classification
+
+
+# Semantic Segmentation
+
+
+# Object Detectiton
+from .det import YOLOXLoss
+
+
+__all__ = ['YOLOv5Loss', 'YOLOv7Loss','EfficientDetLoss', 'YOLOXLoss', 'SsdLoss',
+           'YolopLoss', 'FCOSLoss', 'YOLOv6Loss', 'FastestDetLoss', 'ObjectBoxLoss']
 
 
 
@@ -24,20 +40,33 @@ def build_loss(cfg):
     loss_cfg = deepcopy(cfg)
     name = loss_cfg.pop('name')
 
-    if name == 'Yolov5Loss':
-        return Yolov5Loss(**loss_cfg)
+    if name == 'YOLOv5Loss':
+        return YOLOv5Loss(**loss_cfg)
     elif name == 'EfficientDetLoss':
         return EfficientDetLoss(**loss_cfg)
-    elif name == 'YoloFastestv2Loss':
-        return YoloFastestv2Loss(**loss_cfg)
-    elif name == 'YoloxLoss':
-        return YoloxLoss(**loss_cfg)
+    elif name == 'YOLOXLoss':
+        return YOLOXLoss(**loss_cfg)
+    elif name == 'YOLOv6Loss':
+        return YOLOv6Loss(**loss_cfg)
+    elif name == 'YOLOv7Loss':
+        return YOLOv7Loss(**loss_cfg)
     elif name == 'SsdLoss':
         return SsdLoss(**loss_cfg)
     elif name == 'FCOSLoss':
         return FCOSLoss(**loss_cfg)
+    elif name == 'FastestDetLoss':
+        return FastestDetLoss(**loss_cfg)
+    elif name == 'ObjectBoxLoss':
+        return ObjectBoxLoss(**loss_cfg)
 
+    # seg
+    elif name == 'CrossEntropyLoss2d':
+        return CrossEntropyLoss2d(**loss_cfg)
+    elif name == 'OhemCrossEntropyLoss2d':
+        return OhemCrossEntropyLoss2d(**loss_cfg)
+    elif name == 'DetailAggregateLoss':
+        return DetailAggregateLoss(**loss_cfg)
     elif name == 'YolopLoss':
         return YolopLoss(**loss_cfg)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(name)
