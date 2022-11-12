@@ -265,8 +265,8 @@ data
 | SegFormer |  MIT-B1  | 1024 × 1024 | 77.47 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 | SegFormer |  MIT-B2  | 1024 × 1024 | 80.15 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 | SegFormer |  MIT-B3  | 1024 × 1024 | 80.33 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SegFormer |  MIT-B4  | 1024 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
-| SegFormer |  MIT-B5  | 1024 × 1024 |       |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B4  | 1024 × 1024 | 80.25 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
+| SegFormer |  MIT-B5  | 1024 × 1024 | 80.83 |        |       | [config](conf/seg/cityscapes_segnext_s.yml) | [Link](link) |
 
 
 
