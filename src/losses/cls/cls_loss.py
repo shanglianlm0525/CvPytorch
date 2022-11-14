@@ -112,6 +112,7 @@ class PolyLoss(_Loss):
         return (polyl)
 
 
+
 class LogitNormLoss(nn.Module):
     """
         Mitigating Neural Network Overconfidence with Logit Normalization
@@ -125,6 +126,45 @@ class LogitNormLoss(nn.Module):
         norms = torch.norm(x, p=2, dim=-1, keepdim=True) + 1e-7
         logit_norm = torch.div(x, norms) / self.tau
         return F.cross_entropy(logit_norm, target)
+
+
+class FocalLoss(nn.Module):
+    """
+        Focal Loss for Dense Object Detection
+        https://arxiv.org/pdf/1708.02002.pdf
+    """
+    def __init__(self, class_num, alpha=None, gamma=2, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.class_num = class_num
+        if alpha is None:
+            self.alpha = torch.ones(class_num, 1)
+        else:
+            self.alpha = alpha
+        self.gamma = gamma
+        self.size_average = size_average
+
+    def forward(self, inputs, targets, device):
+        N = inputs.size(0)
+        C = inputs.size(1)
+        P = F.softmax(inputs, dim=1)
+
+        class_mask = inputs.data.new(N, C).fill_(0)
+        ids = targets.view(-1, 1)
+        class_mask.scatter_(1, ids.data, 1.)
+
+        if inputs.is_cuda and not self.alpha.is_cuda:
+            self.alpha = self.alpha.cuda(device)
+        alpha = self.alpha[ids.data.view(-1)]
+
+        probs = (P * class_mask).sum(1).view(-1, 1)
+
+        log_p = probs.log()
+        batch_loss = -alpha * (torch.pow((1 - probs), self.gamma)) * log_p
+        if self.size_average:
+            loss = batch_loss.mean()
+        else:
+            loss = batch_loss.sum()
+        return loss
 
 
 if __name__ == '__main__':
