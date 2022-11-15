@@ -5,11 +5,10 @@
 # @File : yolov6_modules.py
 
 import warnings
-from pathlib import Path
-
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class SiLU(nn.Module):
@@ -21,7 +20,7 @@ class SiLU(nn.Module):
 
 class Conv(nn.Module):
     '''Normal Conv with SiLU activation'''
-    def __init__(self, in_channels, out_channels, kernel_size, stride, groups=1, bias=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, groups=1, bias=False, act=True):
         super().__init__()
         padding = kernel_size // 2
         self.conv = nn.Conv2d(
@@ -34,37 +33,13 @@ class Conv(nn.Module):
             bias=bias,
         )
         self.bn = nn.BatchNorm2d(out_channels)
-        self.act = nn.SiLU()
+        self.act = nn.SiLU() if act else nn.ReLU()
 
     def forward(self, x):
         return self.act(self.bn(self.conv(x)))
 
-    def forward_fuse(self, x):
-        return self.act(self.conv(x))
-
-
-class SimConv(nn.Module):
-    '''Normal Conv with ReLU activation'''
-    def __init__(self, in_channels, out_channels, kernel_size, stride, groups=1, bias=False):
-        super().__init__()
-        padding = kernel_size // 2
-        self.conv = nn.Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            groups=groups,
-            bias=bias,
-        )
-        self.bn = nn.BatchNorm2d(out_channels)
-        self.act = nn.ReLU()
-
-    def forward(self, x):
-        return self.act(self.bn(self.conv(x)))
-
-    def forward_fuse(self, x):
-        return self.act(self.conv(x))
+    # def forward_fuse(self, x):
+    #    return self.act(self.conv(x))
 
 
 class SimSPPF(nn.Module):
@@ -72,8 +47,8 @@ class SimSPPF(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=5):
         super().__init__()
         c_ = in_channels // 2  # hidden channels
-        self.cv1 = SimConv(in_channels, c_, 1, 1)
-        self.cv2 = SimConv(c_ * 4, out_channels, 1, 1)
+        self.cv1 = Conv(in_channels, c_, 1, 1, act=False)
+        self.cv2 = Conv(c_ * 4, out_channels, 1, 1, act=False)
         self.m = nn.MaxPool2d(kernel_size=kernel_size, stride=1, padding=kernel_size // 2)
 
     def forward(self, x):
@@ -123,10 +98,49 @@ class RepBlock(nn.Module):
     '''
         RepBlock is a stage block with rep-style basic block
     '''
-    def __init__(self, in_channels, out_channels, n=1):
+    def __init__(self, in_channels, out_channels, n=1, e=None):
         super().__init__()
         self.conv1 = RepVGGBlock(in_channels, out_channels)
         self.block = nn.Sequential(*(RepVGGBlock(out_channels, out_channels) for _ in range(n - 1))) if n > 1 else None
+
+    def forward(self, x):
+        x = self.conv1(x)
+        if self.block is not None:
+            x = self.block(x)
+        return x
+
+
+class BottleRep(nn.Module):
+
+    def __init__(self, in_channels, out_channels, weight=False):
+        super().__init__()
+        self.conv1 = RepVGGBlock(in_channels, out_channels)
+        self.conv2 = RepVGGBlock(out_channels, out_channels)
+        if in_channels != out_channels:
+            self.shortcut = False
+        else:
+            self.shortcut = True
+        if weight:
+            self.alpha = nn.Parameter(torch.ones(1))
+        else:
+            self.alpha = 1.0
+
+    def forward(self, x):
+        outputs = self.conv1(x)
+        outputs = self.conv2(outputs)
+        return outputs + self.alpha * x if self.shortcut else outputs
+
+
+class BottleRepBlock(nn.Module):
+    '''
+        RepBlock is a stage block with rep-style basic block
+    '''
+
+    def __init__(self, in_channels, out_channels, n=1):
+        super().__init__()
+        self.conv1 = BottleRep(in_channels, out_channels, weight=True)
+        n = n // 2
+        self.block = nn.Sequential(*(BottleRep(out_channels, out_channels, weight=True) for _ in range(n - 1))) if n > 1 else None
 
     def forward(self, x):
         x = self.conv1(x)
@@ -195,6 +209,7 @@ class RepVGGBlock(nn.Module):
 
         return self.nonlinearity(self.se(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out))
 
+    '''
     def get_equivalent_kernel_bias(self):
         kernel3x3, bias3x3 = self._fuse_bn_tensor(self.rbr_dense)
         kernel1x1, bias1x1 = self._fuse_bn_tensor(self.rbr_1x1)
@@ -205,7 +220,7 @@ class RepVGGBlock(nn.Module):
         if kernel1x1 is None:
             return 0
         else:
-            return torch.nn.functional.pad(kernel1x1, [1, 1, 1, 1])
+            return F.pad(kernel1x1, [1, 1, 1, 1])
 
     def _fuse_bn_tensor(self, branch):
         if branch is None:
@@ -235,6 +250,7 @@ class RepVGGBlock(nn.Module):
         t = (gamma / std).reshape(-1, 1, 1, 1)
         return kernel * t, beta - running_mean * gamma / std
 
+
     def switch_to_deploy(self):
         if hasattr(self, 'rbr_reparam'):
             return
@@ -253,20 +269,26 @@ class RepVGGBlock(nn.Module):
         if hasattr(self, 'id_tensor'):
             self.__delattr__('id_tensor')
         self.deploy = True
+    '''
 
 
-class DetectBackend(nn.Module):
-    def __init__(self, weights='yolov6s.pt', device=None, dnn=True):
+class CSPStackRep(nn.Module):
+    '''Beer-mug RepC3 Block'''
 
+    def __init__(self, in_channels, out_channels, n=1, e=0.5, concat=True):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
-        assert isinstance(weights, str) and Path(weights).suffix == '.pt', f'{Path(weights).suffix} format is not supported.'
-        from yolov6.utils.checkpoint import load_checkpoint
-        model = load_checkpoint(weights, map_location=device)
-        stride = int(model.stride.max())
-        self.__dict__.update(locals())  # assign all variables to self
+        c_ = int(out_channels * e)  # hidden channels
+        self.cv1 = Conv(in_channels, c_, 1, 1, act=False)
+        self.cv2 = Conv(in_channels, c_, 1, 1, act=False)
+        self.cv3 = Conv(2 * c_, out_channels, 1, 1, act=False)
 
-    def forward(self, im, val=False):
-        y = self.model(im)
-        if isinstance(y, np.ndarray):
-            y = torch.tensor(y, device=self.device)
-        return y
+        self.m = BottleRepBlock(in_channels=c_, out_channels=c_, n=n)
+        self.concat = concat
+        if not concat:
+            self.cv3 = Conv(c_, out_channels, 1, 1, act=False)
+
+    def forward(self, x):
+        if self.concat is True:
+            return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
+        else:
+            return self.cv3(self.m(self.cv1(x)))
