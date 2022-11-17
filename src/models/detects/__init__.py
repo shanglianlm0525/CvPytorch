@@ -8,13 +8,13 @@ from copy import deepcopy
 from src.models.detects.fcos_detect import FCOSDetect
 from src.models.detects.objectbox_detect import ObjectBoxDetect
 from src.models.detects.yolov5_detect import YOLOv5Detect
-from src.models.detects.yolov6_detect import Yolov6Detect
+from src.models.detects.yolov6_detect import YOLOv6Detect
 from src.models.detects.yolov7_detect import YOLOv7Detect
 
 __all__ = [
     'FCOSDetect',
     'YOLOv5Detect',
-    'Yolov6Detect',
+    'YOLOv6Detect',
     'YOLOv7Detect',
     'ObjectBoxDetect'
 ]
@@ -28,8 +28,8 @@ def build_detect(cfg):
         return FCOSDetect(**detect_cfg)
     elif name == 'YOLOv5Detect':
         return YOLOv5Detect(**detect_cfg)
-    elif name == 'Yolov6Detect':
-        return Yolov6Detect(**detect_cfg)
+    elif name == 'YOLOv6Detect':
+        return YOLOv6Detect(**detect_cfg)
     elif name == 'YOLOv7Detect':
         return YOLOv7Detect(**detect_cfg)
     elif name == 'ObjectBoxDetect':
