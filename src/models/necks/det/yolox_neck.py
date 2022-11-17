@@ -6,7 +6,6 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import math
 
 from src.models.bricks import ConvModule, DepthwiseSeparableConvModule
@@ -21,8 +20,8 @@ class YOLOXNeck(BaseDetNeck):
             "m": [0.67, 0.75],
             "l": [1.0, 1.0],
             "x": [1.33, 1.25]}
-    def __init__(self, subtype='yolox_s', # in_channels=[256, 512, 1024], out_channels=256,
-                 layers=[3, 3, 3, 3], depthwise=False, conv_cfg=None, norm_cfg=dict(type='BN'), act_cfg=dict(type='Swish'),**kwargs):
+    def __init__(self, subtype='yolox_s', # in_channels=[256, 512, 1024], out_channels=256, num_blocks=[3, 3, 3, 3]
+                 depthwise=False, conv_cfg=None, norm_cfg=dict(type='BN'), act_cfg=dict(type='Swish'),**kwargs):
         super(YOLOXNeck, self).__init__(**kwargs)
         assert isinstance(self.in_channels, list)
         self.subtype = subtype
@@ -33,7 +32,7 @@ class YOLOXNeck(BaseDetNeck):
         depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
         self.in_channels = list(map(lambda x: max(round(x * width_mul), 1), self.in_channels))
         self.out_channels = max(round(self.out_channels * width_mul), 1)
-        layers = list(map(lambda x: max(round(x * depth_mul), 1), layers))
+        self.num_blocks = list(map(lambda x: max(round(x * depth_mul), 1), self.num_blocks))
 
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         # build top-down blocks
@@ -45,7 +44,7 @@ class YOLOXNeck(BaseDetNeck):
                     conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
             self.top_down_blocks.append(
                 CSPLayer(self.in_channels[idx - 1] * 2,self.in_channels[idx - 1],
-                    n=layers[idx], shortcut=False, depthwise=depthwise,
+                    n=self.num_blocks[idx], shortcut=False, depthwise=depthwise,
                     conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
 
         # build bottom-up blocks
@@ -56,7 +55,7 @@ class YOLOXNeck(BaseDetNeck):
                 conv(self.in_channels[idx],self.in_channels[idx],3, stride=2, padding=1,
                     conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
             self.bottom_up_blocks.append(
-                CSPLayer(self.in_channels[idx] * 2, self.in_channels[idx + 1], n=layers[idx],
+                CSPLayer(self.in_channels[idx] * 2, self.in_channels[idx + 1], n=self.num_blocks[idx],
                     shortcut=False,depthwise=depthwise,
                     conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg))
 
