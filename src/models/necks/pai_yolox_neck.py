@@ -8,11 +8,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.necks import YOLOXNeck
+# from src.models.necks import YOLOXNeck
 from src.models.necks.asff import ASFF
 
-
-class PAI_YOLOXNeck(YOLOXNeck):
+# class PAI_YOLOXNeck(YOLOXNeck):
+class PAI_YOLOXNeck(nn.Module):
     def __init__(self, subtype='pai_yolox_s', channels=[256, 512, 1024], asff_channel=2, expand_kernel=3, depth_mul=1.0, width_mul=1.0, act='SiLU'):
         super(PAI_YOLOXNeck, self).__init__(subtype=subtype, channels=channels, depth_mul=depth_mul, width_mul=width_mul)
         assert isinstance(channels, list)
