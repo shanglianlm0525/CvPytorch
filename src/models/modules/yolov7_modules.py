@@ -23,13 +23,14 @@ class Conv(nn.Module):
         super(Conv, self).__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
-        self.act = nn.LeakyReLU(0.1, inplace=True) if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
+        self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
 
     def forward(self, x):
         return self.act(self.bn(self.conv(x)))
-
+    '''
     def fuseforward(self, x):
         return self.act(self.conv(x))
+    '''
 
 
 class DownA(nn.Module):
@@ -85,12 +86,13 @@ class UpSampling(nn.Module):
     def __init__(self, c1, c2, c3):
         super(UpSampling, self).__init__()
         self.conv1 = Conv(c1, c3, 1, 1)
+        self.upsampling = nn.UpsamplingNearest2d(scale_factor=2)
         self.conv2 = Conv(c2, c3, 1, 1)
 
     def forward(self, x, y):
         x = self.conv1(x)
         y = self.conv2(y)
-        return torch.cat([F.interpolate(x, scale_factor=2, mode="nearest"), y], dim=1)
+        return torch.cat([self.upsampling(x), y], dim=1)
 
 
 class FeatureFusion(nn.Module):
@@ -138,7 +140,30 @@ class SPPCSPC(nn.Module):
         return self.cv7(torch.cat((y1, y2), dim=1))
 
 
+class ImplicitA(nn.Module):
+    def __init__(self, channel, mean=0., std=.02):
+        super(ImplicitA, self).__init__()
+        self.channel = channel
+        self.mean = mean
+        self.std = std
+        self.implicit = nn.Parameter(torch.zeros(1, channel, 1, 1))
+        nn.init.normal_(self.implicit, mean=self.mean, std=self.std)
 
+    def forward(self, x):
+        return self.implicit + x
+
+
+class ImplicitM(nn.Module):
+    def __init__(self, channel, mean=0., std=.02):
+        super(ImplicitM, self).__init__()
+        self.channel = channel
+        self.mean = mean
+        self.std = std
+        self.implicit = nn.Parameter(torch.ones(1, channel, 1, 1))
+        nn.init.normal_(self.implicit, mean=self.mean, std=self.std)
+
+    def forward(self, x):
+        return self.implicit * x
 
 class RepConv(nn.Module):
     # Represented convolution
@@ -157,8 +182,7 @@ class RepConv(nn.Module):
 
         padding_11 = autopad(k, p) - k // 2
 
-        self.act = nn.LeakyReLU(0.1, inplace=True) if act is True else (
-            act if isinstance(act, nn.Module) else nn.Identity())
+        self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
 
         if deploy:
             self.rbr_reparam = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=True)
@@ -187,6 +211,7 @@ class RepConv(nn.Module):
 
         return self.act(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out)
 
+    '''
     def get_equivalent_kernel_bias(self):
         kernel3x3, bias3x3 = self._fuse_bn_tensor(self.rbr_dense)
         kernel1x1, bias1x1 = self._fuse_bn_tensor(self.rbr_1x1)
@@ -271,7 +296,7 @@ class RepConv(nn.Module):
 
         self.rbr_1x1 = self.fuse_conv_bn(self.rbr_1x1[0], self.rbr_1x1[1])
         rbr_1x1_bias = self.rbr_1x1.bias
-        weight_1x1_expanded = F.pad(self.rbr_1x1.weight, [1, 1, 1, 1])
+        weight_1x1_expanded = torch.nn.functional.pad(self.rbr_1x1.weight, [1, 1, 1, 1])
 
         # Fuse self.rbr_identity
         if (isinstance(self.rbr_identity, nn.BatchNorm2d) or isinstance(self.rbr_identity,
@@ -295,7 +320,7 @@ class RepConv(nn.Module):
 
             identity_conv_1x1 = self.fuse_conv_bn(identity_conv_1x1, self.rbr_identity)
             bias_identity_expanded = identity_conv_1x1.bias
-            weight_identity_expanded = F.pad(identity_conv_1x1.weight, [1, 1, 1, 1])
+            weight_identity_expanded = torch.nn.functional.pad(identity_conv_1x1.weight, [1, 1, 1, 1])
         else:
             # print(f"fuse: rbr_identity != BatchNorm2d, rbr_identity = {self.rbr_identity}")
             bias_identity_expanded = torch.nn.Parameter(torch.zeros_like(rbr_1x1_bias))
@@ -324,5 +349,5 @@ class RepConv(nn.Module):
             del self.rbr_dense
             self.rbr_dense = None
 
-
+    '''
 
