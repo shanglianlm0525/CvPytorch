@@ -15,7 +15,6 @@ import torchvision
 from src.losses.det.general_focal_losses import QualityFocalLoss, DistributionFocalLoss
 from src.losses.det.iou_losses import GIoULoss
 from src.models.assigners.ota_assigner import SimOTAAssigner, bbox_overlaps
-from src.models.heads.gflv2_head_bounding_box import BoxList
 from src.models.modules.convs import ConvModule
 from src.models.modules.init_weights import normal_init
 
@@ -85,7 +84,7 @@ def multiclass_nms(multi_bboxes,
 
 
 
-def postprocess_gfocal(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, imgs=None):
+def postprocess_gfocal(prediction, conf_thre=0.7, nms_thre=0.45):
     box_corner = prediction.new(prediction.shape)
     box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
     box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
@@ -106,24 +105,7 @@ def postprocess_gfocal(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, im
             output[i] = detections
         else:
             output[i] = torch.cat((output[i], detections))
-
-    # transfer to BoxList
-    for i in range(len(output)):
-        res = output[i]
-        if res is None or imgs is None:
-            boxlist = BoxList(torch.zeros(0, 4), (0, 0), mode="xyxy")
-            boxlist.add_field("objectness", 0)
-            boxlist.add_field("scores", 0)
-            boxlist.add_field("labels", -1)
-
-        else:
-            img_h, img_w = imgs.image_sizes[i]
-            boxlist = BoxList(res[:, :4], (img_w, img_h), mode="xyxy")
-            boxlist.add_field("objectness", res[:, 4])
-            boxlist.add_field("scores", res[:, 5] * res[:, 4])
-            boxlist.add_field("labels", res[:, 6] + 1)
-        output[i] = boxlist
-
+    print('output', output)
     return output
 
 
