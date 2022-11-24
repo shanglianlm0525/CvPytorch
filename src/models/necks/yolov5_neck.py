@@ -6,7 +6,7 @@
 
 import torch
 import torch.nn as nn
-from src.models.modules.yolo_modules import UpsamplingModule, DownsamplingModule
+from src.models.modules.yolo11_modules import UpsamplingModule, DownsamplingModule
 
 
 class YOLOv5Neck(nn.Module):
