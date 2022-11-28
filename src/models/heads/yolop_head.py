@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 
-from src.models.modules.yolov5_modules import Conv, BottleneckCSP
+from src.models.modules.yolo11_modules import Conv, BottleneckCSP
 
 
 class SegmentHead(nn.Module):
