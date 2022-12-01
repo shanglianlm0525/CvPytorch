@@ -24,9 +24,9 @@ class YOLOv5Detect(nn.Module):
         self.register_buffer('anchors', torch.tensor(anchors).float())  # shape(num_layers,num_anchors,2)
         self.m = nn.ModuleList(nn.Conv2d(x, self.num_outputs * self.num_anchors, 1) for x in in_channels)  # output conv
 
-        self._init_weight()
+        self.init_weight()
 
-    def _init_weight(self, cf=None):
+    def init_weight(self, cf=None):
         # https://arxiv.org/abs/1708.02002 section 3.3
         # cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=num_classes) + 1.
         for mi, s in zip(self.m, self.stride):  # from
@@ -61,6 +61,5 @@ class YOLOv5Detect(nn.Module):
         d = self.anchors[i].device
         yv, xv = torch.meshgrid([torch.arange(ny).to(d), torch.arange(nx).to(d)])
         grid = torch.stack((xv, yv), 2).expand((1, self.num_anchors, ny, nx, 2)).float()
-        anchor_grid = (self.anchors[i].clone() * self.stride[i]) \
-            .view((1, self.num_anchors, 1, 1, 2)).expand((1, self.num_anchors, ny, nx, 2)).float()
+        anchor_grid = (self.anchors[i].clone() * self.stride[i]).view((1, self.num_anchors, 1, 1, 2)).expand((1, self.num_anchors, ny, nx, 2)).float()
         return grid, anchor_grid
