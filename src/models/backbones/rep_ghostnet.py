@@ -282,84 +282,70 @@ class RepGhostNet(nn.Module):
         ],
     ]
 
-    def __init__(self, num_classes=1000, width=1.0, dropout=0.2, shortcut=True,
-        reparam=True, reparam_bn=True, reparam_identity=False, deploy=False):
+    def __init__(self, subtype='repghostnet_0.5', out_stages=[2, 3, 4], output_stride=16, classifier=False, num_classes=1000, pretrained = False, backbone_path=None,
+                 shortcut=True, reparam=True, reparam_bn=True, reparam_identity=False, deploy=False):
         super(RepGhostNet, self).__init__()
-        self.dropout = dropout
+        self.subtype = subtype
+        self.out_stages = out_stages
+        self.output_stride = output_stride  # 8, 16, 32
+        self.classifier = classifier
         self.num_classes = num_classes
+        self.pretrained = pretrained
+        self.backbone_path = backbone_path
+
+        width = float(self.subtype.split('_')[1])
 
         # building first layer
         output_channel = _make_divisible(16 * width, 4)
-        self.conv_stem = nn.Conv2d(3, output_channel, 3, 2, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(output_channel)
-        self.act1 = nn.ReLU(inplace=True)
+        self.stem = nn.Sequential(nn.Conv2d(3, output_channel, 3, 2, 1, bias=False),
+                                nn.BatchNorm2d(output_channel),
+                                nn.ReLU(inplace=True))
         input_channel = output_channel
 
         # building inverted residual blocks
         stages = []
-        block = RepGhostBottleneck
+        # block = RepGhostBottleneck
         for cfg in self.cfgs:
             layers = []
             for k, exp_size, c, se_ratio, s in cfg:
                 output_channel = _make_divisible(c * width, 4)
                 hidden_channel = _make_divisible(exp_size * width, 4)
-                layers.append(
-                    block(
-                        input_channel,
-                        hidden_channel,
-                        output_channel,
-                        k,
-                        s,
-                        se_ratio=se_ratio,
-                        shortcut=shortcut,
-                        reparam=reparam,
-                        reparam_bn=reparam_bn,
-                        reparam_identity=reparam_identity,
-                        deploy=deploy
-                    ),
+                layers.append(RepGhostBottleneck(input_channel, hidden_channel, output_channel, k, s,
+                        se_ratio=se_ratio, shortcut=shortcut, reparam=reparam, reparam_bn=reparam_bn,reparam_identity=reparam_identity, deploy=deploy)
                 )
                 input_channel = output_channel
             stages.append(nn.Sequential(*layers))
 
         output_channel = _make_divisible(exp_size * width * 2, 4)
-        stages.append(
-            nn.Sequential(
-                ConvBnAct(input_channel, output_channel, 1),
-            ),
-        )
+        stages.append(nn.Sequential(ConvBnAct(input_channel, output_channel, 1)))
         input_channel = output_channel
 
         self.blocks = nn.Sequential(*stages)
 
         # building last several layers
-        output_channel = 1280
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.conv_head = nn.Conv2d(
-            input_channel, output_channel, 1, 1, 0, bias=True,
-        )
+        self.conv_head = nn.Conv2d(input_channel, 1280, 1, 1, 0, bias=True)
         self.act2 = nn.ReLU(inplace=True)
-        self.classifier = nn.Linear(output_channel, num_classes)
+        self.dropout = nn.Dropout2d(0.2)
+        self.classifier = nn.Linear(1280, num_classes)
 
     def convert_to_deploy(self):
         repghost_model_convert(self, do_copy=False)
 
     def forward(self, x):
-        x = self.conv_stem(x)
-        x = self.bn1(x)
-        x = self.act1(x)
+        x = self.stem(x)
         x = self.blocks(x)
         x = self.global_pool(x)
         x = self.conv_head(x)
         x = self.act2(x)
         x = x.view(x.size(0), -1)
-        if self.dropout > 0.0:
-            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.dropout(x)
         x = self.classifier(x)
         return x
 
 
 if __name__ == "__main__":
-    model = RepGhostNet()
+    model = RepGhostNet('repghostnet_0.5')
     print(model)
 
     input = torch.randn(1, 3, 640, 640)
