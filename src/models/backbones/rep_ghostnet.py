@@ -321,8 +321,8 @@ class RepGhostNet(nn.Module):
         # building last several layers
         if self.classifier:
             self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-            self.conv_head = nn.Conv2d(input_channel, 1280, 1, 1, 0, bias=True)
-            self.act2 = nn.ReLU(inplace=True)
+            self.conv_head = nn.Sequential(nn.Conv2d(input_channel, 1280, 1, 1, 0, bias=True),
+                                            nn.ReLU(inplace=True))
             self.dropout = nn.Dropout2d(0.2)
             self.fc = nn.Linear(1280, num_classes)
 
@@ -341,7 +341,6 @@ class RepGhostNet(nn.Module):
             x = self.last_conv(x)
             x = self.global_pool(x)
             x = self.conv_head(x)
-            x = self.act2(x)
             x = x.view(x.size(0), -1)
             x = self.dropout(x)
             x = self.fc(x)
