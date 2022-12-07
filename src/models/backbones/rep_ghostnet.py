@@ -282,7 +282,7 @@ class RepGhostNet(nn.Module):
         ],
     ]
 
-    def __init__(self, subtype='repghostnet_0.5', out_stages=[2, 3, 4], output_stride=16, classifier=False, num_classes=1000, pretrained = False, backbone_path=None,
+    def __init__(self, subtype='repghostnet_0.5', out_stages=[5, 7, 9], output_stride=16, classifier=False, num_classes=1000, pretrained = False, backbone_path=None,
                  shortcut=True, reparam=True, reparam_bn=True, reparam_identity=False, deploy=False):
         super(RepGhostNet, self).__init__()
         self.subtype = subtype
@@ -303,9 +303,7 @@ class RepGhostNet(nn.Module):
         input_channel = output_channel
 
         # building inverted residual blocks
-        stages = []
-        # block = RepGhostBottleneck
-        for cfg in self.cfgs:
+        for i, cfg in enumerate(self.cfgs):
             layers = []
             for k, exp_size, c, se_ratio, s in cfg:
                 output_channel = _make_divisible(c * width, 4)
@@ -314,41 +312,48 @@ class RepGhostNet(nn.Module):
                         se_ratio=se_ratio, shortcut=shortcut, reparam=reparam, reparam_bn=reparam_bn,reparam_identity=reparam_identity, deploy=deploy)
                 )
                 input_channel = output_channel
-            stages.append(nn.Sequential(*layers))
+            setattr(self, 'stage%d' % (i+1), nn.Sequential(*layers))
 
         output_channel = _make_divisible(exp_size * width * 2, 4)
-        stages.append(nn.Sequential(ConvBnAct(input_channel, output_channel, 1)))
+        self.last_conv = ConvBnAct(input_channel, output_channel, 1)
         input_channel = output_channel
 
-        self.blocks = nn.Sequential(*stages)
-
         # building last several layers
-        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.conv_head = nn.Conv2d(input_channel, 1280, 1, 1, 0, bias=True)
-        self.act2 = nn.ReLU(inplace=True)
-        self.dropout = nn.Dropout2d(0.2)
-        self.classifier = nn.Linear(1280, num_classes)
+        if self.classifier:
+            self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+            self.conv_head = nn.Conv2d(input_channel, 1280, 1, 1, 0, bias=True)
+            self.act2 = nn.ReLU(inplace=True)
+            self.dropout = nn.Dropout2d(0.2)
+            self.fc = nn.Linear(1280, num_classes)
 
     def convert_to_deploy(self):
         repghost_model_convert(self, do_copy=False)
 
     def forward(self, x):
         x = self.stem(x)
-        x = self.blocks(x)
-        x = self.global_pool(x)
-        x = self.conv_head(x)
-        x = self.act2(x)
-        x = x.view(x.size(0), -1)
-        x = self.dropout(x)
-        x = self.classifier(x)
-        return x
+        output = []
+        for i in range(1, 10):
+            stage = getattr(self, 'stage{}'.format(i))
+            x = stage(x)
+            if i in self.out_stages and not self.classifier:
+                output.append(x)
+        if self.classifier:
+            x = self.last_conv(x)
+            x = self.global_pool(x)
+            x = self.conv_head(x)
+            x = self.act2(x)
+            x = x.view(x.size(0), -1)
+            x = self.dropout(x)
+            x = self.fc(x)
+            return x
+        return output if len(self.out_stages) > 1 else output[0]
 
 
 if __name__ == "__main__":
-    model = RepGhostNet('repghostnet_0.5')
+    model = RepGhostNet('repghostnet_1.0')
     print(model)
 
-    input = torch.randn(1, 3, 640, 640)
+    input = torch.randn(1, 3, 224, 224)
     out = model(input)
     for o in out:
         print(o.shape)
