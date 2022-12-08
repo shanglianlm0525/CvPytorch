@@ -254,7 +254,7 @@ class VGNetG(nn.Module):
 
         if self.classifier:
             self.avg = nn.AdaptiveAvgPool2d((1, 1))
-            self.classifier = nn.Linear(channels[-1], num_classes)
+            self.fc = nn.Linear(channels[-1], num_classes)
 
     def make_layer(self, in_places, places, method, block, se_ratio):
         layers = [DownsamplingBlock(in_places, places, stride=2, method=method, se_ratio=se_ratio)]
@@ -277,7 +277,7 @@ class VGNetG(nn.Module):
         if self.classifier:
             x = self.avg(x)
             x = torch.flatten(x, 1)
-            x = self.classifier(x)
+            x = self.fc(x)
         return output if len(self.out_stages) > 1 else output[0]
 
 
