@@ -39,7 +39,7 @@ DATASET:
     ImageSubtract128:
 
 USE_MODEL: 'src.models.cls_model.ClsModel'
-EVAL_FUNC: 'classification'
+EVAL_FUNC: 'topformer'
 
 
 CHECKPOINT_DIR: 'checkpoints1'
