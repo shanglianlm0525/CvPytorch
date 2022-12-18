@@ -10,3 +10,4 @@ from .topformer_backbone import TopFormerBackbone
 from .regseg_backbone import RegSegBackbone
 from .resnet import ResNet
 from .mix_transformer import MixVisionTransformer
+from .incep_transformer import IncepTransformer
