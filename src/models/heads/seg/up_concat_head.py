@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from src.models.bricks import ConvModule
 from src.models.heads.seg.base_seg_head import BaseSegHead
@@ -20,9 +21,9 @@ class UpConcatHead(BaseSegHead):
         super(UpConcatHead, self).__init__(**kwargs)
         self.linear_fuse = ConvModule(in_channels=sum(self.in_channels), out_channels=self.channels, kernel_size=1, norm_cfg=self.norm_cfg)
 
-
     def forward(self, x):
-        feats = torch.cat(x, dim=1)
-        feats = self.linear_fuse(feats)
-        feats = self.classify(feats)
-        return feats
+        x = [F.interpolate(xx, size=x[0].size()[2:], mode='bilinear', align_corners=False) for xx in x]
+        x = torch.cat(x, dim=1)
+        x = self.linear_fuse(x)
+        x = self.classify(x)
+        return x
