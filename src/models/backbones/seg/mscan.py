@@ -14,7 +14,7 @@ from src.models.init import trunc_normal_init, constant_init, normal_init
 
 
 class StemConv(BaseModule):
-    def __init__(self, in_channels, out_channels, norm_cfg=dict(type='SyncBN', requires_grad=True)):
+    def __init__(self, in_channels, out_channels, norm_cfg=dict(type='BN', requires_grad=True)):
         super(StemConv, self).__init__()
 
         self.proj = nn.Sequential(
@@ -39,7 +39,7 @@ class OverlapPatchEmbed(BaseModule):
     """ Image to Patch Embedding
     """
 
-    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768, norm_cfg=dict(type='SyncBN', requires_grad=True)):
+    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768, norm_cfg=dict(type='BN', requires_grad=True)):
         super().__init__()
         patch_size = (patch_size, patch_size)
 
@@ -155,7 +155,7 @@ class Block(BaseModule):
                  drop=0.,
                  drop_path=0.,
                  act_layer=nn.GELU,
-                 norm_cfg=dict(type='SyncBN', requires_grad=True)):
+                 norm_cfg=dict(type='BN', requires_grad=True)):
         super().__init__()
         self.norm1 = build_norm_layer(norm_cfg, dim)[1]
         self.attn = SpatialAttention(dim)
