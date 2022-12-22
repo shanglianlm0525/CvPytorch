@@ -15,3 +15,4 @@ from .psp_head import PSPHead
 from .uper_head import UPerHead
 from .segformer_head import SegFormerHead
 from .uper_align_head import UperNetAlignHead
+from .up_concat_head import UpConcatHead
