@@ -6,7 +6,6 @@
 
 from copy import deepcopy
 
-
 from .efficientdet_head import EfficientdetHead
 from .fastestdet_head import FastestDetHead
 from .fcos_head import FCOSHead
@@ -40,6 +39,7 @@ from .seg import PSPHead
 from .seg import UPerHead
 from .seg import SegFormerHead
 from .seg import UperNetAlignHead
+from .seg import UpConcatHead
 
 # Object Detectiton
 from .det import YOLOXHead
@@ -69,7 +69,8 @@ __all__ = [
     'TopFormerHead',
     'FCNHead',
     'PSPHead',
-    'SegFormerHead'
+    'SegFormerHead',
+    'UpConcatHead'
 ]
 
 
@@ -132,6 +133,8 @@ def build_head(cfg):
         return SegFormerHead(**head_cfg)
     elif name == 'UperNetAlignHead':
         return UperNetAlignHead(**head_cfg)
+    elif name == 'UpConcatHead':
+        return UpConcatHead(**head_cfg)
 
 
     elif name == 'OpenPoseHead':
