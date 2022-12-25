@@ -42,13 +42,14 @@ from .seg import TopFormerBackbone
 from .seg import RegSegBackbone
 from .seg import ResNet
 from .seg import MixVisionTransformer
+from .seg import IncepTransformer
 
 # Object Detectiton
 from .det import CSPDarknet
 
 
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
-            'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet', 'MSCAN',
+            'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet', 'MSCAN', 'IncepTransformer',
 
            'YOLOv5Backbone', 'YOLOv6Backbone', 'YOLOv7Backbone', 'PAI_YOLOXBackbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
            'CSPDarknet', 'RegNet', 'LFDResNet',  'LSPNetBackbone']
@@ -97,6 +98,8 @@ def build_backbone(cfg):
         return TopFormerBackbone(**backbone_cfg)
     elif name == 'MixVisionTransformer':
         return MixVisionTransformer(**backbone_cfg)
+    elif name == 'IncepTransformer':
+        return IncepTransformer(**backbone_cfg)
 
     # no pretrained weight
     elif name == 'EfficientNetLite':
