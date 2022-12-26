@@ -115,7 +115,7 @@ class CityscapesSegmentation(Dataset):
         if cache_path.is_file():
             cache = np.load(cache_path, allow_pickle=True).item()
             if cache['hash'] == get_hash(self._imgs + self._targets):
-                print(f'{self.stage} :Cache directory {cache_path} is loaded.')
+                print(f'{self.stage}: Cache directory {cache_path} is loaded.')
                 return cache
 
         desc = f"Scanning '{cache_path.parent / cache_path.stem}' images and labels..."
