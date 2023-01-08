@@ -13,7 +13,6 @@ from .efficientnet_lite import EfficientNetLite
 from .lfd_resnet import LFDResNet
 from .lspnet_backbone import LSPNetBackbone
 from .mobilenet_v3 import MobileNetV3
-from .pai_yolox_backbone import PAI_YOLOXBackbone
 from .regnet import RegNet
 from .repvgg import RepVGG
 from .sgcpnet_backbone import SGCPNetBackbone
@@ -27,9 +26,7 @@ from .shufflenet_v2 import ShuffleNetV2
 from .densenet import Densenet
 
 # from .ghostnet import GhostNet
-from .yolov5_backbone import YOLOv5Backbone
-from .yolov6_backbone import YOLOv6Backbone
-from .yolov7_backbone import YOLOv7Backbone
+
 
 
 # Image Classification
@@ -46,12 +43,18 @@ from .seg import IncepTransformer
 
 # Object Detectiton
 from .det import CSPDarknet
+from .det import YOLOv5CSPDarknet
+from .det import YOLOXCSPDarknet
+from .det import YOLOv6EfficientRep
+from .det import YOLOv7CSPVoVNet
+from .det import YOLOXPAIEfficientRep
 
 
 __all__ = ['VGG', 'ResNet', 'ResNeXt', 'WideResNet', 'SqueezeNet', 'MobileNetV2', 'MobileNetV3', 'ShuffleNetV2',
             'VisionTransformer', 'ConvNeXt', 'EfficientNet', 'RegNet', 'MSCAN', 'IncepTransformer',
 
-           'YOLOv5Backbone', 'YOLOv6Backbone', 'YOLOv7Backbone', 'PAI_YOLOXBackbone', 'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
+           'YOLOv5CSPDarknet', 'YOLOXCSPDarknet', 'YOLOv6EfficientRep', 'YOLOv7CSPVoVNet', 'YOLOXPAIEfficientRep',
+           'STDCNet', 'RepVGG', 'EfficientNetLite', 'CustomCspNet',
            'CSPDarknet', 'RegNet', 'LFDResNet',  'LSPNetBackbone']
 
 
@@ -108,18 +111,20 @@ def build_backbone(cfg):
         return CustomCspNet(**backbone_cfg)
     elif name == 'CSPDarknet':
         return CSPDarknet(**backbone_cfg)
-    elif name == 'YOLOv6Backbone':
-        return YOLOv6Backbone(**backbone_cfg)
     elif name == 'SGCPNetBackbone':
         return SGCPNetBackbone(**backbone_cfg)
     elif name == 'LFDResNet':
         return LFDResNet(**backbone_cfg)
-    elif name == 'YOLOv5Backbone':
-        return YOLOv5Backbone(**backbone_cfg)
-    elif name == 'YOLOv7Backbone':
-        return YOLOv7Backbone(**backbone_cfg)
-    elif name == 'PAI_YOLOXBackbone':
-        return PAI_YOLOXBackbone(**backbone_cfg)
+    elif name == 'YOLOv5CSPDarknet':
+        return YOLOv5CSPDarknet(**backbone_cfg)
+    elif name == 'YOLOXCSPDarknet':
+        return YOLOXCSPDarknet(**backbone_cfg)
+    elif name == 'YOLOv6EfficientRep':
+        return YOLOv6EfficientRep(**backbone_cfg)
+    elif name == 'YOLOv7CSPVoVNet':
+        return YOLOv7CSPVoVNet(**backbone_cfg)
+    elif name == 'YOLOXPAIEfficientRep':
+        return YOLOXPAIEfficientRep(**backbone_cfg)
     elif name == 'RepVGG':
         return RepVGG(**backbone_cfg)
     elif name == 'RegSegBackbone':
