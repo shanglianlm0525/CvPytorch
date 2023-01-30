@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Coco_PAI_YOLOX'
+EXPERIMENT_NAME: 'Coco_PAI_YOLOX_s'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -16,7 +16,7 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 64
     NUM_WORKER: 8
-    LOAD_NUM: 8
+    LOAD_NUM: 4
     CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
@@ -27,7 +27,7 @@ DATASET:
       FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
       RandomAffineWithMosaic: { p: 1.0, size: [640, 640], degrees: [-10., 10.], translate: 0.1, scale: [0.1, 2.0], shear: [-2.0, 2.0], perspective: [0., 0.], fill: [114, 114, 114] }
-      MixUp: { p: 1.0 }
+      # MixUp: { p: 1.0 }
       RandomHorizontalFlip: { p: 0.5 }
       ColorHSV: { p: 1.0, hue: 0.015, saturation: 0.7, value: 0.4 }
       ToCXCYWH: { normalize: False }
@@ -65,7 +65,7 @@ USE_MODEL:
   TYPE: 'pai_yolox_s'
   BACKBONE: { 'name': 'PAI_YOLOXBackbone', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': False }
   NECK: { 'name': 'PAI_YOLOXNeck', 'channels': [256, 512, 1024], 'asff_channel': 2, 'expand_kernel': 3 }
-  HEAD: { 'name': 'TOODHead', 'in_channels': [256, 512, 1024] }
+  HEAD: { 'name': 'TOODHead', 'stacked_convs': 3, 'in_channels': [256, 512, 1024] }
   LOSS: { 'name': 'YOLOXLoss' }
 
 EVALUATOR:
