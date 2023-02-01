@@ -71,7 +71,7 @@ class EfficientDetLoss(nn.Module):
 
             IoU_max, IoU_argmax = torch.max(IoU, dim=1)
 
-            # compute the loss for classification
+            # compute the loss for topformer
             targets = torch.ones_like(classification) * -1
 
             targets[torch.lt(IoU_max, 0.4), :] = 0
@@ -91,7 +91,7 @@ class EfficientDetLoss(nn.Module):
             focal_weight = torch.where(torch.eq(targets, 1.), 1. - classification, classification)
             focal_weight = alpha_factor * torch.pow(focal_weight, self.gamma)
 
-            # bce = -(targets * torch.log(classification) + (1.0 - targets) * torch.log(1.0  - classification))
+            # bce = -(targets * torch.log(topformer) + (1.0 - targets) * torch.log(1.0  - topformer))
             bce = -(targets * torch.log(torch.clamp(classification, 1e-4, 1.0 - 1e-4)) + (1.0 - targets) * torch.log(torch.clamp(1.0 - classification, 1e-4, 1.0 - 1e-4)))
 
             cls_loss = focal_weight * bce
