@@ -43,6 +43,8 @@ from .seg import UpConcatHead
 
 # Object Detectiton
 from .det import YOLOXHead
+from .det import YOLOv6Effidehead
+
 
 __all__ = [
     'YOLOv5Head',
@@ -55,7 +57,7 @@ __all__ = [
     'YOLOPHead',
     'GFocalHeadV2',
     'FCOSHead',
-    'YOLOv6Head',
+    'YOLOv6Effidehead',
     'FastestDetHead',
     'Deeplabv3Head',
     'Deeplabv3PlusHead',
@@ -82,6 +84,8 @@ def build_head(cfg):
         return YOLOv5Head(**head_cfg)
     elif name == 'YOLOXHead':
         return YOLOXHead(**head_cfg)
+    elif name == 'YOLOv6Effidehead':
+        return YOLOv6Effidehead(**head_cfg)
     elif name == 'YOLOv7Head':
         return YOLOv7Head(**head_cfg)
     # elif name == 'TOODHead':
@@ -100,8 +104,6 @@ def build_head(cfg):
         return YOLOPHead(**head_cfg)
     elif name == 'EfficientdetHead':
         return EfficientdetHead(**head_cfg)
-    elif name == 'YOLOv6Head':
-        return YOLOv6Head(**head_cfg)
     elif name == 'FastestDetHead':
         return FastestDetHead(**head_cfg)
 

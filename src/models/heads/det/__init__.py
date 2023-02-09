@@ -5,3 +5,4 @@
 # @File : __init__.py
 
 from .yolox_head import YOLOXHead
+from .yolov6_effidehead import YOLOv6Effidehead
