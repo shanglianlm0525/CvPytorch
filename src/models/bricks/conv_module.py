@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from torch.nn.modules.batchnorm import _BatchNorm
+from torch.nn.modules.instancenorm import _InstanceNorm
 
 from .activation import build_activation_layer
 from .conv import build_conv_layer
@@ -102,7 +103,7 @@ class ConvModule(nn.Module):
         assert set(order) == {'conv', 'norm', 'act'}
 
         self.with_norm = norm_cfg is not None
-        self.with_activation = act_cfg is not None
+        self.with_act = act_cfg is not None
         # if the conv layer is before a norm layer, bias is unnecessary.
         if bias == 'auto':
             bias = not self.with_norm
@@ -157,14 +158,14 @@ class ConvModule(nn.Module):
             self.norm_name = None  # type: ignore
 
         # build activation layer
-        if self.with_activation:
+        if self.with_act:
             act_cfg_ = act_cfg.copy()  # type: ignore
             # nn.Tanh has no 'inplace' argument
             if act_cfg_['type'] not in [
                     'Tanh', 'PReLU', 'Sigmoid', 'HSigmoid', 'Swish', 'GELU'
             ]:
                 act_cfg_.setdefault('inplace', inplace)
-            self.activate = build_activation_layer(act_cfg_)
+            self.act = build_activation_layer(act_cfg_)
 
         # Use msra init by default
         self.init_weights()
@@ -187,7 +188,7 @@ class ConvModule(nn.Module):
         # Note: For PyTorch's conv layers, they will be overwritten by our
         #    initialization implementation using default ``kaiming_init``.
         if not hasattr(self.conv, 'init_weights'):
-            if self.with_activation and self.act_cfg['type'] == 'LeakyReLU':
+            if self.with_act and self.act_cfg['type'] == 'LeakyReLU':
                 nonlinearity = 'leaky_relu'
                 a = self.act_cfg.get('negative_slope', 0.01)
             else:
@@ -208,6 +209,6 @@ class ConvModule(nn.Module):
                 x = self.conv(x)
             elif layer == 'norm' and norm and self.with_norm:
                 x = self.norm(x)
-            elif layer == 'act' and activate and self.with_activation:
-                x = self.activate(x)
+            elif layer == 'act' and activate and self.with_act:
+                x = self.act(x)
         return x
