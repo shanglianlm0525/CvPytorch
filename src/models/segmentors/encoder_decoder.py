@@ -106,7 +106,7 @@ class EncoderDecoder(BaseSegmentor):
                 losses[l.loss_name] += l(preds, targets)
         return losses
 
-    def forward(self, imgs, targets=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer',  epoch_num=0, step_num=0, **kwargs):
         """
         Args:
             imgs: (Tensor)
