@@ -61,7 +61,7 @@ class YOLOv6RepBiPAN(BaseDetNeck):
                 m.momentum = 0.03
 
     def forward(self, x):
-        x3, x2, x1, x0 = input
+        x3, x2, x1, x0 = x
 
         fpn_out0 = self.reduce_layer0(x0)
         f_concat_layer0 = self.bifusion0([fpn_out0, x1, x2])
@@ -79,8 +79,8 @@ class YOLOv6RepBiPAN(BaseDetNeck):
         p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
         pan_out0 = self.Rep_n4(p_concat_layer2)
 
-        outputs = [pan_out2, pan_out1, pan_out0]
-        return outputs
+        output = [pan_out2, pan_out1, pan_out0]
+        return output
 
 
 if __name__ == "__main__":
