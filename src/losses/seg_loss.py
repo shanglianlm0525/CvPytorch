@@ -7,7 +7,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 from .lovasz_losses import lovasz_softmax
 
 
@@ -34,7 +33,6 @@ class NLLLoss(nn.Module):
         self.nll = nn.NLLLoss(weight=weight, ignore_index=ignore_index, reduction=reduction)
 
     def forward(self, output, target):
-        assert output.shape[0] == target.shape[0] and output.shape[2:] == target.shape[1:]
         return self.nll(output, target.long())
 
 
@@ -44,7 +42,6 @@ class CrossEntropyLoss2d(nn.Module):
         self.CE = nn.CrossEntropyLoss(weight=weight, ignore_index=ignore_index, reduction=reduction)
 
     def forward(self, output, target):
-        assert output.shape[0] == target.shape[0] and output.shape[2:] == target.shape[1:]
         return self.CE(output, target.long())
 
 

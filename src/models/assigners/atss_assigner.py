@@ -4,6 +4,7 @@
 # @Author : liumin
 # @File : atss_assigner.py
 
+"""copy from https://github.com/meituan/YOLOv6/yolov6/assigners/atss_assigner.py"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

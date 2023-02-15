@@ -77,14 +77,14 @@ EVALUATOR:
 #########################################
 CHECKPOINT_DIR: 'checkpoints'
 N_EPOCHS_TO_SAVE_MODEL: 10
-# PRETRAIN_MODEL: 'checkpoints1/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
+# PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
 
 
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [3]
+GPU_IDS: [2]
 N_MAX_EPOCHS: 50
 
 INIT_LR: 0.01
@@ -116,11 +116,33 @@ WARMUP:
 
 
 #########################################
+# AMP Configurations
+#########################################
+AMP: True
+
+#########################################
+# EMA Configurations
+#########################################
+EMA: False
+
+#########################################
+# EarlyStopping Configurations
+#########################################
+PATIENCE: 100
+
+#########################################
+# MULTI_SCALE Configurations
+#########################################
+MULTI_SCALE: True
+SCALE_RANGE: [0.5, 1.5]
+
+#########################################
 # GRAD_CLIP Configurations
 #########################################
 GRAD_CLIP:
   TYPE: 'norm'
   VALUE: 0
+
 
 
 #########################################

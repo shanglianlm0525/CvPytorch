@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Coco_YOLOv5_s'
+EXPERIMENT_NAME: 'Coco_YOLOv6_n'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -10,14 +10,14 @@ DATASET:
   BACKGROUND_AS_CATEGORY: False
 
   TRAIN:
-    IMG_DIR: '/home/lmin/data/coco/images/train2017'
+    IMG_DIR: '/home/lmin/data/coco/images/val2017'
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: True
-    BATCH_SIZE: 64
+    BATCH_SIZE: 8 # 64
     NUM_WORKER: 8
-    LOAD_NUM: { '4': 0.8, '9': 0.2 }
-    CACHE: True
+    LOAD_NUM: 4 # { '4': 0.8, '9': 0.2 }
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -44,7 +44,7 @@ DATASET:
     BATCH_SIZE: 8
     NUM_WORKER: 8
     LOAD_NUM: 1
-    CACHE: True
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -63,24 +63,27 @@ DATASET:
 # Model / Evaluator Configurations
 #########################################
 USE_MODEL:
-  CLASS: 'src.models.yolov5.YOLOv5'
-  TYPE: 'yolov5_s'
-  BACKBONE: { 'name': 'YOLOv5Backbone', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': False }
-  NECK: { 'name': 'YOLOv5Neck', 'in_channels': [256, 512, 1024], 'out_channels': [256, 512, 1024] }
-  DETECT: { 'name': 'YOLOv5Detect', 'in_channels': [256, 512, 1024] }
-  LOSS: { 'name': 'YOLOv5Loss', 'hyp_box': 0.05, 'hyp_obj': 1.0, 'hyp_cls': 0.5 }
+  # CLASS: 'src.models.detectors.yolov6.YOLOv6'
+  CLASS: 'src.models.detectors.yolo_detector.YOLODetector'
+  TYPE: 'yolov6_n'
+  BACKBONE: { 'name': 'YOLOv6EfficientRep', 'out_stages': [1, 2, 3, 4], 'output_stride': 32, 'pretrained': False }
+  NECK: { 'name': 'YOLOv6RepBiPAN', 'in_channels': [128, 256, 512, 1024], 'mid_channels': [128, 128, 256], 'out_channels': [128, 256, 512], 'num_blocks': [12, 12, 12, 12] }
+  HEAD: { 'name': 'YOLOv6Effidehead', 'num_classes': 80, 'in_channels': [128, 256, 512], 'use_dfl': False, 'fuse_ab': False }
+  DETECT: { 'name': 'YOLOv6Detect', 'in_channels': [128, 256, 512] }
+  LOSS: { 'name': 'YOLOv6Loss', 'num_classes': 80, 'use_dfl': False, 'reg_max': 0, 'iou_type': 'siou' }
+  ANCHOR: [[(10, 13), (16, 30), (33, 23)], [(30, 61), (62, 45), (59, 119)], [(116, 90), (156, 198), (373, 326)]]
 
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mAP'
-  EVAL_INTERVALS: 2
+  EVAL_INTERVALS: 10
 
 
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
 CHECKPOINT_DIR: 'checkpoints'
-N_EPOCHS_TO_SAVE_MODEL: 5
+N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
 
@@ -88,7 +91,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [2]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 300
 
 INIT_LR: 0.01
@@ -124,12 +127,12 @@ WARMUP:
 #########################################
 # AMP Configurations
 #########################################
-AMP: True
+AMP: False
 
 #########################################
 # EMA Configurations
 #########################################
-EMA: True
+EMA: False
 
 #########################################
 # Gradient Accumulation Configurations
@@ -140,12 +143,12 @@ ACCUMULATE_STEPS: 64
 #########################################
 # EarlyStopping Configurations
 #########################################
-PATIENCE: 100
+PATIENCE: 300
 
 #########################################
 # MULTI_SCALE Configurations
 #########################################
-MULTI_SCALE: True
+MULTI_SCALE: False
 SCALE_RANGE: [0.5, 1.5]
 
 #########################################

@@ -1,22 +1,19 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2023/2/7 13:34
+# @Time : 2023/2/7 14:39
 # @Author : liumin
-# @File : base_yolo_head.py
-
+# @File : base_yolo_detect.py
 import math
-from abc import abstractmethod, ABCMeta
-
 import torch
 import torch.nn as nn
 
-from src.models.heads.det.base_det_head import BaseDetHead
+from src.models.detects.base_det_detect import BaseDetDetect
 
 
-class BaseYOLOHead(BaseDetHead):
-    def __init__(self, subtype='yolov6_s', cfg=None, num_classes=80, in_channels=None, channels=None, out_channels=None, num_blocks=None, stacked_convs=0, depthwise=False,
+class BaseYOLODetect(BaseDetDetect):
+    def __init__(self, subtype='yolov6_s', cfg=None, num_classes=80, in_channels=None, channels=None, out_channels=None, num_blocks=None, depthwise=False,
                  conv_cfg=None, norm_cfg=dict(type='BN', requires_grad=True), act_cfg=dict(type='ReLU')):
-        super(BaseYOLOHead, self).__init__()
+        super(BaseYOLODetect, self).__init__()
         self.subtype = subtype
         self.cfg = cfg
         self.num_classes = num_classes
@@ -24,27 +21,23 @@ class BaseYOLOHead(BaseDetHead):
         self.channels = channels
         self.out_channels = out_channels
         self.num_blocks = num_blocks
-        self.stacked_convs = stacked_convs
         self.depthwise = depthwise
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
 
-        depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
-        self.in_channels = list(map(lambda x: max(round(x * width_mul), 1), self.in_channels))
-        if self.channels is not None:
-            if isinstance(self.channels, int):
-                self.channels = max(round(self.channels * width_mul), 1)
-            else:
+        if self.cfg is not None and self.subtype is not None:
+            depth_mul, width_mul = self.cfg[self.subtype.split("_")[1]]
+            self.in_channels = list(map(lambda x: max(round(x * width_mul), 1), self.in_channels))
+            if self.channels is not None:
                 self.channels = list(map(lambda x: max(round(x * width_mul), 1), self.channels))
-        if self.out_channels is not None:
-            self.out_channels = list(map(lambda x: max(round(x * width_mul), 1), self.out_channels))
-        if self.num_blocks is not None:
-            self.num_blocks = list(map(lambda x: max(round(x * depth_mul), 1), self.num_blocks))
+            if self.out_channels is not None:
+                self.out_channels = list(map(lambda x: max(round(x * width_mul), 1), self.out_channels))
+            if self.num_blocks is not None:
+                self.num_blocks = list(map(lambda x: max(round(x * depth_mul), 1), self.num_blocks))
 
-        # self.init_weights()
+        self.init_weights()
 
-    @abstractmethod
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

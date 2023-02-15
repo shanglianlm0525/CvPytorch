@@ -126,10 +126,10 @@ class FocalLoss(nn.Module):
             return loss
 
 
-class Yolov7Loss:
+class YOLOv7Loss:
     # Compute losses
-    def __init__(self, num_classes, stride=[ 8., 16., 32.], anchors=(), device = 'cuda:0', autobalance=False):
-        super(Yolov7Loss, self).__init__()
+    def __init__(self, num_classes, stride=[ 8., 16., 32.], anchors=(), device='cuda:0', autobalance=False):
+        super(YOLOv7Loss, self).__init__()
         self.num_classes = num_classes
         self.num_layers = len(anchors)  # number of detection layers
         self.num_anchors = len(anchors[0])  # number of anchors

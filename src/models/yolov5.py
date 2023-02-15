@@ -14,7 +14,6 @@ from torchvision.ops import nms
 
 
 from src.models.backbones import build_backbone
-from src.models.modules.yolo_modules import SPPF, C3, Conv
 from src.models.necks import build_neck
 from src.models.heads import build_head
 from src.models.detects import build_detect, YOLOv5Detect

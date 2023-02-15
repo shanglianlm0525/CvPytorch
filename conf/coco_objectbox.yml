@@ -14,10 +14,10 @@ DATASET:
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
     SHUFFLE: True
-    BATCH_SIZE: 64
+    BATCH_SIZE: 32
     NUM_WORKER: 8
     LOAD_NUM: 4
-    CACHE: False
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -41,7 +41,7 @@ DATASET:
     BATCH_SIZE: 8
     NUM_WORKER: 8
     LOAD_NUM: 1
-    CACHE: False
+    CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -61,7 +61,7 @@ DATASET:
 #########################################
 USE_MODEL:
   CLASS: 'src.models.objectbox.ObjectBox'
-  TYPE: 'objectbox_x'
+  TYPE: 'objectbox_s'
   BACKBONE: { 'name': 'YOLOv5Backbone', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': False }
   NECK: { 'name': 'YOLOv5Neck', 'in_channels': [256, 512, 1024], 'out_channels': [256, 512, 1024] }
   DETECT: { 'name': 'ObjectBoxDetect', 'in_channels': [256, 512, 1024] }
@@ -71,7 +71,7 @@ USE_MODEL:
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mAP'
-  EVAL_INTERVALS: 1
+  EVAL_INTERVALS: 10
 
 
 #########################################
@@ -86,8 +86,8 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [2]
-N_MAX_EPOCHS: 1000
+GPU_IDS: [0]
+N_MAX_EPOCHS: 300
 
 INIT_LR: 0.01
 BACKBONE_LR: 0.01
@@ -100,12 +100,13 @@ OPTIMIZER:
     weight_decay: 0.0005
   WEIGHT_PARAMS:
     momentum: 0.937
-    weight_decay: 0.0005
+    weight_decay: 0
   BIAS_LR_MULTIPLIER: 1
 
 LR_SCHEDULER:
   TYPE: 'CosineAnnealingLR' # ['StepLR', 'MultiStepLR', 'ReduceLROnPlateau','CosineAnnealingLR']
   MILESTONES: [130, 160, 175, 185]
+  MAX_LR: 0.1
   MIN_LR: 0.2
   GAMMA: 0.1
   POWER: 0.9
@@ -113,23 +114,23 @@ LR_SCHEDULER:
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 0 # 5000
+  ITERS: 5000
   FACTOR: 0.1
 
 #########################################
 # AMP Configurations
 #########################################
-AMP: False
+AMP: True
 
 #########################################
 # EMA Configurations
 #########################################
-EMA: False
+EMA: True
 
 #########################################
 # Gradient Accumulation Configurations
 #########################################
-ACCUMULATE: True
+ACCUMULATE: False
 ACCUMULATE_STEPS: 64
 
 #########################################

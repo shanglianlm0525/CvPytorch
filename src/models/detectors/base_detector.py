@@ -46,5 +46,5 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         return hasattr(self, 'auxiliary_loss') and self.auxiliary_loss is not None
 
     @abstractmethod
-    def forward(self, imgs, targets=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer',  epoch_num=0, step_num=0, **kwargs):
         pass

@@ -56,6 +56,7 @@ def xywh2xyxy(x):
     y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
     return y
 
+
 def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False, multi_label=False,
                         labels=()):
     """Runs Non-Maximum Suppression (NMS) on inference results
@@ -155,20 +156,16 @@ class YOLOv7(nn.Module):
             "m": [0.67, 0.75],
             "l": [1.0, 1.0],
             "x": [1.33, 1.25]}
-    '''
+
     anchors = [[[ 1.50000,  2.00000], [ 2.37500,  4.50000], [ 5.00000,  3.50000]],
         [[ 2.25000,  4.68750],[ 4.75000,  3.43750], [ 4.50000,  9.12500]],
         [[ 4.43750,  3.43750], [ 6.00000,  7.59375], [14.34375, 12.53125]]]
-    '''
-    anchors = [[[12, 16], [19, 36], [40, 28]],
-               [[36, 75], [76, 55], [72, 146]],
-               [[142, 110], [192, 243], [459, 401]]]
     def __init__(self, dictionary=None, model_cfg=None):
         super(YOLOv7, self).__init__()
         self.dictionary = dictionary
         self.model_cfg = model_cfg
         self.dummy_input = torch.zeros(1, 3, 640, 640)
-
+        # m.anchors /= m.stride.view(-1, 1, 1)
         self.num_classes = len(self.dictionary)
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
@@ -187,7 +184,7 @@ class YOLOv7(nn.Module):
         self.loss = build_loss(self.model_cfg.LOSS)
 
         self.conf_thres = 0.001  # confidence threshold
-        self.iou_thres = 0.6  # NMS IoU threshold
+        self.iou_thres = 0.65  # NMS IoU threshold
 
         self.init_weights()
 
@@ -215,7 +212,6 @@ class YOLOv7(nn.Module):
         self.model_cfg.DETECT.__setitem__('num_classes', self.num_classes)
         self.model_cfg.LOSS.__setitem__('anchors', self.anchors)
         self.model_cfg.LOSS.__setitem__('num_classes', self.num_classes)
-
 
     def trans_specific_format(self, imgs, targets):
         new_gts = []

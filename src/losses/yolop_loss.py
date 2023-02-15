@@ -7,7 +7,7 @@
 import torch
 import torch.nn as nn
 
-from src.losses.yolov5_loss import Yolov5Loss
+from src.losses.yolov5_loss import YOLOv5Loss
 
 
 class YolopLoss(nn.Module):
@@ -16,7 +16,7 @@ class YolopLoss(nn.Module):
         self.num_classes = num_classes
         self.device = device
 
-        self.detection_criterion = Yolov5Loss(num_classes, num_layers, num_anchors, stride, anchors)
+        self.detection_criterion = YOLOv5Loss(num_classes, num_layers, num_anchors, stride, anchors)
         self.drivable_area_segmentation_criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=self.device))
         self.lane_line_segmentation_criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=self.device))
         self.lane_line_segmentation_iou_criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0], device=self.device))

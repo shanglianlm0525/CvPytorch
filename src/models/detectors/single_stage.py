@@ -4,11 +4,14 @@
 # @Author : liumin
 # @File : single_stage.py
 
+from abc import abstractmethod
+
 import torch
 import torch.nn as nn
 from torch import Tensor
 
 from src.models.backbones import build_backbone
+from src.models.detects import build_detect
 from src.models.heads import build_head
 from src.models.necks import build_neck
 from src.losses import build_loss
@@ -54,6 +57,10 @@ class SingleStageDetector(BaseDetector):
             else:
                 raise TypeError(f'self.model_cfg.AUX_HEAD must be a dict or sequence of dict,\
                                                but got {type(self.model_cfg.AUX_HEAD)}')
+
+        # DETECT
+        if self.model_cfg.DETECT is not None:
+            self.detect = build_detect(self.model_cfg.DETECT)
         # LOSS
         self.loss = nn.ModuleList()
         if isinstance(self.model_cfg.LOSS, (dict, CommonConfiguration)):
@@ -82,27 +89,20 @@ class SingleStageDetector(BaseDetector):
         pass
 
 
+    @abstractmethod
     def trans_specific_format(self, imgs, targets):
         pass
 
 
     def loss_forward(self, preds, targets, loss):
-        assert isinstance(preds, Tensor) and preds.ndim == 4, \
-            f'preds must be Tensor type, and ndim == 4, but got {type(preds)} and {preds.ndim}'
-        assert isinstance(targets, Tensor) and targets.ndim == 3, \
-            f'targets must be Tensor type, and ndim == 3, but got {type(targets)} and {targets.ndim}'
         losses = dict()
-
         if not isinstance(loss, (list, nn.ModuleList)):
             loss = [loss]
         for l in loss:
-            if l.loss_name not in losses:
-                losses[l.loss_name] = l(preds, targets)
-            else:
-                losses[l.loss_name] += l(preds, targets)
+            losses.update(l(preds, targets))
         return losses
 
-    def forward(self, imgs, targets=None, mode='infer', **kwargs):
+    def forward(self, imgs, targets=None, mode='infer', epoch_num=0, step_num=0, **kwargs):
         """
         Args:
             imgs: (Tensor)
@@ -126,13 +126,15 @@ class SingleStageDetector(BaseDetector):
             return torch.argmax(feats, dim=1)
         else:
             losses = self.loss_forward(preds, targets["gt"],  self.loss)
+            # print(losses)
 
 
             if mode == 'val':
+                if self.model_cfg.DETECT is not None:
+                    preds = self.detect(preds)
 
                 return
             else:
-                losses = self.loss_forward(preds, targets, self.loss)
 
                 if self.with_auxiliary_head:
                     if aux_feats is not None:

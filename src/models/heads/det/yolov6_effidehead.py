@@ -22,7 +22,7 @@ class YOLOv6Effidehead(BaseYOLOHead):
             "l": [1.0, 1.0],
             "x": [1.33, 1.25]}
     csp_e_cfg = {"n": None, "t": None, "s": None, "m": float(2) / 3, "l": float(1) / 2, "x": float(1) / 2}
-    def __init__(self, subtype='yolov6_s', num_classes=80, in_channels=[128, 256, 512], num_anchors=1, reg_max=16,
+    def __init__(self, subtype='yolov6_s', num_classes=80, in_channels=[128, 256, 512], num_anchors=1, reg_max=16, num_layers=3,
                  stacked_convs=2, depthwise=False, use_dfl=False, fuse_ab=False, conv_cfg=None, norm_cfg=dict(type='BN'), act_cfg=dict(type='SiLU'), **kwargs):
         super(YOLOv6Effidehead, self).__init__(subtype=subtype, cfg=self.cfg, num_classes=num_classes, in_channels=in_channels, stacked_convs=stacked_convs, depthwise=depthwise,
                                                conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg, **kwargs)
@@ -34,6 +34,10 @@ class YOLOv6Effidehead(BaseYOLOHead):
         self.stacked_convs = stacked_convs
         self.use_dfl = use_dfl
 
+        self.num_classes = num_classes  # number of classes
+        self.num_outputs = self.num_classes + 5  # number of outputs per anchor
+        self.num_layers = num_layers  # number of detection layers
+
         # Init decouple head
         self.stems = nn.ModuleList()
         self.cls_convs = nn.ModuleList()
@@ -44,46 +48,46 @@ class YOLOv6Effidehead(BaseYOLOHead):
         self.proj_conv = nn.Conv2d(self.reg_max + 1, 1, 1, bias=False)
 
         # Efficient decoupled head layers
-        self.stems = nn.Sequential(
+        self.stems = nn.ModuleList([
             # stem0
             ConvModule(in_channels=self.in_channels[0], out_channels=self.in_channels[0], kernel_size=1, stride=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg),
             # stem1
             ConvModule(in_channels=self.in_channels[1], out_channels=self.in_channels[1], kernel_size=1, stride=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg),
             # stem2
             ConvModule(in_channels=self.in_channels[2], out_channels=self.in_channels[2], kernel_size=1, stride=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg)
-        )
-        self.cls_convs = nn.Sequential(
+        ])
+        self.cls_convs = nn.ModuleList([
             # cls_conv0
             ConvModule(in_channels=self.in_channels[0], out_channels=self.in_channels[0], kernel_size=3, stride=1, padding=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg),
             # cls_conv1
             ConvModule(in_channels=self.in_channels[1], out_channels=self.in_channels[1], kernel_size=3, stride=1, padding=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg),
             # cls_conv2
             ConvModule(in_channels=self.in_channels[2], out_channels=self.in_channels[2], kernel_size=3, stride=1, padding=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg)
-        )
-        self.reg_convs = nn.Sequential(
+        ])
+        self.reg_convs = nn.ModuleList([
             # reg_conv0
             ConvModule(in_channels=self.in_channels[0], out_channels=self.in_channels[0], kernel_size=3, stride=1, padding=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg),
             # reg_conv1
             ConvModule(in_channels=self.in_channels[1], out_channels=self.in_channels[1], kernel_size=3, stride=1, padding=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg),
             # reg_conv2
             ConvModule(in_channels=self.in_channels[2], out_channels=self.in_channels[2], kernel_size=3, stride=1, padding=1, conv_cfg=self.conv_cfg,norm_cfg=self.norm_cfg,act_cfg=self.act_cfg)
-        )
-        self.cls_preds = nn.Sequential(
+        ])
+        self.cls_preds = nn.ModuleList([
             # cls_pred0
             nn.Conv2d(in_channels=self.in_channels[0], out_channels=self.num_classes * self.num_anchors, kernel_size=1),
             # cls_pred1
             nn.Conv2d(in_channels=self.in_channels[1], out_channels=self.num_classes * self.num_anchors, kernel_size=1),
             # cls_pred2
             nn.Conv2d(in_channels=self.in_channels[2], out_channels=self.num_classes * self.num_anchors, kernel_size=1)
-        )
-        self.reg_preds = nn.Sequential(
+        ])
+        self.reg_preds = nn.ModuleList([
             # reg_pred0
             nn.Conv2d(in_channels=self.in_channels[0], out_channels=4 * (self.num_anchors + self.reg_max), kernel_size=1),
             # reg_pred1
             nn.Conv2d(in_channels=self.in_channels[1], out_channels=4 * (self.num_anchors + self.reg_max), kernel_size=1),
             # reg_pred2
             nn.Conv2d(in_channels=self.in_channels[2], out_channels=4 * (self.num_anchors + self.reg_max), kernel_size=1)
-        )
+        ])
 
         self.init_weights()
 
@@ -110,12 +114,21 @@ class YOLOv6Effidehead(BaseYOLOHead):
         self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(),
                                                    requires_grad=False)
 
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5))
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.eps = 1e-3
+                m.momentum = 0.03
+
     def forward(self, x):
         if self.training:
             cls_score_list = []
             reg_distri_list = []
 
-            for i in range(self.nl):
+            for i in range(self.num_layers):
                 x[i] = self.stems[i](x[i])
                 cls_x = x[i]
                 reg_x = x[i]
@@ -136,7 +149,7 @@ class YOLOv6Effidehead(BaseYOLOHead):
             cls_score_list = []
             reg_dist_list = []
 
-            for i in range(self.nl):
+            for i in range(self.num_layers):
                 b, _, h, w = x[i].shape
                 l = h * w
                 x[i] = self.stems[i](x[i])

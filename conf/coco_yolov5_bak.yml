@@ -1,4 +1,4 @@
-EXPERIMENT_NAME: 'Coco_YOLOv5_s'
+EXPERIMENT_NAME: 'Coco_YOLOv5'
 
 #########################################
 # Dataset / Transforms Configurations
@@ -16,7 +16,7 @@ DATASET:
     SHUFFLE: True
     BATCH_SIZE: 64
     NUM_WORKER: 8
-    LOAD_NUM: { '4': 0.8, '9': 0.2 }
+    LOAD_NUM: 4
     CACHE: True
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
@@ -27,6 +27,7 @@ DATASET:
       FilterAndRemapCocoCategories: { categories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90], remap: True }
       ConvertCocoPolysToMask:
       RandomAffineWithMosaic: { p: 1.0, size: [640, 640], degrees: [0., 0.], translate: 0.1, scale: [0.5, 1.5], shear: [0., 0.], perspective: [0., 0.], fill: [114, 114, 114] } # for n/s
+      # RandomAffineWithMosaic: { p: 1.0, size: [640, 640], degrees: [0., 0.], translate: 0.1, scale: [0.1, 1.9], shear: [0., 0.], perspective: [0., 0.], fill: [114, 114, 114] } # for m/l/x
       RandomHorizontalFlip: { p: 0.5 }
       ColorHSV: { p: 1.0, hue: 0.015, saturation: 0.7, value: 0.4 }
       GaussianBlur: { p: 0.01 }
@@ -40,11 +41,11 @@ DATASET:
     IMG_DIR: '/home/lmin/data/coco/images/val2017'
     IMG_SUFFIX: '*.jpg'
     INDICES: ''
-    SHUFFLE: False
+    SHUFFLE: True
     BATCH_SIZE: 8
     NUM_WORKER: 8
     LOAD_NUM: 1
-    CACHE: True
+    CACHE: False
     LABELS:
       DET_DIR: '/home/lmin/data/coco/annotations'
       DET_SUFFIX: '.xml'
@@ -68,19 +69,19 @@ USE_MODEL:
   BACKBONE: { 'name': 'YOLOv5Backbone', 'out_stages': [2, 3, 4], 'output_stride': 32, 'pretrained': False }
   NECK: { 'name': 'YOLOv5Neck', 'in_channels': [256, 512, 1024], 'out_channels': [256, 512, 1024] }
   DETECT: { 'name': 'YOLOv5Detect', 'in_channels': [256, 512, 1024] }
-  LOSS: { 'name': 'YOLOv5Loss', 'hyp_box': 0.05, 'hyp_obj': 1.0, 'hyp_cls': 0.5 }
+  LOSS: { 'name': 'YOLOv5Loss' }
 
 EVALUATOR:
   NAME: 'coco_detection'
   EVAL_TYPE: 'mAP'
-  EVAL_INTERVALS: 2
+  EVAL_INTERVALS: 10
 
 
 #########################################
 # Checkpoints / Resume Configurations
 #########################################
 CHECKPOINT_DIR: 'checkpoints'
-N_EPOCHS_TO_SAVE_MODEL: 5
+N_EPOCHS_TO_SAVE_MODEL: 10
 # PRETRAIN_MODEL: 'checkpoints/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16/Hymenoptera#AntsBees#ClsModel#sgd#MultiStepLR#2020_07_02_17_37_16#autosave#14.pth'
 RESUME: False
 
@@ -88,7 +89,7 @@ RESUME: False
 #########################################
 # Devices / Optimizer / Lr_scheduler / Warmup Configurations
 #########################################
-GPU_IDS: [2]
+GPU_IDS: [0]
 N_MAX_EPOCHS: 300
 
 INIT_LR: 0.01
@@ -118,7 +119,7 @@ LR_SCHEDULER:
 
 WARMUP:
   NAME: 'linear'
-  ITERS: 5500
+  ITERS: 1000
   FACTOR: 0.1
 
 #########################################

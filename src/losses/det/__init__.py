@@ -5,3 +5,4 @@
 # @File : __init__.py.py
 
 from .yolox_loss import YOLOXLoss
+from .yolov6_loss import YOLOv6Loss

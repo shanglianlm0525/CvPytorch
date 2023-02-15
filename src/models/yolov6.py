@@ -12,6 +12,7 @@ import numpy as np
 import time
 
 from .backbones import build_backbone
+from .detects import build_detect
 from .modules.yolov6_modules import RepVGGBlock
 from .necks import build_neck
 from .heads import build_head
@@ -45,7 +46,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     """
 
     num_classes = prediction.shape[2] - 5  # number of classes
-    pred_candidates = prediction[..., 4] > conf_thres  # candidates
+    pred_candidates = torch.logical_and(prediction[..., 4] > conf_thres, torch.max(prediction[..., 5:], axis=-1)[0] > conf_thres)  # candidates
 
     # Check the parameters.
     assert 0 <= conf_thres <= 1, f'conf_thresh must be in 0.0 to 1.0, however {conf_thres} is provided.'
@@ -107,12 +108,11 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
 
 class YOLOv6(nn.Module):
-    cfg = {"nano": [0.33, 0.25],
-            "tiny": [0.33, 0.375],
-            "s": [0.33, 0.5],
-            "m": [0.67, 0.75],
-            "l": [1.0, 1.0],
-            "x": [1.33, 1.25]}
+    cfg = {"n": [0.33, 0.25, 0.0, False],
+            "t": [0.33, 0.375, 0.0, False],
+            "s": [0.33, 0.5, 0.0, False],
+            "m": [0.60, 0.75, float(2)/3, True],
+            "l": [1.0, 1.0, float(1)/2, True]}
     def __init__(self, dictionary=None, model_cfg=None):
         super(YOLOv6, self).__init__()
         self.dictionary = dictionary
@@ -123,25 +123,19 @@ class YOLOv6(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
+        self.depth_mul, self.width_mul,self.csp_e, self.use_dfl = self.cfg[self.model_cfg.TYPE.split("_")[-1]]
         self.setup_extra_params()
         self.backbone = build_backbone(self.model_cfg.BACKBONE)
         self.neck = build_neck(self.model_cfg.NECK)
-        self.head = build_head(self.model_cfg.HEAD)
+        # self.head = build_head(self.model_cfg.HEAD)
+        self.detect = build_detect(self.model_cfg.DETECT)
 
         self.loss = build_loss(self.model_cfg.LOSS)
 
-        self.conf_thres = 0.001
+        self.conf_thres = 0.03
         self.iou_thres = 0.65
 
         self.init_weights()
-
-    '''
-    def eval(self):
-        super().train(mode=False)
-        for layer in self.modules():
-            if isinstance(layer, RepVGGBlock):
-                layer.switch_to_deploy()
-    '''
 
     def init_weights(self):
         for m in self.modules():
@@ -155,10 +149,18 @@ class YOLOv6(nn.Module):
                 m.inplace = True
 
     def setup_extra_params(self):
-        self.model_cfg.BACKBONE.__setitem__('subtype', self.model_cfg.TYPE)
-        self.model_cfg.NECK.__setitem__('subtype', self.model_cfg.TYPE)
-        self.model_cfg.HEAD.__setitem__('subtype', self.model_cfg.TYPE)
-        self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
+        self.model_cfg.BACKBONE.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.BACKBONE.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.BACKBONE.__setitem__('csp_e', self.csp_e)
+        self.model_cfg.NECK.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.NECK.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.NECK.__setitem__('csp_e', self.csp_e)
+        self.model_cfg.DETECT.__setitem__('depth_mul', self.depth_mul)
+        self.model_cfg.DETECT.__setitem__('width_mul', self.width_mul)
+        self.model_cfg.DETECT.__setitem__('num_classes', self.num_classes)
+        self.model_cfg.DETECT.__setitem__('use_dfl', self.use_dfl)
+        self.model_cfg.LOSS.__setitem__('num_classes', self.num_classes)
+        self.model_cfg.LOSS.__setitem__('use_dfl', self.use_dfl)
 
     def trans_specific_format(self, imgs, targets):
         new_gts = []
@@ -201,20 +203,12 @@ class YOLOv6(nn.Module):
 
             body_feats = self.backbone(imgs)
             neck_feats = self.neck(body_feats)
-            out, train_out = self.head(neck_feats)
 
             losses = {}
-            if train_out is not None:
-                losses['loss'], loss_states = self.loss(train_out, targets["gts"])
-
-                losses['box_loss'] = loss_states[0]
-                losses['l1_loss'] = loss_states[1]
-                losses['obj_loss'] = loss_states[2]
-                losses['cls_loss'] = loss_states[3]
-            else:
+            if mode == 'val':
+                out = self.detect(neck_feats)
                 losses['loss'] = torch.tensor(0, device=out.device)
 
-            if mode == 'val':
                 outputs = []
                 if out is not None:
                     preds = non_max_suppression(out, self.conf_thres, self.iou_thres, multi_label=True)  # N * 6
@@ -240,5 +234,11 @@ class YOLOv6(nn.Module):
                         # outputs.append({"boxes": pred[:, :4], "labels": pred[:, 5], "scores": pred[:, 4]})
                 return losses, outputs
             else:
+                train_out = self.detect(neck_feats)
+                losses['loss'], loss_states = self.loss(train_out, targets["gts"], 0)
+
+                losses['iou_loss'] = loss_states[0]
+                losses['dfl_loss'] = loss_states[1]
+                losses['cls_loss'] = loss_states[2]
                 return losses
 

@@ -1,58 +1,36 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2022/9/14 15:58
+# @Time : 2023/2/8 14:14
 # @Author : liumin
 # @File : yolov6_loss.py
-import math
 
+import math
 import torch
 import torch.nn as nn
-import numpy as np
 import torch.nn.functional as F
+import numpy as np
 
 from src.models.anchors.yolov6_anchor_generator import generate_anchors
 from src.models.assigners.atss_assigner import ATSSAssigner
 from src.models.assigners.tal_assigner import TaskAlignedAssigner
 
 
-def bbox2dist(anchor_points, bbox, reg_max):
-    '''Transform bbox(xyxy) to dist(ltrb).'''
-    x1y1, x2y2 = torch.split(bbox, 2, -1)
-    lt = anchor_points - x1y1
-    rb = x2y2 - anchor_points
-    dist = torch.cat([lt, rb], -1).clip(0, reg_max - 0.01)
-    return dist
-
-
-def xywh2xyxy(bboxes):
-    '''Transform bbox(xywh) to box(xyxy).'''
-    bboxes[..., 0] = bboxes[..., 0] - bboxes[..., 2] * 0.5
-    bboxes[..., 1] = bboxes[..., 1] - bboxes[..., 3] * 0.5
-    bboxes[..., 2] = bboxes[..., 0] + bboxes[..., 2]
-    bboxes[..., 3] = bboxes[..., 1] + bboxes[..., 3]
-    return bboxes
-
-def dist2bbox(distance, anchor_points, box_format='xyxy'):
-    '''Transform distance(ltrb) to box(xywh or xyxy).'''
-    lt, rb = torch.split(distance, 2, -1)
-    x1y1 = anchor_points - lt
-    x2y2 = anchor_points + rb
-    if box_format == 'xyxy':
-        bbox = torch.cat([x1y1, x2y2], -1)
-    elif box_format == 'xywh':
-        c_xy = (x1y1 + x2y2) / 2
-        wh = x2y2 - x1y1
-        bbox = torch.cat([c_xy, wh], -1)
-    return bbox
-
-
-class YOLOv6Loss:
+class YOLOv6Loss(nn.Module):
     '''Loss computation func.'''
 
-    def __init__(self, fpn_strides=[8, 16, 32],grid_cell_size=5.0, grid_cell_offset=0.5,
-                 num_classes=80, ori_img_size=640,warmup_epoch=4, use_dfl=True,reg_max=16,
-                 iou_type='giou',loss_weight={'class': 1.0,'iou': 2.5,'dfl': 0.5}):
-
+    def __init__(self,
+                 num_classes=80,
+                 fpn_strides=[8, 16, 32],
+                 grid_cell_size=5.0,
+                 grid_cell_offset=0.5,
+                 ori_img_size=640,
+                 warmup_epoch=4,
+                 use_dfl=False,
+                 reg_max=16,
+                 iou_type='giou',
+                 loss_weight={'class': 1.0,  'iou': 2.5, 'dfl': 0.5}
+                 ):
+        super(YOLOv6Loss, self).__init__()
         self.fpn_strides = fpn_strides
         self.grid_cell_size = grid_cell_size
         self.grid_cell_offset = grid_cell_offset
@@ -71,11 +49,12 @@ class YOLOv6Loss:
         self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type).cuda()
         self.loss_weight = loss_weight
 
-    def __call__(
+    def forward(
             self,
             outputs,
             targets,
-            epoch_num
+            epoch_num = 0,
+            step_num = 0
     ):
 
         feats, pred_scores, pred_distri = outputs
@@ -97,24 +76,77 @@ class YOLOv6Loss:
         anchor_points_s = anchor_points / stride_tensor
         pred_bboxes = self.bbox_decode(anchor_points_s, pred_distri)  # xyxy
 
-        if epoch_num < self.warmup_epoch:
-            target_labels, target_bboxes, target_scores, fg_mask = \
-                self.warmup_assigner(
-                    anchors,
-                    n_anchors_list,
-                    gt_labels,
-                    gt_bboxes,
-                    mask_gt,
-                    pred_bboxes.detach() * stride_tensor)
-        else:
-            target_labels, target_bboxes, target_scores, fg_mask = \
-                self.formal_assigner(
-                    pred_scores.detach(),
-                    pred_bboxes.detach() * stride_tensor,
-                    anchor_points,
-                    gt_labels,
-                    gt_bboxes,
-                    mask_gt)
+        try:
+            if epoch_num < self.warmup_epoch:
+                target_labels, target_bboxes, target_scores, fg_mask = \
+                    self.warmup_assigner(
+                        anchors,
+                        n_anchors_list,
+                        gt_labels,
+                        gt_bboxes,
+                        mask_gt,
+                        pred_bboxes.detach() * stride_tensor)
+            else:
+                target_labels, target_bboxes, target_scores, fg_mask = \
+                    self.formal_assigner(
+                        pred_scores.detach(),
+                        pred_bboxes.detach() * stride_tensor,
+                        anchor_points,
+                        gt_labels,
+                        gt_bboxes,
+                        mask_gt)
+
+        except RuntimeError:
+            print(
+                "OOM RuntimeError is raised due to the huge memory cost during label assignment. \
+                    CPU mode is applied in this batch. If you want to avoid this issue, \
+                    try to reduce the batch size or image size."
+            )
+            torch.cuda.empty_cache()
+            print("------------CPU Mode for This Batch-------------")
+            if epoch_num < self.warmup_epoch:
+                _anchors = anchors.cpu().float()
+                _n_anchors_list = n_anchors_list
+                _gt_labels = gt_labels.cpu().float()
+                _gt_bboxes = gt_bboxes.cpu().float()
+                _mask_gt = mask_gt.cpu().float()
+                _pred_bboxes = pred_bboxes.detach().cpu().float()
+                _stride_tensor = stride_tensor.cpu().float()
+
+                target_labels, target_bboxes, target_scores, fg_mask = \
+                    self.warmup_assigner(
+                        _anchors,
+                        _n_anchors_list,
+                        _gt_labels,
+                        _gt_bboxes,
+                        _mask_gt,
+                        _pred_bboxes * _stride_tensor)
+
+            else:
+                _pred_scores = pred_scores.detach().cpu().float()
+                _pred_bboxes = pred_bboxes.detach().cpu().float()
+                _anchor_points = anchor_points.cpu().float()
+                _gt_labels = gt_labels.cpu().float()
+                _gt_bboxes = gt_bboxes.cpu().float()
+                _mask_gt = mask_gt.cpu().float()
+                _stride_tensor = stride_tensor.cpu().float()
+
+                target_labels, target_bboxes, target_scores, fg_mask = \
+                    self.formal_assigner(
+                        _pred_scores,
+                        _pred_bboxes * _stride_tensor,
+                        _anchor_points,
+                        _gt_labels,
+                        _gt_bboxes,
+                        _mask_gt)
+
+            target_labels = target_labels.cuda()
+            target_bboxes = target_bboxes.cuda()
+            target_scores = target_scores.cuda()
+            fg_mask = fg_mask.cuda()
+        # Dynamic release GPU memory
+        if step_num % 10 == 0:
+            torch.cuda.empty_cache()
 
         # rescale bbox
         target_bboxes /= stride_tensor
@@ -125,20 +157,30 @@ class YOLOv6Loss:
         loss_cls = self.varifocal_loss(pred_scores, target_scores, one_hot_label)
 
         target_scores_sum = target_scores.sum()
-        loss_cls /= target_scores_sum
+        # avoid devide zero error, devide by zero will cause loss to be inf or nan.
+        # if target_scores_sum is 0, loss_cls equals to 0 alson
+        if target_scores_sum > 0:
+            loss_cls /= target_scores_sum
 
         # bbox loss
         loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
                                             target_scores, target_scores_sum, fg_mask)
 
+        '''
         loss = self.loss_weight['class'] * loss_cls + \
                self.loss_weight['iou'] * loss_iou + \
                self.loss_weight['dfl'] * loss_dfl
-
+        
         return loss, \
                torch.cat(((self.loss_weight['iou'] * loss_iou).unsqueeze(0),
                           (self.loss_weight['dfl'] * loss_dfl).unsqueeze(0),
                           (self.loss_weight['class'] * loss_cls).unsqueeze(0))).detach()
+        '''
+        losses = dict()
+        losses["iou"] = self.loss_weight['iou'] * loss_iou
+        losses["dfl"] = self.loss_weight['dfl'] * loss_iou
+        losses["class"] = self.loss_weight['class'] * loss_iou
+        return losses
 
     def preprocess(self, targets, batch_size, scale_tensor):
         targets_list = np.zeros((batch_size, 1, 5)).tolist()
@@ -158,6 +200,38 @@ class YOLOv6Loss:
             pred_dist = F.softmax(pred_dist.view(batch_size, n_anchors, 4, self.reg_max + 1), dim=-1).matmul(
                 self.proj.to(pred_dist.device))
         return dist2bbox(pred_dist, anchor_points)
+
+
+def dist2bbox(distance, anchor_points, box_format='xyxy'):
+    '''Transform distance(ltrb) to box(xywh or xyxy).'''
+    lt, rb = torch.split(distance, 2, -1)
+    x1y1 = anchor_points - lt
+    x2y2 = anchor_points + rb
+    if box_format == 'xyxy':
+        bbox = torch.cat([x1y1, x2y2], -1)
+    elif box_format == 'xywh':
+        c_xy = (x1y1 + x2y2) / 2
+        wh = x2y2 - x1y1
+        bbox = torch.cat([c_xy, wh], -1)
+    return bbox
+
+
+def bbox2dist(anchor_points, bbox, reg_max):
+    '''Transform bbox(xyxy) to dist(ltrb).'''
+    x1y1, x2y2 = torch.split(bbox, 2, -1)
+    lt = anchor_points - x1y1
+    rb = x2y2 - anchor_points
+    dist = torch.cat([lt, rb], -1).clip(0, reg_max - 0.01)
+    return dist
+
+
+def xywh2xyxy(bboxes):
+    '''Transform bbox(xywh) to box(xyxy).'''
+    bboxes[..., 0] = bboxes[..., 0] - bboxes[..., 2] * 0.5
+    bboxes[..., 1] = bboxes[..., 1] - bboxes[..., 3] * 0.5
+    bboxes[..., 2] = bboxes[..., 0] + bboxes[..., 2]
+    bboxes[..., 3] = bboxes[..., 1] + bboxes[..., 3]
+    return bboxes
 
 
 class VarifocalLoss(nn.Module):
@@ -196,7 +270,10 @@ class BboxLoss(nn.Module):
                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
             loss_iou = self.iou_loss(pred_bboxes_pos,
                                      target_bboxes_pos) * bbox_weight
-            loss_iou = loss_iou.sum() / target_scores_sum
+            if target_scores_sum == 0:
+                loss_iou = loss_iou.sum()
+            else:
+                loss_iou = loss_iou.sum() / target_scores_sum
 
             # dfl loss
             if self.use_dfl:
@@ -209,13 +286,16 @@ class BboxLoss(nn.Module):
                     target_ltrb, bbox_mask).reshape([-1, 4])
                 loss_dfl = self._df_loss(pred_dist_pos,
                                          target_ltrb_pos) * bbox_weight
-                loss_dfl = loss_dfl.sum() / target_scores_sum
+                if target_scores_sum == 0:
+                    loss_dfl = loss_dfl.sum()
+                else:
+                    loss_dfl = loss_dfl.sum() / target_scores_sum
             else:
-                loss_dfl = torch.tensor(0.).to(pred_dist.device)
+                loss_dfl = pred_dist.type(torch.float32).sum() * 0.
 
         else:
-            loss_iou = torch.tensor(0.).to(pred_dist.device)
-            loss_dfl = torch.tensor(0.).to(pred_dist.device)
+            loss_iou = pred_dist.type(torch.float32).sum() * 0.
+            loss_dfl = pred_dist.type(torch.float32).sum() * 0.
 
         return loss_iou, loss_dfl
 
@@ -233,10 +313,10 @@ class BboxLoss(nn.Module):
         return (loss_left + loss_right).mean(-1, keepdim=True)
 
 
+### IOUloss
 class IOUloss:
     """ Calculate IoU loss.
     """
-
     def __init__(self, box_format='xywh', iou_type='ciou', reduction='none', eps=1e-7):
         """ Setting of the class.
         Args:
@@ -304,8 +384,8 @@ class IOUloss:
                 iou = iou - (rho2 / c2 + v * alpha)
         elif self.iou_type == 'siou':
             # SIoU Loss https://arxiv.org/pdf/2205.12740.pdf
-            s_cw = (b2_x1 + b2_x2 - b1_x1 - b1_x2) * 0.5
-            s_ch = (b2_y1 + b2_y2 - b1_y1 - b1_y2) * 0.5
+            s_cw = (b2_x1 + b2_x2 - b1_x1 - b1_x2) * 0.5 + self.eps
+            s_ch = (b2_y1 + b2_y2 - b1_y1 - b1_y2) * 0.5 + self.eps
             sigma = torch.pow(s_cw ** 2 + s_ch ** 2, 0.5)
             sin_alpha_1 = torch.abs(s_cw) / sigma
             sin_alpha_2 = torch.abs(s_ch) / sigma
@@ -329,3 +409,21 @@ class IOUloss:
 
         return loss
 
+
+###
+
+if __name__ == "__main__":
+    compute_loss = YOLOv6Loss(use_dfl=False, reg_max=0, num_classes = 80, iou_type='siou', warmup_epoch=0)
+
+    preds = torch.load("/home/lmin/pythonCode/datasets/yolov6/preds1.pth")
+    targets = torch.load( "/home/lmin/pythonCode/datasets/yolov6/targets1.pth")
+
+    total_loss, loss_items = compute_loss(preds, targets, 0, 0)
+    print(total_loss, loss_items)
+
+    '''
+    input = torch.randn(1, 3, 640, 640)
+    out = model(input)
+    for o in out:
+        print(o.shape)
+    '''

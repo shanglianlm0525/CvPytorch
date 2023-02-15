@@ -4,7 +4,6 @@
 # @Author : liumin
 # @File : yolox.py
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,8 +12,7 @@ import torchvision
 from .backbones import build_backbone
 from .necks import build_neck
 from .heads import build_head
-from ..losses.yolox_loss import YoloxLoss
-
+from ..losses import build_loss
 
 
 def yolox_post_process(outputs, down_strides, num_classes, conf_thre, nms_thre):
@@ -93,11 +91,11 @@ class YOLOX(nn.Module):
         self.neck = build_neck(self.model_cfg.NECK)
         self.head = build_head(self.model_cfg.HEAD)
 
-        self.loss = YoloxLoss(self.num_classes)
+        self.loss = build_loss(self.model_cfg.LOSS)
 
         self.stride = [8, 16, 32]
-        self.conf_thr = 0.001
-        self.nms_thr = 0.7 # 0.65
+        self.conf_thr = 0.01
+        self.nms_thr = 0.65
 
 
     def setup_extra_params(self):
@@ -108,6 +106,7 @@ class YOLOX(nn.Module):
         self.model_cfg.HEAD.__setitem__('depth_mul', self.depth_mul)
         self.model_cfg.HEAD.__setitem__('width_mul', self.width_mul)
         self.model_cfg.HEAD.__setitem__('num_classes', self.num_classes)
+        self.model_cfg.LOSS.__setitem__('num_classes', self.num_classes)
 
 
     def trans_specific_format(self, imgs, targets):

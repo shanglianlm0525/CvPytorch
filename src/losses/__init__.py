@@ -12,11 +12,9 @@ from src.losses.objectbox_loss import ObjectBoxLoss
 from src.losses.seg import CrossEntropyLoss2d
 from src.losses.seg import OhemCrossEntropyLoss2d
 from src.losses.seg import DetailAggregateLoss
-from src.losses.ssd_loss import SsdLoss
 from src.losses.yolop_loss import YolopLoss
 from src.losses.yolov5_loss import YOLOv5Loss
 from src.losses.efficientdet_loss import EfficientDetLoss
-from src.losses.yolov6_loss import YOLOv6Loss
 from src.losses.yolov7_loss import YOLOv7Loss
 
 
@@ -29,9 +27,9 @@ from src.losses.yolov7_loss import YOLOv7Loss
 
 # Object Detectiton
 from .det import YOLOXLoss
+from .det import YOLOv6Loss
 
-
-__all__ = ['YOLOv5Loss', 'YOLOv7Loss','EfficientDetLoss', 'YOLOXLoss', 'SsdLoss',
+__all__ = ['YOLOv5Loss', 'YOLOXLoss', 'YOLOv7Loss','EfficientDetLoss',
            'YolopLoss', 'FCOSLoss', 'YOLOv6Loss', 'FastestDetLoss', 'ObjectBoxLoss']
 
 
@@ -50,8 +48,6 @@ def build_loss(cfg):
         return YOLOv6Loss(**loss_cfg)
     elif name == 'YOLOv7Loss':
         return YOLOv7Loss(**loss_cfg)
-    elif name == 'SsdLoss':
-        return SsdLoss(**loss_cfg)
     elif name == 'FCOSLoss':
         return FCOSLoss(**loss_cfg)
     elif name == 'FastestDetLoss':

@@ -28,7 +28,7 @@ class FasterRCNN(nn.Module):
         self.category = [v for d in self.dictionary for v in d.keys()]
         self.weight = [d[v] for d in self.dictionary for v in d.keys() if v in self.category]
 
-        # load a pre-trained model for classification and return
+        # load a pre-trained model for topformer and return
         # only the features
         backbone = torchvision.models.mobilenet_v2(pretrained=True).features
         # FasterRCNN needs to know the number of
