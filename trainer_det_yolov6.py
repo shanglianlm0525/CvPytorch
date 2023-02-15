@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/6/10 18:51
+# @Time : 2021/1/4 18:51
 # @Author : liumin
 # @File : trainer.py
 
@@ -142,7 +142,7 @@ class Trainer:
 
         clip_method(model.parameters(), self.cfg.GRAD_CLIP.VALUE)
 
-    def run_step(self, i, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
+    def run_step(self, epoch, iter, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
         '''
             Training step including forward
             :param model: model to train

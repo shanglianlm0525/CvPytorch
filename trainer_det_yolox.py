@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 # -- coding: utf-8 --
-# @Time : 2020/6/10 18:51
+# @Time : 2021/1/4 18:51
 # @Author : liumin
 # @File : trainer.py
 
@@ -142,7 +142,7 @@ class Trainer:
 
         clip_method(model.parameters(), self.cfg.GRAD_CLIP.VALUE)
 
-    def run_step(self, i, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
+    def run_step(self, epoch, iter, scaler, model, sample, optimizer, lossLogger, performanceLogger, prefix):
         '''
             Training step including forward
             :param model: model to train
@@ -463,7 +463,7 @@ if __name__ == '__main__':
     # parser.add_argument('--setting', default='conf/voc_deeplabv3plus.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/seg/segnext/cityscapes_segnext_l.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/seg/pspnet/cityscapes_pspnet_r50.yml', help='The path to the configuration file.')
-    parser.add_argument('--setting', default='conf/det/yolov6/coco_yolov6_n.yml',
+    parser.add_argument('--setting', default='conf/det/yolox/coco_yolox_n.yml',
                         help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/camvid_enet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
