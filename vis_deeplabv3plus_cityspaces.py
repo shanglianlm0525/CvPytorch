@@ -19,6 +19,7 @@ from src.utils.distributed import init_distributed
 from src.utils.global_logger import logger
 
 
+
 class Infer:
     def __init__(self, cfg):
         self.cfg = cfg
