@@ -24,5 +24,6 @@ def main(args):
     trainer.start()
     logger.info('Finished training.')
 
+
 if __name__ == '__main__':
     main(parser.parse_args())
