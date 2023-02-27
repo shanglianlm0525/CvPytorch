@@ -463,8 +463,7 @@ if __name__ == '__main__':
     # parser.add_argument('--setting', default='conf/voc_deeplabv3plus.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/seg/segnext/cityscapes_segnext_l.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/seg/pspnet/cityscapes_pspnet_r50.yml', help='The path to the configuration file.')
-    parser.add_argument('--setting', default='conf/det/yolov6/coco_yolov6_n.yml',
-                        help='The path to the configuration file.')
+    parser.add_argument('--setting', default='conf/det/yolov6/coco_yolov6_n.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/camvid_enet.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/coco_maskrcnn.yml', help='The path to the configuration file.')
     # parser.add_argument('--setting', default='conf/pennfudan_maskrcnn.yml', help='The path to the configuration file.')
