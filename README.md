@@ -4,6 +4,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 
 
+
 ## What's New!!!
  
 - [2022.10.16] Release **SegNeXt** models with *segnext_s*, *segnext_b*, *segnext_l* on [Cityscapes](https://www.cityscapes-dataset.com/) (**81.22** ,  **82.49**， **82.57** **mIoU**). 
