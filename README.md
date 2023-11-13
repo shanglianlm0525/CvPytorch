@@ -113,7 +113,7 @@ CvPytorch is an open source COMPUTER VISION toolbox based on PyTorch.
 
 ### Training
 
-For this example, we will use [COCO](https://github.com/ultralytics/yolov5/blob/master/data/get_coco2017.sh) dataset with `yolov5l.yaml` . Feel free to use your own custom dataset and configurations.
+For this example, we will use [COCO](https://githubfast.com/ultralytics/yolov5/blob/master/data/get_coco2017.sh) dataset with `yolov5l.yaml` . Feel free to use your own custom dataset and configurations.
 
 #### Single GPU:
 
@@ -145,6 +145,11 @@ $ python -m torch.distributed.launch --nproc_per_node=2 trainer.py --setting 'co
 - [ ] ONNX and TorchScript Export
 - [ ] Class Activation Mapping (CAM)
 - [ ] Test-Time Augmentation (TTA)
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=shanglianlm0525/CvPytorch&type=Date)](https://star-history.com/#shanglianlm0525/CvPytorch&Date)
 
 
 ## License
